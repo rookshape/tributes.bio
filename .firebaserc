@@ -1,5 +1,6 @@
 {
   "projects": {
-    "dev": "tributes-bio-dev"
+    "dev": "tributes-bio-dev",
+    "prod": "tributes-bio-prod"
   }
 }

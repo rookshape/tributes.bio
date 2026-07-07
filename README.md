@@ -52,7 +52,7 @@ The local development Firebase app uses `tributes-bio-dev`. The real dev values 
 This repo is set up for two Firebase environments:
 
 - `dev`: `tributes-bio-dev`
-- `prod`: pending production project/app config
+- `prod`: `tributes-bio-prod`
 
 Build and deploy dev hosting:
 
@@ -60,4 +60,10 @@ Build and deploy dev hosting:
 npm run deploy:dev
 ```
 
-After the production Firebase project exists, add the production alias and create `.env.production` from `.env.production.example`.
+Build and deploy production hosting:
+
+```bash
+npm run deploy:prod
+```
+
+The real dev and prod Firebase values live in ignored local env files.
