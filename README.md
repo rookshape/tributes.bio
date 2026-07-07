@@ -35,3 +35,29 @@ Tributes is a Linktree-style profile platform for creators, with one key differe
 
 See [docs/product-scope.md](docs/product-scope.md) for the working product notes.
 
+## Local Development
+
+Use the project Node version:
+
+```bash
+nvm use
+npm install
+npm run dev
+```
+
+The local development Firebase app uses `tributes-bio-dev`. The real dev values live in `.env.development`, which is intentionally ignored by Git.
+
+## Firebase Environments
+
+This repo is set up for two Firebase environments:
+
+- `dev`: `tributes-bio-dev`
+- `prod`: pending production project/app config
+
+Build and deploy dev hosting:
+
+```bash
+npm run deploy:dev
+```
+
+After the production Firebase project exists, add the production alias and create `.env.production` from `.env.production.example`.

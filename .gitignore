@@ -2,11 +2,13 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 node_modules/
 dist/
 build/
 .vite/
+.firebase/
 .next/
 coverage/
 
@@ -16,4 +18,3 @@ ui-debug.log
 
 *.local
 *.log
-
