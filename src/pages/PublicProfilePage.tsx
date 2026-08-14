@@ -6,6 +6,7 @@ import { getCreatorByUsername } from "../lib/account";
 import { trackCreatorLinkClick, trackProfileView } from "../lib/analytics";
 import { getPublicCreatorLinks } from "../lib/bio";
 import { getCreatorPaymentAvailability } from "../lib/payments";
+import { getSpinConfig } from "../lib/spin";
 import type { CreatorLink, CreatorProfile } from "../lib/types";
 
 export function PublicProfilePage() {
@@ -13,6 +14,7 @@ export function PublicProfilePage() {
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [links, setLinks] = useState<CreatorLink[]>([]);
   const [paymentsAvailable, setPaymentsAvailable] = useState(false);
+  const [spinAvailable, setSpinAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,17 +31,24 @@ export function PublicProfilePage() {
           return null;
         }
 
-        const [publicLinks, paymentAvailability] = await Promise.all([
+        const [publicLinks, paymentAvailability, spinConfig] = await Promise.all([
           getPublicCreatorLinks(profile.id),
           getCreatorPaymentAvailability(profile.id).catch(() => false),
+          getSpinConfig(profile.id).catch(() => null),
         ]);
-        return { profile, publicLinks, paymentAvailability };
+        return {
+          profile,
+          publicLinks,
+          paymentAvailability,
+          spinAvailable: spinConfig?.isEnabled === true,
+        };
       })
       .then((page) => {
         if (active) {
           setCreator(page?.profile ?? null);
           setLinks(page?.publicLinks ?? []);
           setPaymentsAvailable(page?.paymentAvailability ?? false);
+          setSpinAvailable(page?.spinAvailable ?? false);
         }
       })
       .catch(() => {
@@ -47,6 +56,7 @@ export function PublicProfilePage() {
           setCreator(null);
           setLinks([]);
           setPaymentsAvailable(false);
+          setSpinAvailable(false);
         }
       })
       .finally(() => {
@@ -143,16 +153,33 @@ export function PublicProfilePage() {
         }
         profile={creator}
         topContent={
-          paymentsAvailable ? (
-            <TributeForm
-              profile={creator}
-              result={
-                new URLSearchParams(window.location.search).get("payment") as
-                  | "success"
-                  | "canceled"
-                  | null
-              }
-            />
+          paymentsAvailable || spinAvailable ? (
+            <>
+              {paymentsAvailable ? (
+                <TributeForm
+                  profile={creator}
+                  result={
+                    new URLSearchParams(window.location.search).get("payment") as
+                      | "success"
+                      | "canceled"
+                      | null
+                  }
+                />
+              ) : null}
+              {spinAvailable ? (
+                <Link
+                  className="mt-4 flex min-h-12 items-center justify-center border-2 px-4 py-3 text-sm font-semibold"
+                  style={{
+                    backgroundColor: creator.appearance.buttonColor,
+                    borderColor: creator.appearance.buttonColor,
+                    color: creator.appearance.buttonTextColor,
+                  }}
+                  to={`/${creator.username}/spin`}
+                >
+                  Spin the wheel
+                </Link>
+              ) : null}
+            </>
           ) : null
         }
       />

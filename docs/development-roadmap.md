@@ -156,6 +156,8 @@ Exit criteria:
 
 Goal: add the payment field that differentiates Tributes from a standard bio-link page.
 
+Status: Complete as of 2026-08-14. Verified with a Stripe Connect sandbox account and an end-to-end `$1.25` guest checkout, including the payer-side fee, destination transfer, webhook reconciliation, and creator transaction history.
+
 Deliverables:
 
 - Stripe Connect account creation
@@ -180,6 +182,8 @@ Exit criteria:
 ### Phase 3: Tributes Spin Prototype
 
 Goal: make the spinner visible and testable on top of the creator-page foundation.
+
+Status: Complete as of 2026-08-14. Verified against the dev Firebase project for wheel configuration, anonymous mock queue entry, server-selected outcomes, bonus-spin insertion, manual counter adjustment, real-time dashboard and OBS synchronization, and profile-to-spin routing.
 
 Deliverables:
 

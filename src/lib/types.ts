@@ -62,3 +62,51 @@ export type LinkAnalytics = {
   title: string;
   clicks: number;
 };
+
+export type SpinSliceType = "amount" | "multiplier" | "bonus" | "action";
+
+export type SpinSlice = {
+  id: string;
+  label: string;
+  type: SpinSliceType;
+  value: number;
+  action: string;
+  color: string;
+};
+
+export type SpinConfig = {
+  creatorId: string;
+  title: string;
+  counterLabel: string;
+  spinPriceCents: number;
+  isEnabled: boolean;
+  mockModeEnabled: boolean;
+  slices: SpinSlice[];
+};
+
+export type SpinQueueStatus = "queued" | "completed";
+
+export type SpinQueueEntry = {
+  id: string;
+  viewerName: string;
+  amountCents: number;
+  source: "mock" | "bonus";
+  status: SpinQueueStatus;
+  resultLabel: string | null;
+  createdAtMs: number;
+};
+
+export type SpinState = {
+  creatorId: string;
+  counterCents: number;
+  spinId: string | null;
+  queueEntryId: string | null;
+  viewerName: string | null;
+  selectedIndex: number | null;
+  resultLabel: string | null;
+  resultType: SpinSliceType | null;
+  counterDeltaCents: number;
+  startedAtMs: number;
+  durationMs: number;
+  lockedUntilMs: number;
+};

@@ -139,3 +139,9 @@ export {
   refreshStripeConnectStatus,
   stripeWebhook,
 } from "./stripe.js";
+
+export {
+  adjustSpinCounter,
+  createMockSpinEntry,
+  triggerSpin,
+} from "./spin.js";

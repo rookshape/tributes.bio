@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Disc3,
   PanelsTopLeft,
   Settings,
   UserRound,
@@ -10,6 +11,12 @@ import { useAuth } from "../context/AuthContext";
 
 const creatorLinks = [
   { label: "Page", path: "/dashboard", icon: PanelsTopLeft, end: true },
+  {
+    label: "Spin",
+    path: "/dashboard/spin",
+    icon: Disc3,
+    end: false,
+  },
   {
     label: "Analytics",
     path: "/dashboard/analytics",

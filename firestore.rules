@@ -67,6 +67,40 @@ service cloud.firestore {
         && request.resource.data.isActive is bool;
     }
 
+    function validSpinConfig(creatorId) {
+      return request.resource.data.keys().hasOnly([
+          'creatorId',
+          'title',
+          'counterLabel',
+          'spinPriceCents',
+          'isEnabled',
+          'mockModeEnabled',
+          'slices',
+          'updatedAt'
+        ])
+        && request.resource.data.creatorId == creatorId
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 60
+        && request.resource.data.counterLabel is string
+        && request.resource.data.counterLabel.size() > 0
+        && request.resource.data.counterLabel.size() <= 40
+        && request.resource.data.spinPriceCents is int
+        && request.resource.data.spinPriceCents >= 100
+        && request.resource.data.spinPriceCents <= 100000
+        && request.resource.data.isEnabled is bool
+        && request.resource.data.mockModeEnabled is bool
+        && request.resource.data.slices is list
+        && request.resource.data.slices.size() >= 2
+        && request.resource.data.slices.size() <= 12;
+    }
+
+    function publicSpinAvailable(creatorId) {
+      return get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
+        && get(/databases/$(database)/documents/creators/$(creatorId)).data.moderationStatus == 'active'
+        && get(/databases/$(database)/documents/creators/$(creatorId)/spinConfigs/current).data.isEnabled == true;
+    }
+
     function signedIn() {
       return request.auth != null;
     }
@@ -119,8 +153,26 @@ service cloud.firestore {
       }
 
       match /spinConfigs/{configId} {
+        allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+          || (configId == 'current'
+            && resource.data.isEnabled == true
+            && get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
+            && get(/databases/$(database)/documents/creators/$(creatorId)).data.moderationStatus == 'active');
+        allow create, update: if configId == 'current'
+          && owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+          && validSpinConfig(creatorId);
+        allow delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
+      }
+
+      match /spinQueue/{entryId} {
         allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
-        allow create, update, delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
+        allow write: if false;
+      }
+
+      match /spinStates/{stateId} {
+        allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+          || (stateId == 'current' && publicSpinAvailable(creatorId));
+        allow write: if false;
       }
     }
 
