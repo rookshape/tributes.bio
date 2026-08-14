@@ -24,7 +24,7 @@ Tributes is a Linktree-style profile platform for creators, with one key differe
 ## MVP
 
 1. Landing page
-2. Auth with Google, Apple, and email
+2. Auth with Google and email
 3. Creator onboarding
 4. Username claim flow
 5. Stripe Connect onboarding
@@ -46,6 +46,14 @@ npm run dev
 ```
 
 The local development Firebase app uses `tributes-bio-dev`. The real dev values live in `.env.development`, which is intentionally ignored by Git.
+
+Run Firebase emulators:
+
+```bash
+npm run emulators
+```
+
+Set `VITE_USE_FIREBASE_EMULATORS=true` in `.env.development` when you want the app to use local Auth, Firestore, and Storage.
 
 ## Firebase Environments
 

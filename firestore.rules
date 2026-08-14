@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, create, update: if owns(uid);
+    }
+
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/usernames/$(username))
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.creatorId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /creators/{creatorId} {
+      allow read: if resource.data.isPublished == true || owns(resource.data.ownerUid);
+      allow create, update: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && creatorId == request.auth.uid;
+
+      match /links/{linkId} {
+        allow read: if get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
+          || owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
+        allow create, update, delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
+      }
+
+      match /spinConfigs/{configId} {
+        allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
+        allow create, update, delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
+      }
+    }
+
+    match /payments/{paymentId} {
+      allow read: if signedIn() && resource.data.payerUid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /analyticsEvents/{eventId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getAnalytics, isSupported } from "firebase/analytics";
+import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import type { FirebaseOptions } from "firebase/app";
 
 const requiredEnv = {
@@ -26,10 +27,18 @@ export const firebaseConfig: FirebaseOptions = {
 
 export const firebaseProjectId = requiredEnv.projectId;
 export const firebaseApp = initializeApp(firebaseConfig);
+export const auth = getAuth(firebaseApp);
+export const db = getFirestore(firebaseApp);
 
-export const analyticsPromise =
-  typeof window === "undefined"
-    ? Promise.resolve(null)
-    : isSupported().then((supported) =>
-        supported ? getAnalytics(firebaseApp) : null,
-      );
+if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true") {
+  const emulatorHost = import.meta.env.VITE_FIREBASE_EMULATOR_HOST ?? "127.0.0.1";
+
+  try {
+    connectAuthEmulator(auth, `http://${emulatorHost}:9099`, {
+      disableWarnings: true,
+    });
+    connectFirestoreEmulator(db, emulatorHost, 8080);
+  } catch {
+    // Vite hot reload can evaluate this module more than once.
+  }
+}

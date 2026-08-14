@@ -2,7 +2,22 @@
 
 ## Concept
 
-Tributes is a creator bio-link platform similar to Linktree. The differentiator is a payment-first profile experience: the top field on a public profile lets visitors send a one-time tip quickly and without creating an account.
+Tributes is a creator payment platform starting with a Twitch streamer wedge called Tributes Spin. The broader platform still includes bio-link pages similar to Linktree, but the first growth driver is an interactive OBS/Twitch spinner where viewers pay for spin experiences and the creator's counter updates automatically.
+
+The bio-page differentiator remains important: the top field on a public profile lets visitors send a one-time tip quickly and without creating an account.
+
+## Tributes Spin
+
+Tributes Spin gives streamers a configurable wheel, viewer spin queue, live money counter, and OBS browser-source overlay. It replaces the disconnected workflow where streamers manually run a spinner, calculate outcomes, collect payments elsewhere, and update counters by hand.
+
+Spin outcomes may include:
+
+- Flat amounts
+- Multipliers
+- Bonus spins
+- Stream actions
+
+The safest MVP payment model is fixed-price spins. Pre-authorized maximum charges or automatic variable charges should wait for payment processor and legal review.
 
 ## Accounts
 
@@ -23,6 +38,7 @@ Personal accounts are optional for visitors. A visitor does not need an account 
 ## Payments
 
 - Payments are one-time tips.
+- Spin payments start as fixed-price one-time payments.
 - Stripe Connect is the payout model for creators.
 - Lurk LLC owns the platform Stripe account.
 - Platform revenue comes from a 25% upcharge paid by the person sending the tip.
@@ -53,7 +69,6 @@ The landing page should explain the platform to prospective creators and include
 Supported sign-in methods:
 
 - Google
-- Apple
 - Email
 
 After first sign-up, users are routed to onboarding:
@@ -67,6 +82,9 @@ After first sign-up, users are routed to onboarding:
 
 The dashboard should include:
 
+- Spin wheel editor
+- Spin queue and live counter controls
+- OBS overlay setup
 - Profile editor
 - Link editor with add, edit, delete, and reorder controls
 - Appearance customization
@@ -101,6 +119,7 @@ The public profile should be mobile-first and fast. It should include:
 - Bio
 - One-time tip field at the top
 - Creator links
+- Spin entry point when enabled
 - Social/SEO metadata
 
 ## Admin
@@ -130,4 +149,3 @@ The platform will need:
 - Payment and payout terms
 - SEO-ready public profile metadata
 - Basic transactional email flows for account, payment, and payout setup events
-
