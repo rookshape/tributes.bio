@@ -2,13 +2,13 @@
 
 ## Strategy
 
-Tributes should be built around the Twitch spinner wedge first. The bio page and simple payment field still matter, but they become supporting infrastructure for a more differentiated product: a streamer overlay where viewers pay for spin experiences, wheel outcomes update a live counter, and the streamer no longer has to run a spinner, calculator, payment app, and overlay by hand.
+Tributes should establish the shareable bio-link product first, add one-time creator tips second, and then build the Twitch spinner as its differentiated growth feature. This order gives creators a useful public page immediately and puts identity, links, publishing, and payments in place before the real-time spinner workflow.
 
 The first MVP should prove three things:
 
-1. Streamers can configure a wheel and display it in OBS.
-2. Viewers can join a spin flow from the creator's Tributes link.
-3. Payments, spins, queue state, and counters stay connected in real time.
+1. Creators can build and share a polished bio-link page.
+2. Visitors can send a one-time tip without creating an account.
+3. Streamers can later connect those payments to a real-time spin queue and OBS overlay.
 
 ## Product Lines
 
@@ -76,7 +76,7 @@ The viewer agrees upfront to a maximum charge and the wheel chooses the final ch
 
 The MVP should include:
 
-- Landing page focused on Tributes Spin
+- Landing page for creator bio pages, tipping, and Tributes Spin
 - Auth with Google and email
 - Creator onboarding
 - Username claim
@@ -126,9 +126,60 @@ Exit criteria:
 - A creator can sign up, pick a username, and land in the dashboard.
 - A public route can resolve `:username` to a creator profile.
 
-### Phase 2: Tributes Spin Prototype
+### Phase 2A: Bio Page Builder
 
-Goal: make the wedge visible and testable before payment complexity.
+Goal: give creators a complete, shareable Linktree-style page before payment complexity.
+
+Status: Complete as of 2026-08-14. Verified against local Firebase emulators for profile editing, link creation and ordering, public visibility, publishing controls, private creator settings, safe link protocols, profile-image storage, server-recorded analytics, and account preferences.
+
+Deliverables:
+
+- Display name, bio, and profile image editing
+- Link create, edit, delete, visibility, and ordering controls
+- Page, text, button, and button-text color controls
+- Solid and outline button styles
+- Live mobile preview
+- Publish and unpublish controls
+- Public profile rendering without the dashboard navigation
+- Server-recorded, deduplicated profile-view and link-click analytics
+- Creator analytics dashboard with date ranges, CTR, activity, and link performance
+- Account settings, email preferences, and password-reset controls
+- Basic SEO and social metadata
+- Public profile and private creator-settings data separation
+
+Exit criteria:
+
+- A creator can configure and publish `tributes.bio/:username`.
+- A visitor sees only active links on active, published profiles.
+
+### Phase 2B: Stripe Connect And One-Time Tips
+
+Goal: add the payment field that differentiates Tributes from a standard bio-link page.
+
+Deliverables:
+
+- Stripe Connect account creation
+- Stripe Connect onboarding status
+- Top one-time tip field
+- Preset and custom tip amounts
+- Guest checkout without a Tributes account
+- Optional sender name, message, and anonymous mode
+- Payer-side 25% upcharge calculation
+- Clear fee and total display before payment
+- PaymentIntent metadata for creator and tip reconciliation
+- Webhook handler
+- Failed, refunded, disputed, and canceled payment states
+- Creator transaction history
+- Creator payout visibility
+
+Exit criteria:
+
+- A visitor can send a one-time tip without signing up.
+- A successful webhook records the payment for the correct creator.
+
+### Phase 3: Tributes Spin Prototype
+
+Goal: make the spinner visible and testable on top of the creator-page foundation.
 
 Deliverables:
 
@@ -147,47 +198,22 @@ Exit criteria:
 - A streamer can configure a wheel and open an OBS-safe overlay URL.
 - A local queue item can spin, resolve an outcome, and update the counter.
 
-### Phase 3: Stripe Connect And Fixed-Price Spins
+### Phase 4: Fixed-Price Spin Payments
 
-Goal: connect payments to queue and counter state.
+Goal: connect one-time payments to queue and counter state.
 
 Deliverables:
 
-- Stripe Connect account creation
-- Stripe Connect onboarding status
 - Fixed-price spin checkout
-- Payer-side 25% upcharge calculation
 - PaymentIntent metadata for creator, spin config, and queue reconciliation
-- Webhook handler
 - Payment-to-queue reconciliation
-- Failed, refunded, disputed, and canceled payment states
-- Creator payout visibility
+- Spin entry point on the public bio page
+- Real-time payment, queue, and overlay updates
 
 Exit criteria:
 
 - A visitor can pay for a fixed-price spin without signing up.
-- A successful webhook creates a queue item.
-- The overlay receives the item in real time.
-
-### Phase 4: Bio Page And Tip Field
-
-Goal: make the spin flow discoverable from the creator's bio page.
-
-Deliverables:
-
-- Public bio profile
-- Profile image upload
-- Bio and display name editing
-- Link CRUD and reorder
-- Top one-time tip field
-- Spin CTA module
-- Basic SEO metadata
-- Social preview metadata
-
-Exit criteria:
-
-- A creator can share `tributes.bio/:username`.
-- Visitors can tip or enter the spin flow from the same public page.
+- A successful webhook creates a queue item and updates the overlay.
 
 ### Phase 5: Twitch Integration
 
@@ -266,13 +292,20 @@ Exit criteria:
 - `displayName`
 - `bio`
 - `photoPath`
+- `photoURL`
+- `appearance`
+- `isPublished`
+- `moderationStatus`
+- `createdAt`
+- `updatedAt`
+
+### `creatorSettings/{creatorId}`
+
+- `ownerUid`
 - `stripeAccountId`
 - `stripeOnboardingStatus`
 - `twitchUserId`
 - `twitchLogin`
-- `isPublished`
-- `moderationStatus`
-- `createdAt`
 - `updatedAt`
 
 ### `usernames/{username}`
@@ -287,7 +320,6 @@ Exit criteria:
 - `url`
 - `position`
 - `isActive`
-- `clickCount`
 
 ### `creators/{creatorId}/spinConfigs/{configId}`
 
@@ -349,18 +381,14 @@ Exit criteria:
 - `metadata`
 - `createdAt`
 
-## First Sprint
+## Current Build Order
 
-1. Add routing and app layout.
-2. Create landing page copy centered on Tributes Spin.
-3. Create static public bio, spin, dashboard, and overlay routes.
-4. Move sample MVP data into typed fixtures.
-5. Build the wheel preview component as reusable UI.
-6. Build the overlay component with stable OBS dimensions.
-7. Add Firebase Auth shell.
-8. Add Firestore profile and username types.
-9. Add emulator config and security rules draft.
-10. Verify desktop and mobile layouts.
+1. Complete the bio page builder.
+2. Add Stripe Connect and guest one-time tips.
+3. Build the spinner, queue, counter, and OBS overlay prototype.
+4. Connect fixed-price spin payments to the queue.
+5. Add Twitch integration.
+6. Add creator analytics, admin tools, and moderation operations.
 
 ## Early Product Decisions
 

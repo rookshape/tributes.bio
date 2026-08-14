@@ -2,12 +2,82 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function publicCreatorFields() {
+      return [
+        'ownerUid',
+        'username',
+        'displayName',
+        'bio',
+        'photoPath',
+        'photoURL',
+        'appearance',
+        'isPublished',
+        'moderationStatus',
+        'createdAt',
+        'updatedAt'
+      ];
+    }
+
+    function validColor(value) {
+      return value is string && value.matches('^#[0-9a-fA-F]{6}$');
+    }
+
+    function validPublicCreator() {
+      return request.resource.data.keys().hasOnly(publicCreatorFields())
+        && request.resource.data.ownerUid is string
+        && request.resource.data.username is string
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 80
+        && request.resource.data.bio is string
+        && request.resource.data.bio.size() <= 160
+        && request.resource.data.isPublished is bool
+        && request.resource.data.appearance is map
+        && request.resource.data.appearance.keys().hasOnly([
+          'backgroundColor',
+          'textColor',
+          'buttonColor',
+          'buttonTextColor',
+          'buttonStyle'
+        ])
+        && validColor(request.resource.data.appearance.backgroundColor)
+        && validColor(request.resource.data.appearance.textColor)
+        && validColor(request.resource.data.appearance.buttonColor)
+        && validColor(request.resource.data.appearance.buttonTextColor)
+        && request.resource.data.appearance.buttonStyle in ['solid', 'outline'];
+    }
+
+    function validCreatorLink() {
+      return request.resource.data.keys().hasOnly([
+          'title',
+          'url',
+          'position',
+          'isActive',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.url is string
+        && request.resource.data.url.size() <= 2048
+        && request.resource.data.url.matches('^https?://.*')
+        && request.resource.data.position is int
+        && request.resource.data.position >= 0
+        && request.resource.data.isActive is bool;
+    }
+
     function signedIn() {
       return request.auth != null;
     }
 
     function owns(uid) {
       return signedIn() && request.auth.uid == uid;
+    }
+
+    function ownsCreator(creatorId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid == request.auth.uid;
     }
 
     match /users/{uid} {
@@ -24,15 +94,28 @@ service cloud.firestore {
     }
 
     match /creators/{creatorId} {
-      allow read: if resource.data.isPublished == true || owns(resource.data.ownerUid);
-      allow create, update: if signedIn()
+      allow read: if (resource.data.isPublished == true
+          && resource.data.moderationStatus == 'active')
+        || owns(resource.data.ownerUid);
+      allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
-        && creatorId == request.auth.uid;
+        && creatorId == request.auth.uid
+        && request.resource.data.moderationStatus == 'active'
+        && validPublicCreator();
+      allow update: if owns(resource.data.ownerUid)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.username == resource.data.username
+        && request.resource.data.moderationStatus == resource.data.moderationStatus
+        && validPublicCreator();
 
       match /links/{linkId} {
-        allow read: if get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
+        allow read: if (resource.data.isActive == true
+            && get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
+            && get(/databases/$(database)/documents/creators/$(creatorId)).data.moderationStatus == 'active')
           || owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
-        allow create, update, delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
+        allow create, update: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+          && validCreatorLink();
+        allow delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
       }
 
       match /spinConfigs/{configId} {
@@ -41,14 +124,37 @@ service cloud.firestore {
       }
     }
 
+    match /creatorSettings/{uid} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.ownerUid == uid;
+      allow delete: if owns(uid);
+    }
+
     match /payments/{paymentId} {
-      allow read: if signedIn() && resource.data.payerUid == request.auth.uid;
+      allow read: if signedIn() && (
+        resource.data.payerUid == request.auth.uid
+        || ownsCreator(resource.data.creatorId)
+      );
       allow write: if false;
     }
 
+    match /stripeEvents/{eventId} {
+      allow read, write: if false;
+    }
+
     match /analyticsEvents/{eventId} {
-      allow create: if true;
-      allow read, update, delete: if false;
+      allow read, write: if false;
+    }
+
+    match /creatorAnalytics/{creatorId} {
+      allow read: if ownsCreator(creatorId);
+      allow write: if false;
+
+      match /{document=**} {
+        allow read: if ownsCreator(creatorId);
+        allow write: if false;
+      }
     }
   }
 }

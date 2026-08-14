@@ -1,6 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import { connectStorageEmulator, getStorage } from "firebase/storage";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 import type { FirebaseOptions } from "firebase/app";
 
 const requiredEnv = {
@@ -29,6 +31,8 @@ export const firebaseProjectId = requiredEnv.projectId;
 export const firebaseApp = initializeApp(firebaseConfig);
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
+export const storage = getStorage(firebaseApp);
+export const functions = getFunctions(firebaseApp, "us-central1");
 
 if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true") {
   const emulatorHost = import.meta.env.VITE_FIREBASE_EMULATOR_HOST ?? "127.0.0.1";
@@ -38,6 +42,8 @@ if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true") {
       disableWarnings: true,
     });
     connectFirestoreEmulator(db, emulatorHost, 8080);
+    connectStorageEmulator(storage, emulatorHost, 9199);
+    connectFunctionsEmulator(functions, emulatorHost, 5001);
   } catch {
     // Vite hot reload can evaluate this module more than once.
   }

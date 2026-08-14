@@ -1,26 +1,52 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { BioPageView } from "../components/BioPageView";
+import { TributeForm } from "../components/TributeForm";
 import { getCreatorByUsername } from "../lib/account";
-import type { CreatorProfile } from "../lib/types";
+import { trackCreatorLinkClick, trackProfileView } from "../lib/analytics";
+import { getPublicCreatorLinks } from "../lib/bio";
+import { getCreatorPaymentAvailability } from "../lib/payments";
+import type { CreatorLink, CreatorProfile } from "../lib/types";
 
 export function PublicProfilePage() {
   const { username = "" } = useParams();
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
+  const [links, setLinks] = useState<CreatorLink[]>([]);
+  const [paymentsAvailable, setPaymentsAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-
     setLoading(true);
+
     getCreatorByUsername(username)
-      .then((profile) => {
+      .then(async (profile) => {
+        if (
+          !profile ||
+          !profile.isPublished ||
+          profile.moderationStatus !== "active"
+        ) {
+          return null;
+        }
+
+        const [publicLinks, paymentAvailability] = await Promise.all([
+          getPublicCreatorLinks(profile.id),
+          getCreatorPaymentAvailability(profile.id).catch(() => false),
+        ]);
+        return { profile, publicLinks, paymentAvailability };
+      })
+      .then((page) => {
         if (active) {
-          setCreator(profile);
+          setCreator(page?.profile ?? null);
+          setLinks(page?.publicLinks ?? []);
+          setPaymentsAvailable(page?.paymentAvailability ?? false);
         }
       })
       .catch(() => {
         if (active) {
           setCreator(null);
+          setLinks([]);
+          setPaymentsAvailable(false);
         }
       })
       .finally(() => {
@@ -34,38 +60,102 @@ export function PublicProfilePage() {
     };
   }, [username]);
 
+  useEffect(() => {
+    if (!creator) {
+      return;
+    }
+
+    const previousTitle = document.title;
+    const description = creator.bio || `${creator.displayName} on Tributes`;
+    document.title = `${creator.displayName} | Tributes`;
+    trackProfileView(creator.id, creator.username);
+
+    const metaValues = [
+      ['meta[name="description"]', "name", "description", description],
+      ['meta[property="og:title"]', "property", "og:title", document.title],
+      [
+        'meta[property="og:description"]',
+        "property",
+        "og:description",
+        description,
+      ],
+      ['meta[property="og:type"]', "property", "og:type", "profile"],
+      ['meta[property="og:url"]', "property", "og:url", window.location.href],
+      ...(creator.photoURL
+        ? [
+            [
+              'meta[property="og:image"]',
+              "property",
+              "og:image",
+              creator.photoURL,
+            ],
+          ]
+        : []),
+    ] as const;
+
+    const previousMeta = metaValues.map(
+      ([selector, attribute, attributeValue, content]) => {
+        let meta = document.querySelector<HTMLMetaElement>(selector);
+
+        if (!meta) {
+          meta = document.createElement("meta");
+          meta.setAttribute(attribute, attributeValue);
+          document.head.appendChild(meta);
+        }
+
+        const previousContent = meta.content;
+        meta.content = content;
+        return { meta, previousContent };
+      },
+    );
+
+    return () => {
+      document.title = previousTitle;
+      previousMeta.forEach(({ meta, previousContent }) => {
+        meta.content = previousContent;
+      });
+    };
+  }, [creator]);
+
   if (loading) {
-    return <section className="mx-auto max-w-xl px-5 py-14">Loading</section>;
+    return <div className="min-h-screen bg-paper" />;
   }
 
   if (!creator) {
     return (
-      <section className="mx-auto max-w-xl px-5 py-14">
-        <h1 className="text-3xl font-semibold">Profile not found</h1>
-        <Link className="mt-6 inline-block font-semibold text-tribute" to="/">
-          Go home
-        </Link>
-      </section>
+      <main className="grid min-h-screen place-items-center bg-paper px-5 text-center">
+        <div>
+          <h1 className="text-2xl font-semibold">Profile not found</h1>
+          <Link className="mt-5 inline-block font-semibold text-tribute" to="/">
+            Go home
+          </Link>
+        </div>
+      </main>
     );
   }
 
   return (
-    <section className="mx-auto w-full max-w-xl px-5 py-14 text-center">
-      <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-ink text-2xl font-semibold text-white">
-        {creator.displayName.charAt(0).toUpperCase()}
-      </div>
-      <h1 className="mt-5 text-3xl font-semibold">{creator.displayName}</h1>
-      <p className="mt-1 text-zinc-500">@{creator.username}</p>
-      {creator.bio ? <p className="mt-5 text-zinc-700">{creator.bio}</p> : null}
-
-      <div className="mt-8 grid gap-3">
-        <button className="border border-zinc-300 bg-white px-4 py-3 font-semibold" type="button">
-          Tip
-        </button>
-        <button className="bg-ink px-4 py-3 font-semibold text-white" type="button">
-          Spin
-        </button>
-      </div>
-    </section>
+    <main className="min-h-screen">
+      <BioPageView
+        links={links}
+        onLinkClick={(link) =>
+          trackCreatorLinkClick(creator.id, creator.username, link.id)
+        }
+        profile={creator}
+        topContent={
+          paymentsAvailable ? (
+            <TributeForm
+              profile={creator}
+              result={
+                new URLSearchParams(window.location.search).get("payment") as
+                  | "success"
+                  | "canceled"
+                  | null
+              }
+            />
+          ) : null
+        }
+      />
+    </main>
   );
 }

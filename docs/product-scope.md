@@ -2,7 +2,7 @@
 
 ## Concept
 
-Tributes is a creator payment platform starting with a Twitch streamer wedge called Tributes Spin. The broader platform still includes bio-link pages similar to Linktree, but the first growth driver is an interactive OBS/Twitch spinner where viewers pay for spin experiences and the creator's counter updates automatically.
+Tributes is a creator payment platform built on shareable bio-link pages. The bio page ships first, one-time tips follow, and the Twitch streamer wedge called Tributes Spin becomes the differentiated growth feature layered on top.
 
 The bio-page differentiator remains important: the top field on a public profile lets visitors send a one-time tip quickly and without creating an account.
 

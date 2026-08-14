@@ -8,6 +8,15 @@ import {
 import type { User } from "firebase/auth";
 import { db } from "./firebase";
 import type { AppUser, CreatorProfile } from "./types";
+import type { EmailPreferences } from "./types";
+
+const defaultAppearance = {
+  backgroundColor: "#fbfaf7",
+  textColor: "#101114",
+  buttonColor: "#101114",
+  buttonTextColor: "#ffffff",
+  buttonStyle: "solid" as const,
+};
 
 const reservedUsernames = new Set([
   "admin",
@@ -63,6 +72,10 @@ export async function ensureUserRecord(user: User) {
       photoURL: user.photoURL,
       accountType: null,
       onboardingComplete: false,
+      emailPreferences: {
+        paymentActivity: true,
+        productUpdates: false,
+      },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
@@ -101,7 +114,25 @@ export async function getUserRecord(uid: string): Promise<AppUser | null> {
     onboardingComplete: Boolean(data.onboardingComplete),
     creatorId: data.creatorId,
     username: data.username,
+    emailPreferences: {
+      paymentActivity: data.emailPreferences?.paymentActivity ?? true,
+      productUpdates: data.emailPreferences?.productUpdates ?? false,
+    },
   };
+}
+
+export async function updateEmailPreferences(
+  uid: string,
+  emailPreferences: EmailPreferences,
+) {
+  await setDoc(
+    doc(db, "users", uid),
+    {
+      emailPreferences,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 }
 
 export async function completePersonalOnboarding(user: User) {
@@ -165,11 +196,22 @@ export async function reserveCreatorUsername(user: User, usernameValue: string) 
         displayName: user.displayName ?? username,
         bio: "",
         photoPath: null,
-        stripeAccountId: null,
-        stripeOnboardingStatus: "not_started",
+        photoURL: user.photoURL,
+        appearance: defaultAppearance,
         isPublished: true,
         moderationStatus: "active",
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    transaction.set(
+      doc(db, "creatorSettings", user.uid),
+      {
+        ownerUid: user.uid,
+        stripeAccountId: null,
+        stripeOnboardingStatus: "not_started",
         updatedAt: serverTimestamp(),
       },
       { merge: true },
@@ -211,8 +253,11 @@ export async function getCreatorByUsername(
     displayName: data.displayName,
     bio: data.bio ?? "",
     photoPath: data.photoPath ?? null,
-    stripeAccountId: data.stripeAccountId ?? null,
-    stripeOnboardingStatus: data.stripeOnboardingStatus ?? "not_started",
+    photoURL: data.photoURL ?? null,
+    appearance: {
+      ...defaultAppearance,
+      ...(data.appearance ?? {}),
+    },
     isPublished: Boolean(data.isPublished),
     moderationStatus: data.moderationStatus ?? "active",
   };

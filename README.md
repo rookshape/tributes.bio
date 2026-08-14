@@ -18,6 +18,7 @@ Tributes is a Linktree-style profile platform for creators, with one key differe
 - Creator onboarding with username reservation
 - Link management, profile customization, preview, and publishing
 - Creator analytics for earnings, profile views, link clicks, and payment conversion
+- Account settings, notification preferences, and password reset
 - Personal accounts for optional spend tracking and a basic profile
 - Admin tooling, moderation, SEO, legal pages, and basic email flows
 
@@ -27,9 +28,9 @@ Tributes is a Linktree-style profile platform for creators, with one key differe
 2. Auth with Google and email
 3. Creator onboarding
 4. Username claim flow
-5. Stripe Connect onboarding
-6. Basic page builder
-7. Public profile page with one-time tip field and creator links
+5. Bio page builder
+6. Public profile page with creator links
+7. Stripe Connect onboarding and one-time tip field
 8. Simple creator analytics
 9. Basic settings and admin surfaces
 
@@ -47,7 +48,7 @@ npm run dev
 
 The local development Firebase app uses `tributes-bio-dev`. The real dev values live in `.env.development`, which is intentionally ignored by Git.
 
-Run Firebase emulators:
+Run Firebase Auth, Firestore, Storage, and Functions emulators:
 
 ```bash
 npm run emulators

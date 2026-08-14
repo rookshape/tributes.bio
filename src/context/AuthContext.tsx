@@ -4,6 +4,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
+  sendPasswordResetEmail,
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import {
@@ -28,6 +29,7 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   createAccountWithEmail: (email: string, password: string) => Promise<void>;
+  sendPasswordReset: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -91,6 +93,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
         await ensureUserRecord(result.user);
         await refreshAppUser();
+      },
+      sendPasswordReset: async () => {
+        if (!auth.currentUser?.email) {
+          throw new Error("No email address is attached to this account.");
+        }
+
+        await sendPasswordResetEmail(auth, auth.currentUser.email);
       },
       signOut: () => firebaseSignOut(auth),
     }),

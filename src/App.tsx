@@ -2,11 +2,15 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AppLayout } from "./components/AppLayout";
+import { DashboardLayout } from "./components/DashboardLayout";
 import { AuthPage } from "./pages/AuthPage";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LandingPage } from "./pages/LandingPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
+import { PaymentsPage } from "./pages/PaymentsPage";
 import { PublicProfilePage } from "./pages/PublicProfilePage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { appUser, loading, user } = useAuth();
@@ -37,13 +41,18 @@ function AppRoutes() {
         <Route
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <DashboardLayout />
             </ProtectedRoute>
           }
           path="dashboard"
-        />
-        <Route element={<PublicProfilePage />} path=":username" />
+        >
+          <Route index element={<DashboardPage />} />
+          <Route element={<AnalyticsPage />} path="analytics" />
+          <Route element={<PaymentsPage />} path="payments" />
+          <Route element={<SettingsPage />} path="settings" />
+        </Route>
       </Route>
+      <Route element={<PublicProfilePage />} path=":username" />
     </Routes>
   );
 }
