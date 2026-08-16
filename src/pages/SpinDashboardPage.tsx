@@ -6,6 +6,7 @@ import {
   Minus,
   Play,
   Plus,
+  Radio,
   Save,
   Trash2,
 } from "lucide-react";
@@ -17,14 +18,19 @@ import {
   adjustSpinCounter,
   createMockSpinEntry,
   getOrCreateSpinConfig,
+  heartbeatSpinSession,
   saveSpinConfig,
   subscribeSpinQueue,
+  subscribeSpinSession,
   subscribeSpinState,
+  setSpinLiveStatus,
+  spinSessionIsLive,
   triggerNextSpin,
 } from "../lib/spin";
 import type {
   SpinConfig,
   SpinQueueEntry,
+  SpinSession,
   SpinSlice,
   SpinSliceType,
   SpinState,
@@ -56,6 +62,7 @@ export function SpinDashboardPage() {
   const [config, setConfig] = useState<SpinConfig | null>(null);
   const [queue, setQueue] = useState<SpinQueueEntry[]>([]);
   const [spinState, setSpinState] = useState<SpinState | null>(null);
+  const [spinSession, setSpinSession] = useState<SpinSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -77,6 +84,7 @@ export function SpinDashboardPage() {
     let active = true;
     const unsubscribers = [
       subscribeSpinQueue(creatorId, setQueue),
+      subscribeSpinSession(creatorId, setSpinSession),
       subscribeSpinState(creatorId, setSpinState),
     ];
 
@@ -104,6 +112,19 @@ export function SpinDashboardPage() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!creatorId || spinSession?.status !== "live") {
+      return;
+    }
+
+    const sendHeartbeat = () => {
+      heartbeatSpinSession(creatorId).catch(() => undefined);
+    };
+    sendHeartbeat();
+    const timer = window.setInterval(sendHeartbeat, 45000);
+    return () => window.clearInterval(timer);
+  }, [creatorId, spinSession?.status]);
+
   const queuedEntries = useMemo(
     () => queue.filter((entry) => entry.status === "queued"),
     [queue],
@@ -113,6 +134,7 @@ export function SpinDashboardPage() {
     [queue],
   );
   const spinning = Boolean(spinState && spinState.lockedUntilMs > now);
+  const isLive = spinSessionIsLive(spinSession, now);
   const animation: SpinAnimation | null =
     spinState?.spinId && spinState.selectedIndex !== null
       ? {
@@ -178,6 +200,11 @@ export function SpinDashboardPage() {
   };
 
   const save = async () => {
+    if (isLive) {
+      setError("End the live session before changing the wheel.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -240,6 +267,23 @@ export function SpinDashboardPage() {
     }
   };
 
+  const toggleLive = async () => {
+    setWorking(true);
+    setError(null);
+
+    try {
+      await setSpinLiveStatus(creatorId, !isLive);
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Could not change live status.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const overlayPath = `/overlay/${creatorId}/spin`;
   const viewerPath = `/${appUser?.username ?? ""}/spin`;
 
@@ -248,9 +292,17 @@ export function SpinDashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-6">
         <div>
           <h1 className="text-3xl font-semibold">Spin</h1>
-          <p className="mt-1 text-sm text-zinc-500">Development prototype</p>
+          <p className="mt-1 text-sm text-zinc-500">{isLive ? "Live" : "Offline"}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            className={`flex h-10 items-center gap-2 px-3 text-sm font-semibold text-white disabled:opacity-50 ${isLive ? "bg-red-600" : "bg-tribute"}`}
+            disabled={working}
+            onClick={toggleLive}
+            type="button"
+          >
+            <Radio size={16} /> {isLive ? "End live" : "Go live"}
+          </button>
           <Link className="flex h-10 items-center gap-2 border border-zinc-300 bg-white px-3 text-sm font-semibold" target="_blank" to={viewerPath}>
             <ExternalLink size={16} /> Viewer
           </Link>
@@ -269,10 +321,12 @@ export function SpinDashboardPage() {
         <section className="min-w-0">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Wheel</h2>
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input checked={config.isEnabled} onChange={(event) => changeConfig({ isEnabled: event.target.checked })} type="checkbox" />
-              Enabled
-            </label>
+            <div className="grid gap-2 text-sm font-medium">
+              <label className="flex items-center justify-end gap-2">
+                <input checked={config.isEnabled} onChange={(event) => changeConfig({ isEnabled: event.target.checked })} type="checkbox" />
+                Enabled
+              </label>
+            </div>
           </div>
 
           <div className="mt-5 grid gap-4">
@@ -281,7 +335,7 @@ export function SpinDashboardPage() {
               <input className={fieldClass} maxLength={60} onChange={(event) => changeConfig({ title: event.target.value })} value={config.title} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Test spin price
+              Base amount
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
                 <input className={`${fieldClass} pl-7`} min="1" onChange={(event) => changeConfig({ spinPriceCents: Math.round(Number(event.target.value) * 100) })} step="1" type="number" value={config.spinPriceCents / 100} />
@@ -331,7 +385,7 @@ export function SpinDashboardPage() {
             ))}
           </div>
 
-          <button className="mt-5 flex h-11 w-full items-center justify-center gap-2 bg-ink px-4 text-sm font-semibold text-white disabled:opacity-50" disabled={saving} onClick={save} type="button">
+          <button className="mt-5 flex h-11 w-full items-center justify-center gap-2 bg-ink px-4 text-sm font-semibold text-white disabled:opacity-50" disabled={saving || isLive} onClick={save} type="button">
             {saving ? <LoaderCircle className="animate-spin" size={17} /> : saved ? <Check size={17} /> : <Save size={17} />}
             {saving ? "Saving" : saved ? "Saved" : "Save wheel"}
           </button>
@@ -384,7 +438,7 @@ export function SpinDashboardPage() {
               <div className="flex items-center justify-between gap-4 py-3 text-sm" key={entry.id}>
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{entry.viewerName}</p>
-                  <p className="text-xs text-zinc-500">{entry.source === "bonus" ? "Bonus spin" : formatMoney(entry.amountCents)}</p>
+                  <p className="text-xs text-zinc-500">{entry.source === "bonus" ? "Bonus spin" : entry.source === "payment" ? entry.authorizedTotalCents > 0 ? `Authorized ${formatMoney(entry.authorizedTotalCents)}` : `Paid ${formatMoney(entry.amountCents)}` : `Test ${formatMoney(entry.amountCents)}`}</p>
                 </div>
                 <span className="text-xs text-zinc-400">#{index + 1}</span>
               </div>

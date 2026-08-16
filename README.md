@@ -76,3 +76,21 @@ npm run deploy:prod
 ```
 
 The real dev and prod Firebase values live in ignored local env files.
+
+## Stripe Webhook Events
+
+The Stripe webhook endpoint must listen for these events:
+
+- `account.updated`
+- `charge.dispute.closed`
+- `charge.dispute.created`
+- `charge.refunded`
+- `checkout.session.async_payment_failed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.completed`
+- `payment_intent.amount_capturable_updated`
+- `payment_intent.canceled`
+- `payment_intent.payment_failed`
+- `payment_intent.succeeded`
+
+`payment_intent.amount_capturable_updated` is required to turn a successful manual Spin authorization into a queue entry.

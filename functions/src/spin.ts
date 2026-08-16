@@ -2,6 +2,11 @@ import { randomInt, randomUUID } from "node:crypto";
 import { getApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import {
+  cancelSpinAuthorization,
+  captureSpinAuthorization,
+  stripeSecret,
+} from "./stripe.js";
 
 type SpinSliceType = "amount" | "multiplier" | "bonus" | "action";
 
@@ -19,6 +24,7 @@ type SpinConfig = {
   counterLabel: string;
   spinPriceCents: number;
   isEnabled: boolean;
+  showOnProfile: boolean;
   mockModeEnabled: boolean;
   slices: SpinSlice[];
 };
@@ -73,6 +79,14 @@ function parseConfig(data: FirebaseFirestore.DocumentData | undefined): SpinConf
     ) {
       throw new HttpsError("failed-precondition", "The wheel configuration is invalid.");
     }
+
+    if (
+      (slice.type === "amount" && (slice.value < 100 || slice.value > 100000)) ||
+      (slice.type === "multiplier" &&
+        (slice.value < 1 || data.spinPriceCents * slice.value > 100000))
+    ) {
+      throw new HttpsError("failed-precondition", "Spin results must be between $1 and $1,000.");
+    }
   }
 
   return {
@@ -80,6 +94,7 @@ function parseConfig(data: FirebaseFirestore.DocumentData | undefined): SpinConf
     counterLabel: data.counterLabel,
     spinPriceCents: data.spinPriceCents,
     isEnabled: data.isEnabled === true,
+    showOnProfile: data.showOnProfile !== false,
     mockModeEnabled: data.mockModeEnabled === true,
     slices,
   };
@@ -94,8 +109,111 @@ function counterDelta(slice: SpinSlice, amountCents: number) {
     return Math.min(amountCents * Math.max(1, slice.value), 10000000);
   }
 
-  return amountCents;
+  if (slice.type === "action") {
+    return amountCents;
+  }
+
+  return 0;
 }
+
+export const setSpinLiveStatus = onCall(
+  { secrets: [stripeSecret] },
+  async (request) => {
+    const creatorId = requiredId(request.data?.creatorId, "creator ID");
+    const isLive = request.data?.isLive === true;
+
+    if (!request.auth || request.auth.uid !== creatorId) {
+      throw new HttpsError("permission-denied", "Only the creator can change live status.");
+    }
+
+    const firestore = getFirestore();
+    const creatorRef = firestore.doc(`creators/${creatorId}`);
+    const configRef = creatorRef.collection("spinConfigs").doc("current");
+    const sessionRef = creatorRef.collection("spinSessions").doc("current");
+    const [creatorSnapshot, configSnapshot] = await Promise.all([
+      creatorRef.get(),
+      configRef.get(),
+    ]);
+
+    if (
+      !creatorSnapshot.exists ||
+      creatorSnapshot.data()?.ownerUid !== request.auth.uid
+    ) {
+      throw new HttpsError("permission-denied", "Only the creator can change live status.");
+    }
+
+    const config = parseConfig(configSnapshot.data());
+
+    if (isLive && !config.isEnabled) {
+      throw new HttpsError("failed-precondition", "Enable Spin before going live.");
+    }
+
+    const now = Date.now();
+    await sessionRef.set(
+      {
+        creatorId,
+        status: isLive ? "live" : "offline",
+        heartbeatAtMs: now,
+        ...(isLive ? { startedAtMs: now } : { endedAtMs: now }),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    if (!isLive) {
+      const queuedSnapshot = await creatorRef
+        .collection("spinQueue")
+        .where("status", "==", "queued")
+        .limit(50)
+        .get();
+      await Promise.allSettled(
+        queuedSnapshot.docs
+          .map((snapshot) => snapshot.data().paymentId)
+          .filter((paymentId): paymentId is string => typeof paymentId === "string")
+          .map((paymentId) => cancelSpinAuthorization(paymentId)),
+      );
+    }
+
+    return {
+      status: isLive ? "live" as const : "offline" as const,
+      heartbeatAtMs: now,
+    };
+  },
+);
+
+export const heartbeatSpinSession = onCall(async (request) => {
+  const creatorId = requiredId(request.data?.creatorId, "creator ID");
+
+  if (!request.auth || request.auth.uid !== creatorId) {
+    throw new HttpsError("permission-denied", "Only the creator can update the live session.");
+  }
+
+  const firestore = getFirestore();
+  const creatorRef = firestore.doc(`creators/${creatorId}`);
+  const sessionRef = creatorRef.collection("spinSessions").doc("current");
+  const [creatorSnapshot, sessionSnapshot] = await Promise.all([
+    creatorRef.get(),
+    sessionRef.get(),
+  ]);
+
+  if (
+    !creatorSnapshot.exists ||
+    creatorSnapshot.data()?.ownerUid !== request.auth.uid ||
+    sessionSnapshot.data()?.status !== "live"
+  ) {
+    throw new HttpsError("failed-precondition", "Spin is not live.");
+  }
+
+  const heartbeatAtMs = Date.now();
+  await sessionRef.set(
+    {
+      heartbeatAtMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+  return { heartbeatAtMs };
+});
 
 export const createMockSpinEntry = onCall(async (request) => {
   const creatorId = requiredId(request.data?.creatorId, "creator ID");
@@ -157,7 +275,7 @@ export const createMockSpinEntry = onCall(async (request) => {
   return { entryId: entryRef.id };
 });
 
-export const triggerSpin = onCall(async (request) => {
+export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) => {
   const creatorId = requiredId(request.data?.creatorId, "creator ID");
 
   if (!request.auth || request.auth.uid !== creatorId) {
@@ -168,18 +286,26 @@ export const triggerSpin = onCall(async (request) => {
   const creatorRef = firestore.doc(`creators/${creatorId}`);
   const configRef = creatorRef.collection("spinConfigs").doc("current");
   const stateRef = creatorRef.collection("spinStates").doc("current");
+  const sessionRef = creatorRef.collection("spinSessions").doc("current");
   const queueRef = creatorRef.collection("spinQueue");
   const now = Date.now();
   const durationMs = 5500;
   const spinId = randomUUID();
   let selectedIndex = 0;
+  let selectedEntryId = "";
+  let selectedPaymentId: string | null = null;
+  let selectedReceiptId: string | null = null;
+  let selectedResultAmountCents = 0;
+  let selectedResultLabel = "";
+  let selectedResultType: SpinSliceType = "action";
 
   await firestore.runTransaction(async (transaction) => {
-    const [creatorSnapshot, configSnapshot, stateSnapshot, queueSnapshot] =
+    const [creatorSnapshot, configSnapshot, stateSnapshot, sessionSnapshot, queueSnapshot] =
       await Promise.all([
         transaction.get(creatorRef),
         transaction.get(configRef),
         transaction.get(stateRef),
+        transaction.get(sessionRef),
         transaction.get(queueRef.orderBy("createdAt", "asc").limit(50)),
       ]);
     const creator = creatorSnapshot.data();
@@ -190,6 +316,14 @@ export const triggerSpin = onCall(async (request) => {
 
     const config = parseConfig(configSnapshot.data());
     const state = stateSnapshot.data();
+    const session = sessionSnapshot.data();
+
+    if (
+      session?.status !== "live" ||
+      now - Number(session.heartbeatAtMs ?? 0) >= 120000
+    ) {
+      throw new HttpsError("failed-precondition", "Go live before spinning.");
+    }
 
     if (Number(state?.lockedUntilMs ?? 0) > now) {
       throw new HttpsError("failed-precondition", "The wheel is already spinning.");
@@ -203,13 +337,126 @@ export const triggerSpin = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "The queue is empty.");
     }
 
-    selectedIndex = randomInt(config.slices.length);
+    const previousSelectedIndex = Number(queueEntry.data().selectedIndex);
+    selectedIndex =
+      Number.isInteger(previousSelectedIndex) &&
+      previousSelectedIndex >= 0 &&
+      previousSelectedIndex < config.slices.length
+        ? previousSelectedIndex
+        : randomInt(config.slices.length);
     const slice = config.slices[selectedIndex];
     const entry = queueEntry.data();
     const amountCents = Number(entry.amountCents ?? config.spinPriceCents);
     const deltaCents = counterDelta(slice, amountCents);
-    const nextCounter = Math.max(0, Number(state?.counterCents ?? 0) + deltaCents);
+    const paymentId = typeof entry.paymentId === "string" ? entry.paymentId : null;
+    const requiresCapture = Boolean(
+      paymentId &&
+        entry.paymentStatus === "authorized" &&
+        Number(entry.authorizedTotalCents ?? 0) > 0,
+    );
+    const receiptId = typeof entry.receiptId === "string" ? entry.receiptId : null;
+    const receiptRef = receiptId ? firestore.doc(`spinReceipts/${receiptId}`) : null;
+    selectedEntryId = queueEntry.id;
+    selectedPaymentId = requiresCapture ? paymentId : null;
+    selectedReceiptId = receiptId;
+    selectedResultAmountCents = deltaCents;
+    selectedResultLabel = slice.label;
+    selectedResultType = slice.type;
 
+    if (slice.type === "bonus") {
+      transaction.update(queueEntry.ref, {
+        status: "queued",
+        resultLabel: slice.label,
+        selectedIndex: null,
+        selectedSliceId: slice.id,
+        capturePending: false,
+        createdAt: FieldValue.serverTimestamp(),
+        createdAtMs: now,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      if (receiptRef) {
+        transaction.set(
+          receiptRef,
+          {
+            status: "bonus",
+            resultLabel: slice.label,
+            creatorAmountCents: null,
+            totalCents: null,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedAtMs: now,
+          },
+          { merge: true },
+        );
+      }
+
+      transaction.set(
+        stateRef,
+        {
+          creatorId,
+          counterCents: Number(state?.counterCents ?? 0),
+          spinId,
+          queueEntryId: queueEntry.id,
+          viewerName: String(entry.viewerName ?? "Viewer"),
+          selectedIndex,
+          resultLabel: slice.label,
+          resultType: slice.type,
+          counterDeltaCents: 0,
+          startedAtMs: now,
+          durationMs,
+          lockedUntilMs: now + durationMs,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      return;
+    }
+
+    if (requiresCapture) {
+      transaction.update(queueEntry.ref, {
+        status: "capturing",
+        selectedIndex,
+        selectedSliceId: slice.id,
+        resultLabel: slice.label,
+        resultAmountCents: deltaCents,
+        captureOperationId: spinId,
+        capturePending: true,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      if (receiptRef) {
+        transaction.set(
+          receiptRef,
+          {
+            status: "capturing",
+            resultLabel: null,
+            creatorAmountCents: null,
+            totalCents: null,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedAtMs: now,
+          },
+          { merge: true },
+        );
+      }
+
+      transaction.set(
+        stateRef,
+        {
+          creatorId,
+          spinId: null,
+          queueEntryId: queueEntry.id,
+          viewerName: String(entry.viewerName ?? "Viewer"),
+          selectedIndex: null,
+          resultLabel: null,
+          lockedUntilMs: now + 30000,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      return;
+    }
+
+    const nextCounter = Math.max(0, Number(state?.counterCents ?? 0) + deltaCents);
     transaction.update(queueEntry.ref, {
       status: "completed",
       resultLabel: slice.label,
@@ -217,21 +464,6 @@ export const triggerSpin = onCall(async (request) => {
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
-
-    if (slice.type === "bonus") {
-      const bonusRef = queueRef.doc();
-      transaction.create(bonusRef, {
-        viewerName: String(entry.viewerName ?? "Viewer"),
-        amountCents,
-        source: "bonus",
-        status: "queued",
-        resultLabel: null,
-        createdAt: FieldValue.serverTimestamp(),
-        createdAtMs: now + 1,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    }
-
     transaction.set(
       stateRef,
       {
@@ -252,6 +484,110 @@ export const triggerSpin = onCall(async (request) => {
       { merge: true },
     );
   });
+
+  if (selectedPaymentId && selectedResultAmountCents > 0) {
+    let capturedTotalCents = 0;
+
+    try {
+      const capture = await captureSpinAuthorization(
+        selectedPaymentId,
+        selectedResultAmountCents,
+      );
+      capturedTotalCents = capture.totalCents;
+    } catch (error) {
+      const batch = firestore.batch();
+      batch.set(
+        queueRef.doc(selectedEntryId),
+        {
+          status: "queued",
+          capturePending: true,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      batch.set(
+        stateRef,
+        { lockedUntilMs: 0, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      if (selectedReceiptId) {
+        batch.set(
+          firestore.doc(`spinReceipts/${selectedReceiptId}`),
+          {
+            status: "queued",
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedAtMs: Date.now(),
+          },
+          { merge: true },
+        );
+      }
+      await batch.commit();
+      throw error;
+    }
+
+    const animationStartedAt = Date.now();
+    await firestore.runTransaction(async (transaction) => {
+      const [entrySnapshot, stateSnapshot] = await Promise.all([
+        transaction.get(queueRef.doc(selectedEntryId)),
+        transaction.get(stateRef),
+      ]);
+
+      if (
+        !entrySnapshot.exists ||
+        entrySnapshot.data()?.captureOperationId !== spinId
+      ) {
+        throw new HttpsError("aborted", "The queue entry changed during capture.");
+      }
+
+      const nextCounter = Math.max(
+        0,
+        Number(stateSnapshot.data()?.counterCents ?? 0) + selectedResultAmountCents,
+      );
+      transaction.set(
+        entrySnapshot.ref,
+        {
+          status: "completed",
+          capturePending: false,
+          completedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      transaction.set(
+        stateRef,
+        {
+          creatorId,
+          counterCents: nextCounter,
+          spinId,
+          queueEntryId: selectedEntryId,
+          viewerName: String(entrySnapshot.data()?.viewerName ?? "Viewer"),
+          selectedIndex,
+          resultLabel: selectedResultLabel,
+          resultType: selectedResultType,
+          counterDeltaCents: selectedResultAmountCents,
+          startedAtMs: animationStartedAt,
+          durationMs,
+          lockedUntilMs: animationStartedAt + durationMs,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      if (selectedReceiptId) {
+        transaction.set(
+          firestore.doc(`spinReceipts/${selectedReceiptId}`),
+          {
+            status: "completed",
+            resultLabel: selectedResultLabel,
+            creatorAmountCents: selectedResultAmountCents,
+            totalCents: capturedTotalCents,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedAtMs: animationStartedAt,
+          },
+          { merge: true },
+        );
+      }
+    });
+  }
 
   return { spinId, selectedIndex };
 });

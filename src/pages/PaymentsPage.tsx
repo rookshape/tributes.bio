@@ -76,7 +76,7 @@ export function PaymentsPage() {
       {error ? <p className="mt-5 text-sm text-red-700">{error}</p> : null}
 
       {!error && payments.length === 0 ? (
-        <p className="py-12 text-sm text-zinc-500">No tributes yet.</p>
+        <p className="py-12 text-sm text-zinc-500">No payments yet.</p>
       ) : null}
 
       {payments.length > 0 ? (
@@ -85,6 +85,7 @@ export function PaymentsPage() {
             <thead>
               <tr className="border-b border-zinc-200 text-zinc-500">
                 <th className="py-3 pr-4 font-medium">From</th>
+                <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Date</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="py-3 pl-4 text-right font-medium">Amount</th>
@@ -97,6 +98,9 @@ export function PaymentsPage() {
                     {payment.anonymous || !payment.senderName
                       ? "Anonymous"
                       : payment.senderName}
+                  </td>
+                  <td className="px-4 py-4 capitalize text-zinc-600">
+                    {payment.kind}
                   </td>
                   <td className="px-4 py-4 text-zinc-600">
                     {payment.createdAt

@@ -18,6 +18,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { BioPageView } from "../components/BioPageView";
+import { LiveSpinCard } from "../components/LiveSpinCard";
 import { useAuth } from "../context/AuthContext";
 import {
   createCreatorLink,
@@ -28,11 +29,18 @@ import {
   updateCreatorProfile,
   uploadProfilePhoto,
 } from "../lib/bio";
+import {
+  getSpinConfig,
+  spinSessionIsLive,
+  subscribeSpinSession,
+} from "../lib/spin";
 import type {
   ButtonStyle,
   CreatorLink,
   CreatorProfile,
   ProfileAppearance,
+  SpinConfig,
+  SpinSession,
 } from "../lib/types";
 
 type EditorTab = "profile" | "links" | "appearance";
@@ -61,12 +69,15 @@ export function DashboardPage() {
   const { appUser, user } = useAuth();
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [links, setLinks] = useState<CreatorLink[]>([]);
+  const [spinConfig, setSpinConfig] = useState<SpinConfig | null>(null);
+  const [spinSession, setSpinSession] = useState<SpinSession | null>(null);
   const [tab, setTab] = useState<EditorTab>("profile");
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newUrl, setNewUrl] = useState("");
+  const [now, setNow] = useState(Date.now());
 
   const isCreator = appUser?.accountType === "creator";
 
@@ -79,11 +90,15 @@ export function DashboardPage() {
     let active = true;
     setLoading(true);
 
-    getCreatorWorkspace(user.uid)
-      .then((workspace) => {
+    Promise.all([
+      getCreatorWorkspace(user.uid),
+      getSpinConfig(user.uid).catch(() => null),
+    ])
+      .then(([workspace, loadedSpinConfig]) => {
         if (active) {
           setProfile(workspace.profile);
           setLinks(workspace.links);
+          setSpinConfig(loadedSpinConfig);
         }
       })
       .catch((caughtError) => {
@@ -105,6 +120,19 @@ export function DashboardPage() {
       active = false;
     };
   }, [isCreator, user]);
+
+  useEffect(() => {
+    if (!user || !isCreator) {
+      return;
+    }
+
+    return subscribeSpinSession(user.uid, setSpinSession);
+  }, [isCreator, user]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (!isCreator) {
     return <PersonalDashboard />;
@@ -654,7 +682,16 @@ export function DashboardPage() {
             Preview
           </p>
           <div className="mx-auto h-[640px] w-full max-w-[360px] overflow-y-auto border-[8px] border-ink bg-white shadow-sm">
-            <BioPageView links={links} preview profile={profile} />
+            <BioPageView
+              links={links}
+              preview
+              profile={profile}
+              topContent={
+                spinConfig?.isEnabled && spinSessionIsLive(spinSession, now) ? (
+                  <LiveSpinCard config={spinConfig} preview profile={profile} />
+                ) : null
+              }
+            />
           </div>
         </aside>
       </div>

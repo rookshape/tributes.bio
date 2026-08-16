@@ -1,20 +1,32 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BioPageView } from "../components/BioPageView";
+import { LiveSpinCard } from "../components/LiveSpinCard";
 import { TributeForm } from "../components/TributeForm";
 import { getCreatorByUsername } from "../lib/account";
 import { trackCreatorLinkClick, trackProfileView } from "../lib/analytics";
 import { getPublicCreatorLinks } from "../lib/bio";
 import { getCreatorPaymentAvailability } from "../lib/payments";
-import { getSpinConfig } from "../lib/spin";
-import type { CreatorLink, CreatorProfile } from "../lib/types";
+import {
+  getSpinConfig,
+  spinSessionIsLive,
+  subscribeSpinSession,
+} from "../lib/spin";
+import type {
+  CreatorLink,
+  CreatorProfile,
+  SpinConfig,
+  SpinSession,
+} from "../lib/types";
 
 export function PublicProfilePage() {
   const { username = "" } = useParams();
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [links, setLinks] = useState<CreatorLink[]>([]);
   const [paymentsAvailable, setPaymentsAvailable] = useState(false);
-  const [spinAvailable, setSpinAvailable] = useState(false);
+  const [spinConfig, setSpinConfig] = useState<SpinConfig | null>(null);
+  const [spinSession, setSpinSession] = useState<SpinSession | null>(null);
+  const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,7 +52,7 @@ export function PublicProfilePage() {
           profile,
           publicLinks,
           paymentAvailability,
-          spinAvailable: spinConfig?.isEnabled === true,
+          spinConfig,
         };
       })
       .then((page) => {
@@ -48,7 +60,7 @@ export function PublicProfilePage() {
           setCreator(page?.profile ?? null);
           setLinks(page?.publicLinks ?? []);
           setPaymentsAvailable(page?.paymentAvailability ?? false);
-          setSpinAvailable(page?.spinAvailable ?? false);
+          setSpinConfig(page?.spinConfig ?? null);
         }
       })
       .catch(() => {
@@ -56,7 +68,7 @@ export function PublicProfilePage() {
           setCreator(null);
           setLinks([]);
           setPaymentsAvailable(false);
-          setSpinAvailable(false);
+          setSpinConfig(null);
         }
       })
       .finally(() => {
@@ -69,6 +81,20 @@ export function PublicProfilePage() {
       active = false;
     };
   }, [username]);
+
+  useEffect(() => {
+    if (!creator) {
+      setSpinSession(null);
+      return;
+    }
+
+    return subscribeSpinSession(creator.id, setSpinSession);
+  }, [creator]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!creator) {
@@ -144,6 +170,12 @@ export function PublicProfilePage() {
     );
   }
 
+  const spinAvailable = Boolean(
+    paymentsAvailable &&
+      spinConfig?.isEnabled &&
+      spinSessionIsLive(spinSession, now),
+  );
+
   return (
     <main className="min-h-screen">
       <BioPageView
@@ -167,17 +199,7 @@ export function PublicProfilePage() {
                 />
               ) : null}
               {spinAvailable ? (
-                <Link
-                  className="mt-4 flex min-h-12 items-center justify-center border-2 px-4 py-3 text-sm font-semibold"
-                  style={{
-                    backgroundColor: creator.appearance.buttonColor,
-                    borderColor: creator.appearance.buttonColor,
-                    color: creator.appearance.buttonTextColor,
-                  }}
-                  to={`/${creator.username}/spin`}
-                >
-                  Spin the wheel
-                </Link>
+                <LiveSpinCard config={spinConfig!} profile={creator} />
               ) : null}
             </>
           ) : null

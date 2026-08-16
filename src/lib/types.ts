@@ -80,20 +80,56 @@ export type SpinConfig = {
   counterLabel: string;
   spinPriceCents: number;
   isEnabled: boolean;
+  showOnProfile: boolean;
   mockModeEnabled: boolean;
   slices: SpinSlice[];
 };
 
-export type SpinQueueStatus = "queued" | "completed";
+export type SpinQueueStatus =
+  | "queued"
+  | "capturing"
+  | "completed"
+  | "payment_failed"
+  | "canceled";
 
 export type SpinQueueEntry = {
   id: string;
   viewerName: string;
   amountCents: number;
-  source: "mock" | "bonus";
+  authorizedTotalCents: number;
+  source: "mock" | "bonus" | "payment";
   status: SpinQueueStatus;
   resultLabel: string | null;
   createdAtMs: number;
+};
+
+export type SpinSession = {
+  creatorId: string;
+  status: "offline" | "live";
+  startedAtMs: number;
+  heartbeatAtMs: number;
+};
+
+export type SpinReceiptStatus =
+  | "checkout"
+  | "authorized"
+  | "queued"
+  | "capturing"
+  | "bonus"
+  | "completed"
+  | "payment_failed"
+  | "canceled";
+
+export type SpinReceipt = {
+  id: string;
+  creatorId: string;
+  creatorUsername: string;
+  viewerName: string;
+  status: SpinReceiptStatus;
+  resultLabel: string | null;
+  creatorAmountCents: number | null;
+  totalCents: number | null;
+  updatedAtMs: number;
 };
 
 export type SpinState = {

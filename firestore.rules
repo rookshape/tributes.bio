@@ -74,6 +74,7 @@ service cloud.firestore {
           'counterLabel',
           'spinPriceCents',
           'isEnabled',
+          'showOnProfile',
           'mockModeEnabled',
           'slices',
           'updatedAt'
@@ -89,6 +90,7 @@ service cloud.firestore {
         && request.resource.data.spinPriceCents >= 100
         && request.resource.data.spinPriceCents <= 100000
         && request.resource.data.isEnabled is bool
+        && request.resource.data.showOnProfile is bool
         && request.resource.data.mockModeEnabled is bool
         && request.resource.data.slices is list
         && request.resource.data.slices.size() >= 2
@@ -174,6 +176,19 @@ service cloud.firestore {
           || (stateId == 'current' && publicSpinAvailable(creatorId));
         allow write: if false;
       }
+
+      match /spinSessions/{sessionId} {
+        allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+          || (sessionId == 'current'
+            && get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
+            && get(/databases/$(database)/documents/creators/$(creatorId)).data.moderationStatus == 'active');
+        allow write: if false;
+      }
+    }
+
+    match /spinReceipts/{receiptId} {
+      allow read: if receiptId.size() >= 24;
+      allow write: if false;
     }
 
     match /creatorSettings/{uid} {

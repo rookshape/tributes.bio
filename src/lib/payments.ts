@@ -65,8 +65,24 @@ export async function createTributeCheckout(input: CheckoutInput) {
   return result.data.url;
 }
 
+type SpinCheckoutInput = {
+  creatorId: string;
+  senderName: string;
+  anonymous: boolean;
+};
+
+export async function createSpinCheckout(input: SpinCheckoutInput) {
+  const callable = httpsCallable<
+    SpinCheckoutInput & { origin: string },
+    UrlResponse
+  >(functions, "createSpinCheckoutSession");
+  const result = await callable({ ...input, origin: window.location.origin });
+  return result.data.url;
+}
+
 export type CreatorPayment = {
   id: string;
+  kind: "tribute" | "spin";
   anonymous: boolean;
   creatorAmountCents: number;
   senderName: string;
@@ -89,6 +105,7 @@ export async function getCreatorPayments(creatorId: string) {
 
       return {
         id: payment.id,
+        kind: data.kind === "spin" ? "spin" : "tribute",
         anonymous: data.anonymous === true,
         creatorAmountCents: Number(data.creatorAmountCents ?? 0),
         senderName: String(data.senderName ?? ""),

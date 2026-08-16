@@ -51,26 +51,26 @@ Relevant docs checked on 2026-08-13:
 
 ## Payment Modes
 
-### MVP Mode: Fixed-Price Spin
+### MVP Mode: Live Maximum Authorization
 
-The viewer pays a known spin price before entering the queue. The wheel result controls stream presentation, bonus spins, counter credit labeling, or configured stream actions. This is the safest first version because the viewer knows the charge before paying.
+The viewer authorizes the maximum possible total before entering the queue. The streamer runs the wheel live, and Tributes captures only the selected result plus the payer-side service fee. The unused authorization is released.
 
 Example:
 
-- Creator sets spin price to `$10`.
-- Viewer pays `$10` plus the Tributes payer-side upcharge.
-- Stripe webhook confirms payment.
-- Queue entry is created.
-- Overlay spins when the streamer triggers or auto-advances.
-- Counter increments by the configured amount.
+- Creator configures outcomes from `$5` to `$100`.
+- Viewer authorizes up to `$125`, including the maximum service fee.
+- Stripe confirms the authorization and creates the queue entry.
+- The streamer triggers the wheel and it lands on `$20`.
+- Tributes captures `$25` and releases the unused hold.
+- The overlay, viewer receipt, and counter update together.
 
 ### Later Mode: Post-Spin Confirmation
 
 The viewer spins first, sees the random amount, then confirms payment. This is likely easier to explain than automatic variable charging, but conversion will be weaker and queue abuse needs controls.
 
-### Review-Only Mode: Pre-Authorized Maximum
+### Fallback Mode: Fixed-Price Spin
 
-The viewer agrees upfront to a maximum charge and the wheel chooses the final charge amount. This is the most compelling version, but it should not ship until Stripe/payment counsel confirms it is allowed.
+If processor review does not approve variable capture, the viewer pays a known fixed amount before entering the queue and the wheel controls only stream presentation, bonus spins, and configured actions.
 
 ## MVP Scope
 
@@ -202,22 +202,30 @@ Exit criteria:
 - A streamer can configure a wheel and open an OBS-safe overlay URL.
 - A local queue item can spin, resolve an outcome, and update the counter.
 
-### Phase 4: Fixed-Price Spin Payments
+### Phase 4: Live Spin Authorizations
 
-Goal: connect one-time payments to queue and counter state.
+Goal: connect live-stream spin authorizations to queue, result, payment, and counter state.
+
+Status: Complete as of 2026-08-16. Verified in the Stripe sandbox with a `$25.00` maximum authorization, webhook-created queue entry, server-selected `2x` result, `$20.00` creator amount, `$5.00` application fee, partial capture, viewer receipt, counter and OBS overlay updates, unused-hold release, and offline profile cleanup.
 
 Deliverables:
 
-- Fixed-price spin checkout
-- PaymentIntent metadata for creator, spin config, and queue reconciliation
-- Payment-to-queue reconciliation
-- Spin entry point on the public bio page
-- Real-time payment, queue, and overlay updates
+- Manual creator live-session control with stale-session expiry
+- Live-only Spin entry point on the public bio page
+- Maximum authorization before queue entry
+- PaymentIntent metadata for creator, spin config, receipt, and queue reconciliation
+- Authorization-to-queue webhook reconciliation
+- Server-selected result and partial capture of the result plus service fee
+- Automatic release or cancellation of unused authorizations
+- Private viewer status and result receipt without signup
+- Real-time payment, queue, counter, and overlay updates
 
 Exit criteria:
 
-- A visitor can pay for a fixed-price spin without signing up.
-- A successful webhook creates a queue item and updates the overlay.
+- A visitor can authorize a live spin without signing up.
+- A successful authorization creates exactly one private queue item.
+- The streamer can resolve the spin on stream and capture only the result plus fee.
+- Offline profiles expose no Spin entry point.
 
 ### Phase 5: Twitch Integration
 

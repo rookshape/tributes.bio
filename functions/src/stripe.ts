@@ -1,9 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import Stripe from "stripe";
 
-const stripeSecret = defineSecret("STRIPE_SECRET_KEY");
+export const stripeSecret = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
 
 type ConnectStatus = "not_started" | "needs_action" | "pending" | "active" | "restricted";
@@ -15,6 +16,18 @@ type CheckoutRequest = {
   message?: unknown;
   origin?: unknown;
   senderName?: unknown;
+};
+
+type SpinCheckoutRequest = {
+  anonymous?: unknown;
+  creatorId?: unknown;
+  origin?: unknown;
+  senderName?: unknown;
+};
+
+type SpinSlice = {
+  type?: unknown;
+  value?: unknown;
 };
 
 function stripeClient() {
@@ -102,6 +115,30 @@ function connectStatus(account: Stripe.Account): ConnectStatus {
   }
 
   return "needs_action";
+}
+
+function spinResultAmountCents(slice: SpinSlice, baseAmountCents: number) {
+  const value = Number(slice.value ?? 0);
+
+  if (slice.type === "amount") {
+    return Number.isInteger(value) ? Math.max(0, value) : 0;
+  }
+
+  if (slice.type === "multiplier") {
+    return Number.isInteger(value)
+      ? baseAmountCents * Math.max(1, value)
+      : baseAmountCents;
+  }
+
+  if (slice.type === "action") {
+    return baseAmountCents;
+  }
+
+  return 0;
+}
+
+function totalWithServiceFee(amountCents: number) {
+  return amountCents + Math.round(amountCents * 0.25);
 }
 
 async function syncConnectAccount(
@@ -323,6 +360,7 @@ export const createTributeCheckoutSession = onCall(
     const username = String(creator.username ?? creatorId);
 
     await paymentRef.set({
+      kind: "tribute",
       creatorId,
       payerUid: request.auth?.uid ?? null,
       senderName,
@@ -397,6 +435,367 @@ export const createTributeCheckoutSession = onCall(
   },
 );
 
+export const createSpinCheckoutSession = onCall(
+  { secrets: [stripeSecret] },
+  async (request) => {
+    const data = request.data as SpinCheckoutRequest;
+    const creatorId = requiredId(data.creatorId, "creator ID");
+    const origin = allowedOrigin(data.origin);
+    const firestore = getFirestore();
+    const [creatorSnapshot, settingsSnapshot, configSnapshot, sessionSnapshot] =
+      await Promise.all([
+        firestore.doc(`creators/${creatorId}`).get(),
+        firestore.doc(`creatorSettings/${creatorId}`).get(),
+        firestore.doc(`creators/${creatorId}/spinConfigs/current`).get(),
+        firestore.doc(`creators/${creatorId}/spinSessions/current`).get(),
+      ]);
+    const creator = creatorSnapshot.data();
+    const settings = settingsSnapshot.data();
+    const config = configSnapshot.data();
+    const session = sessionSnapshot.data();
+    const liveHeartbeat = Number(session?.heartbeatAtMs ?? 0);
+
+    if (
+      !creatorSnapshot.exists ||
+      creator?.isPublished !== true ||
+      creator?.moderationStatus !== "active" ||
+      !configSnapshot.exists ||
+      config?.isEnabled !== true ||
+      session?.status !== "live" ||
+      Date.now() - liveHeartbeat >= 120000
+    ) {
+      throw new HttpsError("failed-precondition", "This creator is not accepting spins.");
+    }
+
+    const spinPriceCents = config?.spinPriceCents;
+
+    if (
+      typeof spinPriceCents !== "number" ||
+      !Number.isInteger(spinPriceCents) ||
+      spinPriceCents < 100 ||
+      spinPriceCents > 100000
+    ) {
+      throw new HttpsError("failed-precondition", "The spin price is invalid.");
+    }
+
+    const accountId = settings?.stripeAccountId;
+
+    if (
+      settings?.stripeOnboardingStatus !== "active" ||
+      typeof accountId !== "string"
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This creator is not accepting paid spins yet.",
+      );
+    }
+
+    const stripe = stripeClient();
+    const account = await stripe.accounts.retrieve(accountId);
+
+    if (account.deleted || connectStatus(account) !== "active") {
+      if (!account.deleted) {
+        await syncConnectAccount(creatorId, account);
+      }
+      throw new HttpsError(
+        "failed-precondition",
+        "This creator is not accepting paid spins yet.",
+      );
+    }
+
+    const slices = Array.isArray(config?.slices) ? (config.slices as SpinSlice[]) : [];
+    const maximumCreatorAmountCents = Math.max(
+      spinPriceCents,
+      ...slices.map((slice) => spinResultAmountCents(slice, spinPriceCents)),
+    );
+
+    if (maximumCreatorAmountCents < 100 || maximumCreatorAmountCents > 100000) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Spin results must be between $1 and $1,000.",
+      );
+    }
+
+    const authorizedTotalCents = totalWithServiceFee(maximumCreatorAmountCents);
+    const anonymous = data.anonymous === true;
+    const senderName = anonymous ? "" : optionalText(data.senderName, 40);
+    const paymentRef = firestore.collection("payments").doc();
+    const receiptId = randomBytes(24).toString("base64url");
+    const receiptRef = firestore.doc(`spinReceipts/${receiptId}`);
+    const username = String(creator.username ?? creatorId);
+
+    const batch = firestore.batch();
+    batch.set(paymentRef, {
+        kind: "spin",
+        creatorId,
+        payerUid: request.auth?.uid ?? null,
+        senderName,
+        message: "",
+        anonymous,
+        currency: "usd",
+        baseAmountCents: spinPriceCents,
+        maximumCreatorAmountCents,
+        authorizedTotalCents,
+        creatorAmountCents: null,
+        platformFeeCents: null,
+        totalCents: null,
+        spinConfigId: "current",
+        queueEntryId: null,
+        receiptId,
+        status: "pending_checkout",
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    batch.set(receiptRef, {
+      creatorId,
+      creatorUsername: username,
+      viewerName: anonymous || !senderName ? "Anonymous" : senderName,
+      status: "checkout",
+      resultLabel: null,
+      creatorAmountCents: null,
+      totalCents: null,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedAtMs: Date.now(),
+    });
+    await batch.commit();
+
+    try {
+      const session = await stripe.checkout.sessions.create(
+        {
+          mode: "payment",
+          submit_type: "pay",
+          line_items: [
+            {
+              quantity: 1,
+              price_data: {
+                currency: "usd",
+                unit_amount: authorizedTotalCents,
+                product_data: {
+                  name: `Maximum spin authorization for ${String(creator.displayName ?? username)}`,
+                  description: "The final charge is based on the live wheel result.",
+                },
+              },
+            },
+          ],
+          metadata: {
+            creatorId,
+            kind: "spin",
+            paymentId: paymentRef.id,
+          },
+          payment_intent_data: {
+            capture_method: "manual",
+            transfer_data: { destination: accountId },
+            metadata: {
+              creatorId,
+              kind: "spin",
+              paymentId: paymentRef.id,
+            },
+          },
+          payment_method_types: ["card"],
+          success_url: `${origin}/${encodeURIComponent(username)}/spin?receipt=${encodeURIComponent(receiptId)}`,
+          cancel_url: `${origin}/${encodeURIComponent(username)}`,
+        },
+        { idempotencyKey: `spin_checkout_${paymentRef.id}` },
+      );
+
+      if (!session.url) {
+        throw new Error("Stripe did not return a checkout URL.");
+      }
+
+      await paymentRef.update({
+        stripeCheckoutSessionId: session.id,
+        status: "checkout_created",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      return { url: session.url };
+    } catch (error) {
+      await paymentRef.update({
+        status: "checkout_failed",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      await receiptRef.set(
+        {
+          status: "canceled",
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedAtMs: Date.now(),
+        },
+        { merge: true },
+      );
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Could not start checkout.",
+      );
+    }
+  },
+);
+
+async function updatePaymentAndSpinQueue(
+  paymentId: string,
+  status: string,
+  changes: Record<string, unknown>,
+) {
+  const firestore = getFirestore();
+  const paymentRef = firestore.doc(`payments/${paymentId}`);
+
+  await firestore.runTransaction(async (transaction) => {
+    const paymentSnapshot = await transaction.get(paymentRef);
+
+    if (!paymentSnapshot.exists) {
+      return;
+    }
+
+    const payment = paymentSnapshot.data()!;
+    const creatorId = payment.creatorId;
+    const isSpin = payment.kind === "spin" && typeof creatorId === "string";
+    let effectiveStatus = status;
+
+    if (
+      payment.status === "succeeded" &&
+      (status === "processing" || status === "authorized")
+    ) {
+      effectiveStatus = "succeeded";
+    } else if (payment.status === "authorized" && status === "processing") {
+      effectiveStatus = "authorized";
+    } else if (
+      ["failed", "canceled", "refunded", "disputed", "dispute_lost"].includes(
+        payment.status,
+      ) &&
+      (status === "processing" || status === "authorized")
+    ) {
+      effectiveStatus = payment.status;
+    }
+    const queueRef = isSpin
+      ? firestore.doc(`creators/${creatorId}/spinQueue/${paymentId}`)
+      : null;
+    const receiptRef =
+      isSpin && typeof payment.receiptId === "string"
+        ? firestore.doc(`spinReceipts/${payment.receiptId}`)
+        : null;
+    const [queueSnapshot, receiptSnapshot] = await Promise.all([
+      queueRef ? transaction.get(queueRef) : Promise.resolve(null),
+      receiptRef ? transaction.get(receiptRef) : Promise.resolve(null),
+    ]);
+    const paymentChanges: Record<string, unknown> = {
+      ...changes,
+      status: effectiveStatus,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    transaction.set(paymentRef, paymentChanges, { merge: true });
+
+    if (!queueRef || !queueSnapshot || !isSpin) {
+      return;
+    }
+
+    if (effectiveStatus === "authorized") {
+      const queueData = {
+        paymentId,
+        receiptId: payment.receiptId ?? null,
+        paymentStatus: effectiveStatus,
+        viewerName:
+          payment.anonymous === true || !payment.senderName
+            ? "Anonymous"
+            : String(payment.senderName).slice(0, 40),
+        amountCents: Number(payment.baseAmountCents ?? 0),
+        authorizedTotalCents: Number(payment.authorizedTotalCents ?? 0),
+        source: "payment",
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      if (!queueSnapshot.exists) {
+        transaction.create(queueRef, {
+          ...queueData,
+          status: "queued",
+          resultLabel: null,
+          createdAt: FieldValue.serverTimestamp(),
+          createdAtMs: Date.now(),
+        });
+        transaction.set(
+          paymentRef,
+          {
+            queueEntryId: queueRef.id,
+            queuedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } else if (queueSnapshot.data()?.status === "canceled") {
+        transaction.set(queueRef, { ...queueData, status: "queued" }, { merge: true });
+      } else {
+        transaction.set(queueRef, queueData, { merge: true });
+      }
+
+      if (receiptRef && receiptSnapshot?.exists) {
+        transaction.set(
+          receiptRef,
+          {
+            status: "queued",
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedAtMs: Date.now(),
+          },
+          { merge: true },
+        );
+      }
+
+      return;
+    }
+
+    if (effectiveStatus === "succeeded") {
+      if (queueSnapshot.exists) {
+        transaction.set(
+          queueRef,
+          {
+            paymentStatus: effectiveStatus,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      }
+      return;
+    }
+
+    if (!["failed", "canceled", "refunded", "disputed", "dispute_lost"].includes(effectiveStatus)) {
+      return;
+    }
+
+    if (queueSnapshot.exists) {
+      const currentQueueStatus = queueSnapshot.data()?.status;
+      const queueStatus =
+        currentQueueStatus === "queued" || currentQueueStatus === "capturing"
+          ? effectiveStatus === "canceled"
+            ? "canceled"
+            : "payment_failed"
+          : currentQueueStatus;
+
+      transaction.set(
+        queueRef,
+        {
+          paymentStatus: effectiveStatus,
+          status: queueStatus,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+
+    if (
+      receiptRef &&
+      receiptSnapshot?.exists &&
+      receiptSnapshot.data()?.status !== "completed"
+    ) {
+      transaction.set(
+        receiptRef,
+        {
+          status: effectiveStatus === "canceled" ? "canceled" : "payment_failed",
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedAtMs: Date.now(),
+        },
+        { merge: true },
+      );
+    }
+  });
+}
+
 async function updatePaymentFromSession(
   session: Stripe.Checkout.Session,
   status: string,
@@ -407,20 +806,17 @@ async function updatePaymentFromSession(
     return;
   }
 
-  await getFirestore().doc(`payments/${paymentId}`).set(
+  await updatePaymentAndSpinQueue(
+    paymentId,
+    status,
     {
-      status,
       stripeCheckoutSessionId: session.id,
       stripePaymentIntentId:
         typeof session.payment_intent === "string"
           ? session.payment_intent
           : session.payment_intent?.id ?? null,
       payerEmail: session.customer_details?.email ?? null,
-      completedAt:
-        status === "succeeded" ? FieldValue.serverTimestamp() : null,
-      updatedAt: FieldValue.serverTimestamp(),
     },
-    { merge: true },
   );
 }
 
@@ -434,17 +830,105 @@ async function updatePaymentFromIntent(
     return;
   }
 
-  await getFirestore().doc(`payments/${paymentId}`).set(
+  await updatePaymentAndSpinQueue(
+    paymentId,
+    status,
     {
-      status,
       stripePaymentIntentId: intent.id,
+      amountCapturableCents: intent.amount_capturable,
       failureMessage: intent.last_payment_error?.message ?? null,
-      completedAt:
-        status === "succeeded" ? FieldValue.serverTimestamp() : null,
+    },
+  );
+}
+
+export async function captureSpinAuthorization(
+  paymentId: string,
+  creatorAmountCents: number,
+) {
+  const paymentRef = getFirestore().doc(`payments/${paymentId}`);
+  const paymentSnapshot = await paymentRef.get();
+  const payment = paymentSnapshot.data();
+
+  if (
+    !paymentSnapshot.exists ||
+    payment?.kind !== "spin" ||
+    typeof payment.stripePaymentIntentId !== "string"
+  ) {
+    throw new HttpsError("failed-precondition", "Spin authorization not found.");
+  }
+
+  const platformFeeCents = Math.round(creatorAmountCents * 0.25);
+  const totalCents = creatorAmountCents + platformFeeCents;
+
+  if (
+    !Number.isInteger(creatorAmountCents) ||
+    creatorAmountCents < 100 ||
+    totalCents > Number(payment.authorizedTotalCents ?? 0)
+  ) {
+    throw new HttpsError("failed-precondition", "Spin result exceeds the authorization.");
+  }
+
+  const stripe = stripeClient();
+  const intent = await stripe.paymentIntents.retrieve(
+    payment.stripePaymentIntentId,
+  );
+
+  if (intent.status !== "succeeded") {
+    if (intent.status !== "requires_capture") {
+      throw new HttpsError("failed-precondition", "The payment is not capturable.");
+    }
+
+    await stripe.paymentIntents.capture(
+      intent.id,
+      {
+        amount_to_capture: totalCents,
+        application_fee_amount: platformFeeCents,
+        metadata: {
+          ...intent.metadata,
+          creatorAmountCents: String(creatorAmountCents),
+          platformFeeCents: String(platformFeeCents),
+        },
+      },
+      { idempotencyKey: `spin_capture_${paymentId}` },
+    );
+  }
+
+  await paymentRef.set(
+    {
+      creatorAmountCents,
+      platformFeeCents,
+      totalCents,
+      capturedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
   );
+
+  return { platformFeeCents, totalCents };
+}
+
+export async function cancelSpinAuthorization(paymentId: string) {
+  const paymentRef = getFirestore().doc(`payments/${paymentId}`);
+  const paymentSnapshot = await paymentRef.get();
+  const payment = paymentSnapshot.data();
+
+  if (
+    !paymentSnapshot.exists ||
+    payment?.kind !== "spin" ||
+    typeof payment.stripePaymentIntentId !== "string"
+  ) {
+    return;
+  }
+
+  const intent = await stripeClient().paymentIntents.retrieve(
+    payment.stripePaymentIntentId,
+  );
+
+  if (intent.status === "requires_capture") {
+    await stripeClient().paymentIntents.cancel(intent.id, undefined, {
+      idempotencyKey: `spin_cancel_${paymentId}`,
+    });
+  }
 }
 
 async function updatePaymentByIntentId(
@@ -458,9 +942,13 @@ async function updatePaymentByIntentId(
     .get();
 
   if (!snapshot.empty) {
-    await snapshot.docs[0].ref.set(
-      { ...changes, updatedAt: FieldValue.serverTimestamp() },
-      { merge: true },
+    const status = typeof changes.status === "string" ? changes.status : "processing";
+    const paymentChanges = { ...changes };
+    delete paymentChanges.status;
+    await updatePaymentAndSpinQueue(
+      snapshot.docs[0].id,
+      status,
+      paymentChanges,
     );
   }
 }
@@ -510,8 +998,17 @@ export const stripeWebhook = onRequest(
       case "checkout.session.async_payment_failed":
         await updatePaymentFromSession(event.data.object, "failed");
         break;
+      case "checkout.session.expired":
+        await updatePaymentFromSession(event.data.object, "canceled");
+        break;
       case "payment_intent.succeeded":
         await updatePaymentFromIntent(event.data.object, "succeeded");
+        break;
+      case "payment_intent.amount_capturable_updated":
+        await updatePaymentFromIntent(
+          event.data.object,
+          event.data.object.amount_capturable > 0 ? "authorized" : "processing",
+        );
         break;
       case "payment_intent.payment_failed":
         await updatePaymentFromIntent(event.data.object, "failed");

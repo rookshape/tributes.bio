@@ -134,6 +134,7 @@ export const recordAnalyticsEvent = onCall(async (request) => {
 export {
   createStripeConnectDashboardLink,
   createStripeConnectOnboardingLink,
+  createSpinCheckoutSession,
   createTributeCheckoutSession,
   getCreatorPaymentAvailability,
   refreshStripeConnectStatus,
@@ -143,5 +144,7 @@ export {
 export {
   adjustSpinCounter,
   createMockSpinEntry,
+  heartbeatSpinSession,
+  setSpinLiveStatus,
   triggerSpin,
 } from "./spin.js";

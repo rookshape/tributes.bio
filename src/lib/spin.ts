@@ -16,6 +16,9 @@ import { db, functions } from "./firebase";
 import type {
   SpinConfig,
   SpinQueueEntry,
+  SpinReceipt,
+  SpinReceiptStatus,
+  SpinSession,
   SpinSlice,
   SpinSliceType,
   SpinState,
@@ -46,6 +49,7 @@ export function createDefaultSpinConfig(creatorId: string): SpinConfig {
     counterLabel: "Tribute total",
     spinPriceCents: 1000,
     isEnabled: false,
+    showOnProfile: true,
     mockModeEnabled: true,
     slices: defaultSpinSlices.map((slice) => ({ ...slice })),
   };
@@ -96,6 +100,17 @@ export function validateSpinConfig(config: SpinConfig) {
     throw new Error("Every slice needs a label.");
   }
 
+  if (
+    slices.some(
+      (slice) =>
+        (slice.type === "amount" && (slice.value < 100 || slice.value > 100000)) ||
+        (slice.type === "multiplier" &&
+          (slice.value < 1 || config.spinPriceCents * slice.value > 100000)),
+    )
+  ) {
+    throw new Error("Every paid result must be between $1 and $1,000.");
+  }
+
   return { ...config, title, counterLabel, slices };
 }
 
@@ -105,6 +120,43 @@ function configRef(creatorId: string) {
 
 function stateRef(creatorId: string) {
   return doc(db, "creators", creatorId, "spinStates", "current");
+}
+
+function sessionRef(creatorId: string) {
+  return doc(db, "creators", creatorId, "spinSessions", "current");
+}
+
+function receiptRef(receiptId: string) {
+  return doc(db, "spinReceipts", receiptId);
+}
+
+export function spinResultAmountCents(slice: SpinSlice, baseAmountCents: number) {
+  if (slice.type === "amount") {
+    return slice.value;
+  }
+
+  if (slice.type === "multiplier") {
+    return baseAmountCents * Math.max(1, slice.value);
+  }
+
+  if (slice.type === "action") {
+    return baseAmountCents;
+  }
+
+  return 0;
+}
+
+export function maxSpinAmountCents(config: SpinConfig) {
+  return Math.max(
+    config.spinPriceCents,
+    ...config.slices.map((slice) =>
+      spinResultAmountCents(slice, config.spinPriceCents),
+    ),
+  );
+}
+
+export function totalWithServiceFee(amountCents: number) {
+  return amountCents + Math.round(amountCents * 0.25);
 }
 
 function mapSpinConfig(creatorId: string, data: DocumentData): SpinConfig {
@@ -120,6 +172,7 @@ function mapSpinConfig(creatorId: string, data: DocumentData): SpinConfig {
       typeof data.counterLabel === "string" ? data.counterLabel : defaults.counterLabel,
     spinPriceCents: Number(data.spinPriceCents ?? defaults.spinPriceCents),
     isEnabled: Boolean(data.isEnabled),
+    showOnProfile: data.showOnProfile !== false,
     mockModeEnabled: data.mockModeEnabled !== false,
     slices,
   };
@@ -156,11 +209,56 @@ function mapQueueEntry(snapshot: QueryDocumentSnapshot<DocumentData>): SpinQueue
     id: snapshot.id,
     viewerName: String(data.viewerName ?? "Viewer"),
     amountCents: Number(data.amountCents ?? 0),
-    source: data.source === "bonus" ? "bonus" : "mock",
-    status: data.status === "completed" ? "completed" : "queued",
+    authorizedTotalCents: Number(data.authorizedTotalCents ?? 0),
+    source:
+      data.source === "bonus"
+        ? "bonus"
+        : data.source === "payment"
+          ? "payment"
+          : "mock",
+    status: ["queued", "capturing", "completed", "payment_failed", "canceled"].includes(
+      data.status,
+    )
+      ? data.status
+      : "queued",
     resultLabel: typeof data.resultLabel === "string" ? data.resultLabel : null,
     createdAtMs:
       typeof timestamp?.toMillis === "function" ? timestamp.toMillis() : Number(data.createdAtMs ?? 0),
+  };
+}
+
+function mapSpinSession(creatorId: string, data: DocumentData | undefined): SpinSession {
+  return {
+    creatorId,
+    status: data?.status === "live" ? "live" : "offline",
+    startedAtMs: Number(data?.startedAtMs ?? 0),
+    heartbeatAtMs: Number(data?.heartbeatAtMs ?? 0),
+  };
+}
+
+function mapSpinReceipt(receiptId: string, data: DocumentData): SpinReceipt {
+  const allowedStatuses: SpinReceiptStatus[] = [
+    "checkout",
+    "authorized",
+    "queued",
+    "capturing",
+    "bonus",
+    "completed",
+    "payment_failed",
+    "canceled",
+  ];
+
+  return {
+    id: receiptId,
+    creatorId: String(data.creatorId ?? ""),
+    creatorUsername: String(data.creatorUsername ?? ""),
+    viewerName: String(data.viewerName ?? "Viewer"),
+    status: allowedStatuses.includes(data.status) ? data.status : "checkout",
+    resultLabel: typeof data.resultLabel === "string" ? data.resultLabel : null,
+    creatorAmountCents:
+      typeof data.creatorAmountCents === "number" ? data.creatorAmountCents : null,
+    totalCents: typeof data.totalCents === "number" ? data.totalCents : null,
+    updatedAtMs: Number(data.updatedAtMs ?? 0),
   };
 }
 
@@ -209,6 +307,32 @@ export function subscribeSpinState(
   });
 }
 
+export function subscribeSpinSession(
+  creatorId: string,
+  onChange: (session: SpinSession) => void,
+): Unsubscribe {
+  return onSnapshot(sessionRef(creatorId), (snapshot) => {
+    onChange(mapSpinSession(creatorId, snapshot.data()));
+  });
+}
+
+export function subscribeSpinReceipt(
+  receiptId: string,
+  onChange: (receipt: SpinReceipt | null) => void,
+): Unsubscribe {
+  return onSnapshot(receiptRef(receiptId), (snapshot) => {
+    onChange(snapshot.exists() ? mapSpinReceipt(receiptId, snapshot.data()) : null);
+  });
+}
+
+export function spinSessionIsLive(session: SpinSession | null, now = Date.now()) {
+  return Boolean(
+    session?.status === "live" &&
+      session.heartbeatAtMs > 0 &&
+      now - session.heartbeatAtMs < 120000,
+  );
+}
+
 export function subscribeSpinQueue(
   creatorId: string,
   onChange: (entries: SpinQueueEntry[]) => void,
@@ -234,6 +358,16 @@ const adjustCounterCall = httpsCallable<
   { counterCents: number }
 >(functions, "adjustSpinCounter");
 
+const setLiveStatusCall = httpsCallable<
+  { creatorId: string; isLive: boolean },
+  { status: "offline" | "live"; heartbeatAtMs: number }
+>(functions, "setSpinLiveStatus");
+
+const heartbeatCall = httpsCallable<
+  { creatorId: string },
+  { heartbeatAtMs: number }
+>(functions, "heartbeatSpinSession");
+
 export async function createMockSpinEntry(creatorId: string, viewerName: string) {
   const result = await createMockEntryCall({ creatorId, viewerName: viewerName.trim() });
   return result.data;
@@ -247,4 +381,14 @@ export async function triggerNextSpin(creatorId: string) {
 export async function adjustSpinCounter(creatorId: string, deltaCents: number) {
   const result = await adjustCounterCall({ creatorId, deltaCents: Math.round(deltaCents) });
   return result.data.counterCents;
+}
+
+export async function setSpinLiveStatus(creatorId: string, isLive: boolean) {
+  const result = await setLiveStatusCall({ creatorId, isLive });
+  return result.data;
+}
+
+export async function heartbeatSpinSession(creatorId: string) {
+  const result = await heartbeatCall({ creatorId });
+  return result.data;
 }
