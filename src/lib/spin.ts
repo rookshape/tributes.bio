@@ -53,6 +53,9 @@ export const defaultSpinSlices: SpinSlice[] = defaultSlicesWithoutColor.map(
 
 export function createDefaultSpinConfig(creatorId: string): SpinConfig {
   return {
+    id: "current",
+    name: "Default wheel",
+    archived: false,
     creatorId,
     title: "Spin the wheel",
     counterLabel: "Tribute goal",
@@ -91,6 +94,12 @@ function normalizeSlice(
 }
 
 export function validateSpinConfig(config: SpinConfig) {
+  const name = config.name.trim();
+
+  if (!name || name.length > 60) {
+    throw new Error("Wheel name must be between 1 and 60 characters.");
+  }
+
   const title = config.title.trim();
   const counterLabel = config.counterLabel.trim();
 
@@ -137,7 +146,7 @@ export function validateSpinConfig(config: SpinConfig) {
     throw new Error("Every paid result must be between $1 and $1,000.");
   }
 
-  return { ...config, title, counterLabel, wheelHue, wheelTone, slices };
+  return { ...config, name, title, counterLabel, wheelHue, wheelTone, slices };
 }
 
 function configRef(creatorId: string) {
@@ -185,7 +194,11 @@ export function totalWithServiceFee(amountCents: number) {
   return amountCents + Math.round(amountCents * 0.25);
 }
 
-function mapSpinConfig(creatorId: string, data: DocumentData): SpinConfig {
+function mapSpinConfig(
+  creatorId: string,
+  data: DocumentData,
+  id = "current",
+): SpinConfig {
   const defaults = createDefaultSpinConfig(creatorId);
   const wheelHue = normalizeWheelHue(data.wheelHue);
   const wheelTone = normalizeWheelTone(data.wheelTone);
@@ -202,6 +215,9 @@ function mapSpinConfig(creatorId: string, data: DocumentData): SpinConfig {
     : defaults.slices;
 
   return {
+    id,
+    name: typeof data.name === "string" && data.name.trim() ? data.name : defaults.name,
+    archived: data.archived === true,
     creatorId,
     title: typeof data.title === "string" ? data.title : defaults.title,
     // "Tribute total" was the previous default; move those wheels onto the new
@@ -349,9 +365,10 @@ export async function getOrCreateSpinConfig(creatorId: string) {
 
 export async function saveSpinConfig(config: SpinConfig) {
   const normalized = validateSpinConfig(config);
+  const { id: _id, ...stored } = normalized;
   await setDoc(
     configRef(config.creatorId),
-    { ...normalized, updatedAt: serverTimestamp() },
+    { ...stored, updatedAt: serverTimestamp() },
     { merge: true },
   );
   return normalized;
@@ -365,6 +382,9 @@ export function subscribeSpinConfig(
     onChange(snapshot.exists() ? mapSpinConfig(creatorId, snapshot.data()) : null);
   });
 }
+
+/** Shared with the wheel library, which stores the same shape under its own id. */
+export { mapSpinConfig };
 
 export function subscribeSpinState(
   creatorId: string,

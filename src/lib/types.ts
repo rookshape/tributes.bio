@@ -90,6 +90,11 @@ export type SpinSlice = {
 };
 
 export type SpinConfig = {
+  /** Document id. "current" is the active wheel the Cloud Functions read. */
+  id: string;
+  /** Library name, shown in the wheel list. */
+  name: string;
+  archived: boolean;
   creatorId: string;
   title: string;
   counterLabel: string;

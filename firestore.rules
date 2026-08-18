@@ -61,6 +61,10 @@ service cloud.firestore {
     function validSpinConfig(creatorId) {
       return request.resource.data.keys().hasOnly([
           'creatorId',
+          'name',
+          'archived',
+          'activeWheelId',
+          'createdAt',
           'title',
           'counterLabel',
           'spinPriceCents',
@@ -74,6 +78,13 @@ service cloud.firestore {
           'updatedAt'
         ])
         && request.resource.data.creatorId == creatorId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.archived is bool
+        // Only the active document carries a pointer, and only ever to a string id.
+        && (!('activeWheelId' in request.resource.data)
+          || request.resource.data.activeWheelId is string)
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 60
@@ -168,8 +179,7 @@ service cloud.firestore {
             && resource.data.isEnabled == true
             && get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
             && get(/databases/$(database)/documents/creators/$(creatorId)).data.moderationStatus == 'active');
-        allow create, update: if configId == 'current'
-          && owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+        allow create, update: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
           && validSpinConfig(creatorId);
         allow delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
       }
