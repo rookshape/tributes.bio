@@ -13,6 +13,7 @@ import {
   OVERLAY_PARTS,
   OverlayGoalBar,
   OverlayQueue,
+  OverlayTotal,
   OverlayWheel,
 } from "../components/overlay/OverlayParts";
 import {
@@ -61,7 +62,7 @@ import type {
  * touches mid-stream directly on them: the spin button, and the goal.
  *
  * Everything else — overlay URLs, a test spin — is setup, so it lives behind a
- * disclosure at the bottom instead of taking up the surface.
+ * disclosure rather than taking up the surface.
  */
 
 /** Signals the transparent region OBS will key out. */
@@ -361,45 +362,10 @@ export function LiveControlPage() {
 
       <StatusMessage className="mt-5" tone="error">{error}</StatusMessage>
 
-      {/* The overlay itself, at working size. */}
-      <div
-        className="mt-5 rounded-panel border border-line p-5 sm:p-8"
-        style={STAGE}
-      >
-        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="flex min-w-0 flex-col items-center gap-6">
-            <div className="w-full max-w-[420px]">
-              <OverlayWheel
-                animation={animation}
-                config={shownWheel}
-                spinning={spinning}
-                state={state}
-              />
-            </div>
-            <LiveGoalBar
-              config={config}
-              goal={goal}
-              onSave={(goalCents) =>
-                saveSpinGoal({
-                  ...goal,
-                  creatorId,
-                  goalCents,
-                  label: DEFAULT_GOAL_LABEL,
-                }).then(setGoal)
-              }
-              state={state}
-            />
-          </div>
-          <div className="mx-auto w-full max-w-[320px] lg:mx-0">
-            <OverlayQueue config={config} entries={queued} />
-          </div>
-        </div>
-      </div>
-
-      {/* The only action. */}
-      <div className="mt-6 grid justify-items-center gap-2">
+      {/* The only action, and the setup that sits beside it. */}
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
         <Button
-          className="min-w-56"
+          className="min-w-48"
           disabled={spinning || queued.length === 0 || !manualLive}
           iconLeft={working ? undefined : <Play size={19} />}
           loading={working}
@@ -409,10 +375,10 @@ export function LiveControlPage() {
         >
           {spinning ? "Spinning" : runOpen ? "Spin again" : "Spin"}
         </Button>
-        <p className="text-detail text-content-muted">
+        <p className="min-w-0 flex-1 text-detail text-content-muted">
           {spinBlockedReason ??
             (runOpen
-              ? `${state?.viewerName} is on ${formatMoney(state?.tabCents ?? 0)} and still going`
+              ? `${state?.viewerName} is on ${formatMoney(state?.tabCents ?? 0)}, ${state?.spinsLeft ?? 0} to go`
               : nextUp
                 ? `${nextUp.viewerName}${nextUp.wheelName ? ` · ${nextUp.wheelName}` : ""}`
                 : null)}
@@ -420,15 +386,15 @@ export function LiveControlPage() {
       </div>
 
       {/* Setup, not stream controls. */}
-      <details className="group mt-8 border-t border-line pt-4">
-        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-detail font-medium text-content-muted hover:text-content">
+      <details className="group mt-4">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-detail font-medium text-content-muted hover:text-content">
           <ChevronDown
             className="transition-transform duration-fast group-open:rotate-180"
             size={15}
           />
           OBS sources
         </summary>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {OVERLAY_PARTS.map((part) => {
             const path = `${overlayBase}/${part.id}`;
             return (
@@ -483,6 +449,42 @@ export function LiveControlPage() {
           </p>
         </div>
       </details>
+      {/* The overlay itself, at working size. */}
+      <div
+        className="mt-5 rounded-panel border border-line p-5 sm:p-8"
+        style={STAGE}
+      >
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="flex min-w-0 flex-col items-center gap-6">
+            <div className="w-full max-w-[420px]">
+              <OverlayWheel
+                animation={animation}
+                config={shownWheel}
+                spinning={spinning}
+                state={state}
+              />
+            </div>
+            <OverlayTotal config={shownWheel} spinning={spinning} state={state} />
+            <LiveGoalBar
+              config={config}
+              goal={goal}
+              onSave={(goalCents) =>
+                saveSpinGoal({
+                  ...goal,
+                  creatorId,
+                  goalCents,
+                  label: DEFAULT_GOAL_LABEL,
+                }).then(setGoal)
+              }
+              state={state}
+            />
+          </div>
+          <div className="mx-auto w-full max-w-[320px] lg:mx-0">
+            <OverlayQueue config={config} entries={queued} />
+          </div>
+        </div>
+      </div>
+
     </section>
   );
 }

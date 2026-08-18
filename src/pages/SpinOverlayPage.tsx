@@ -4,6 +4,7 @@ import type { SpinAnimation } from "../components/SpinWheel";
 import {
   OverlayGoalBar,
   OverlayQueue,
+  OverlayTotal,
   OverlayWheel,
   type OverlayPart,
 } from "../components/overlay/OverlayParts";
@@ -21,7 +22,9 @@ import {
 import type { SpinConfig, SpinQueueEntry, SpinState } from "../lib/types";
 
 function isOverlayPart(value: string | undefined): value is OverlayPart {
-  return value === "wheel" || value === "bar" || value === "queue";
+  return (
+    value === "wheel" || value === "total" || value === "bar" || value === "queue"
+  );
 }
 
 export function SpinOverlayPage() {
@@ -117,6 +120,13 @@ export function SpinOverlayPage() {
       {activePart === "wheel" ? (
         <OverlayWheel
           animation={animation}
+          config={queuedWheel ?? config}
+          spinning={spinning}
+          state={state}
+        />
+      ) : null}
+      {activePart === "total" ? (
+        <OverlayTotal
           config={queuedWheel ?? config}
           spinning={spinning}
           state={state}

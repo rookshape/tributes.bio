@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { SpinWheel, type SpinAnimation } from "../SpinWheel";
 import {
   wheelAccent,
@@ -15,10 +16,11 @@ import type { SpinConfig, SpinQueueEntry, SpinState } from "../../lib/types";
  * Every panel is light frosted glass tinted towards the wheel's hue — never a
  * solid dark plate, which would cut a hard rectangle out of the stream.
  */
-export type OverlayPart = "wheel" | "bar" | "queue";
+export type OverlayPart = "wheel" | "total" | "bar" | "queue";
 
 export const OVERLAY_PARTS: { id: OverlayPart; label: string; hint: string }[] = [
   { id: "wheel", label: "Wheel", hint: "The wheel and its result" },
+  { id: "total", label: "Running total", hint: "The tab climbing as they spin" },
   { id: "bar", label: "Progress bar", hint: "Tribute goal progress" },
   { id: "queue", label: "Queue", hint: "Who is waiting to spin" },
 ];
@@ -39,10 +41,6 @@ export function OverlayWheel({
   spinning: boolean;
 }) {
   const appearance = appearanceOf(config);
-  // Mid-animation the state already holds the new tab, so show the value from
-  // before this spin until the wheel settles.
-  const tabCents = spinning ? (state?.tabBeforeCents ?? 0) : (state?.tabCents ?? 0);
-  const tabMaxCents = state?.tabMaxCents ?? 0;
 
   return (
     <div className="flex w-full flex-col items-center gap-3">
@@ -58,30 +56,148 @@ export function OverlayWheel({
           <p className="text-sm font-medium opacity-70 lg:text-base">
             {state.viewerName}
           </p>
+          {/* The money lives on the Running total source, which the streamer
+              places wherever it suits their scene. */}
           <p className="text-xl font-bold leading-tight lg:text-3xl">
             {spinning ? "Spinning" : state.resultLabel}
           </p>
-          {/* The whole point of a run: what they owe climbing as it goes. The
-              tab holds its old value through the animation so the jump lands
-              with the result rather than spoiling it. */}
-          {tabCents > 0 ? (
-            <p className="mt-1 text-lg font-bold leading-none tabular-nums lg:text-2xl">
-              {formatMoney(tabCents)}
-              {tabMaxCents > 0 ? (
-                <span className="font-semibold opacity-50">
-                  {" "}
-                  / {formatMoney(tabMaxCents)}
-                </span>
-              ) : null}
-            </p>
-          ) : null}
-          {!spinning && state.tabOpen ? (
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-60 lg:text-sm">
-              Spins again
-            </p>
-          ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** One digit of the reel, rolled into place rather than swapped. */
+function Reel({ char }: { char: string }) {
+  const digit = Number(char);
+
+  if (!/^\d$/.test(char)) {
+    return <span className="inline-block">{char}</span>;
+  }
+
+  return (
+    <span className="reel-window">
+      <span
+        className="reel-strip"
+        style={{ transform: `translateY(${-digit * 10}%)` }}
+      >
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((value) => (
+          <span className="reel-cell" key={value}>
+            {value}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The running total. This is the part of a run people watch — the number
+ * climbing as multipliers land — so it gets its own source the streamer can put
+ * anywhere, and it behaves like a slot machine: digits roll into place, the
+ * panel kicks when the number moves, and anything the slice handed out flies up
+ * over the top.
+ */
+export function OverlayTotal({
+  config,
+  state,
+  spinning,
+}: {
+  config: SpinConfig;
+  state: SpinState | null;
+  spinning: boolean;
+}) {
+  const appearance = appearanceOf(config);
+  const ink = wheelInk(appearance);
+  const accent = wheelAccent(appearance);
+
+  // Mid-animation the state already holds the new tab, so the reels hold the
+  // value from before this spin and roll only once the wheel settles.
+  const tabCents = spinning ? (state?.tabBeforeCents ?? 0) : (state?.tabCents ?? 0);
+  const spinsLeft = state?.spinsLeft ?? 0;
+  const multiplier = spinning ? 0 : (state?.multiplier ?? 0);
+  const spinsAwarded = spinning ? 0 : (state?.spinsAwarded ?? 0);
+
+  // Re-key the kick and the award flash on each settled result so the CSS
+  // animations replay rather than firing once and staying put.
+  const [pulseKey, setPulseKey] = useState(0);
+  const previousTabRef = useRef(tabCents);
+
+  useEffect(() => {
+    if (tabCents !== previousTabRef.current) {
+      previousTabRef.current = tabCents;
+      setPulseKey((key) => key + 1);
+    }
+  }, [tabCents]);
+
+  if (!state?.viewerName) {
+    return null;
+  }
+
+  const amount = formatMoney(tabCents);
+  // A multiplier already grants its own spin, so it is called out as the
+  // multiplier rather than as "+1 spin".
+  const award =
+    multiplier > 1
+      ? `${multiplier}×`
+      : spinsAwarded > 0
+        ? `+${spinsAwarded} ${spinsAwarded === 1 ? "spin" : "spins"}`
+        : null;
+
+  return (
+    <div
+      className="relative w-full max-w-[420px] rounded-3xl border px-6 py-4 text-center backdrop-blur-md"
+      style={{ ...wheelGlass(appearance), color: ink }}
+    >
+      {award ? (
+        <span
+          className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full px-3 py-1 text-sm font-bold lg:text-base"
+          key={`award-${pulseKey}`}
+          style={{
+            animation: "award-flash 1.6s var(--ease-standard) forwards",
+            backgroundColor: accent,
+            color: "#fff",
+          }}
+        >
+          {award}
+        </span>
+      ) : null}
+
+      <p className="truncate text-xs font-semibold uppercase tracking-[0.14em] opacity-65 lg:text-sm">
+        {state.viewerName}
+      </p>
+
+      <p
+        className="mt-1 flex items-center justify-center text-4xl font-black leading-none lg:text-6xl"
+        key={`total-${pulseKey}`}
+        style={{ animation: "total-pop 480ms var(--ease-standard)" }}
+      >
+        {amount.split("").map((char, index) => (
+          <Reel char={char} key={`${index}-${char}`} />
+        ))}
+      </p>
+
+      <div className="mt-2.5 flex items-center justify-center gap-3 text-xs font-semibold uppercase tracking-wide lg:text-sm">
+        {spinsLeft > 0 ? (
+          <span className="flex items-center gap-1.5">
+            {/* Pips read faster than a number at stream distance. */}
+            <span className="flex gap-1">
+              {Array.from({ length: Math.min(spinsLeft, 6) }, (_, index) => (
+                <span
+                  className="h-2 w-2 rounded-full"
+                  key={index}
+                  style={{ backgroundColor: accent }}
+                />
+              ))}
+            </span>
+            <span className="opacity-70">
+              {spinsLeft > 6 ? `${spinsLeft} left` : "left"}
+            </span>
+          </span>
+        ) : (
+          <span className="opacity-55">Run complete</span>
+        )}
+      </div>
     </div>
   );
 }

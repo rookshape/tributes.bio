@@ -1,11 +1,15 @@
 /**
- * A spin is a *run*, not a single event. Multipliers and bonus slices keep the
- * run going, and what the viewer owes accumulates across it:
+ * A spin is a *run*, not a single event.
  *
- *   pay $10 to spin  ->  tab $10
- *   land 2x          ->  tab $20, spin again
- *   land +1          ->  tab $20, spin again
- *   land $20         ->  tab $40, run ends and captures
+ * A viewer buys a run and gets the wheel's spins-per-purchase to use. Slices
+ * hand out more spins, multiply what they owe, or add cash, and the tab
+ * accumulates across the whole run:
+ *
+ *   pay $5 for 3 spins  ->  tab $5, 3 spins
+ *   land 2x             ->  tab $10, still 3 spins (a multiplier is free)
+ *   land +2 spins       ->  tab $10, 4 spins
+ *   land $20            ->  tab $30, 3 spins
+ *   ...until the spins run out
  *
  * Stripe needs the amount agreed up front, so the wheel's max charge bounds the
  * run: the tab clamps there and the run ends. That ceiling is what gets
@@ -21,12 +25,25 @@ export type TabSlice = {
   value?: unknown;
 };
 
-/** An all-bonus wheel would otherwise never end a run. */
-export const MAX_RUN_SPINS = 20;
+/** Backstop against a wheel whose slices only ever hand out more spins. */
+export const MAX_RUN_SPINS = 30;
 
 export const MIN_MAX_CHARGE_CENTS = 100;
 export const MAX_MAX_CHARGE_CENTS = 500000;
 export const DEFAULT_MAX_CHARGE_MULTIPLE = 5;
+
+export const MIN_SPINS_PER_PURCHASE = 1;
+export const MAX_SPINS_PER_PURCHASE = 10;
+
+export function spinsPerPurchase(config: FirebaseFirestore.DocumentData | undefined) {
+  const stored = Number(config?.spinsPerPurchase);
+
+  if (!Number.isInteger(stored)) {
+    return MIN_SPINS_PER_PURCHASE;
+  }
+
+  return Math.min(MAX_SPINS_PER_PURCHASE, Math.max(MIN_SPINS_PER_PURCHASE, stored));
+}
 
 /**
  * The most one slice can move a tab. The cap can never sit below this, or the
@@ -69,51 +86,69 @@ export function maxChargeCents(
   );
 }
 
-export type TabStep = {
-  /** What the viewer owes after this slice, never above the cap. */
+export type TabRun = {
+  /** What the viewer owes so far, never above the cap. */
   tabCents: number;
+  /** Spins still owed to them. */
+  spinsLeft: number;
+  /** Spins already taken in this run. */
+  spinsTaken: number;
+};
+
+export type TabStep = TabRun & {
   /** Whether the run keeps going rather than capturing now. */
   continues: boolean;
   /** The run stopped because it reached the wheel's ceiling. */
   capped: boolean;
+  /** Spins this slice handed out, for the overlay to call out. */
+  spinsAwarded: number;
+  /** Multiplier this slice applied, or 0. */
+  multiplier: number;
 };
 
-/**
- * Apply one landed slice to a run's tab.
- *
- * `spinsSoFar` counts spins already taken in this run, including the one that
- * produced `slice`.
- */
+/** Apply one landed slice to a run. */
 export function applyTabStep(
   slice: TabSlice,
-  tabCents: number,
+  run: TabRun,
   capCents: number,
-  spinsSoFar: number,
 ): TabStep {
   const value = Number(slice?.value ?? 0);
-  let next = tabCents;
-  let continues = false;
+  const spinsTaken = run.spinsTaken + 1;
+  // The spin they just used is spent whatever it landed on.
+  let spinsLeft = Math.max(0, run.spinsLeft - 1);
+  let tabCents = run.tabCents;
+  let spinsAwarded = 0;
+  let multiplier = 0;
 
   if (slice?.type === "amount") {
-    next = tabCents + Math.max(0, value);
+    tabCents = run.tabCents + Math.max(0, value);
   } else if (slice?.type === "multiplier") {
-    next = tabCents * Math.max(1, value);
-    continues = true;
+    multiplier = Math.max(1, value);
+    tabCents = run.tabCents * multiplier;
+    // A multiplier costs nothing to land on — it escalates the run rather than
+    // spending one of the spins the viewer paid for.
+    spinsLeft += 1;
+    spinsAwarded = 1;
   } else if (slice?.type === "bonus") {
-    continues = true;
+    spinsAwarded = Math.max(0, Math.round(value));
+    spinsLeft += spinsAwarded;
   }
-  // An action slice costs nothing extra and ends the run.
+  // An action slice costs nothing extra and just uses up a spin.
 
-  const clamped = Math.max(0, Math.min(capCents, Math.round(next)));
+  const clamped = Math.max(0, Math.min(capCents, Math.round(tabCents)));
 
   // Once the ceiling is reached nothing further can be charged, so the run ends
   // there rather than spinning for nothing.
-  const capped = continues && clamped >= capCents;
-  const exhausted = spinsSoFar >= MAX_RUN_SPINS;
+  const capped = clamped >= capCents;
+  const exhausted = spinsTaken >= MAX_RUN_SPINS;
 
   return {
     tabCents: clamped,
-    continues: continues && !capped && !exhausted,
+    spinsLeft,
+    spinsTaken,
+    continues: spinsLeft > 0 && !capped && !exhausted,
     capped,
+    spinsAwarded,
+    multiplier,
   };
 }

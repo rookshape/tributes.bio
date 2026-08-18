@@ -4,7 +4,7 @@ import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import Stripe from "stripe";
 import { spinSessionIsLive } from "./spin-session.js";
-import { maxChargeCents } from "./spin-tab.js";
+import { maxChargeCents, spinsPerPurchase } from "./spin-tab.js";
 
 export const stripeSecret = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
@@ -545,6 +545,7 @@ export const createSpinCheckoutSession = onCall(
     // is also the number the viewer agreed to on the spin page. The tab stops
     // there, so the capture can never exceed this hold.
     const maximumCreatorAmountCents = maxChargeCents(config, spinPriceCents, slices);
+    const runSpins = spinsPerPurchase(config);
 
     if (maximumCreatorAmountCents < 100 || maximumCreatorAmountCents > 500000) {
       throw new HttpsError(
@@ -577,6 +578,7 @@ export const createSpinCheckoutSession = onCall(
         anonymous,
         currency: "usd",
         baseAmountCents: spinPriceCents,
+        spinsPerPurchase: runSpins,
         maximumCreatorAmountCents,
         authorizedTotalCents,
         creatorAmountCents: null,
@@ -748,6 +750,7 @@ async function updatePaymentAndSpinQueue(
         // the ceiling this authorization was taken against.
         tabCents: Number(payment.baseAmountCents ?? 0),
         tabMaxCents: Number(payment.maximumCreatorAmountCents ?? 0),
+        spinsLeft: Number(payment.spinsPerPurchase ?? 1),
         runSpins: 0,
         source: "payment",
         wheelId: typeof payment.wheelId === "string" ? payment.wheelId : "current",

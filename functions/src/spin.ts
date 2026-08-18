@@ -10,7 +10,7 @@ import {
 import {
   spinSessionIsLive,
 } from "./spin-session.js";
-import { applyTabStep, maxChargeCents } from "./spin-tab.js";
+import { applyTabStep, maxChargeCents, spinsPerPurchase } from "./spin-tab.js";
 
 type SpinSliceType = "amount" | "multiplier" | "bonus" | "action";
 
@@ -274,6 +274,7 @@ export const createMockSpinEntry = onCall(async (request) => {
         config.spinPriceCents,
         config.slices,
       ),
+      spinsLeft: spinsPerPurchase(configSnapshot.data()),
       runSpins: 0,
       source: "mock",
       wheelId: "current",
@@ -319,6 +320,8 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
   /** What the tab read before this spin, so the overlay holds the old number
    *  through the animation and ticks up only when the result lands. */
   let selectedTabBeforeCents = 0;
+  let selectedSpinsAwarded = 0;
+  let selectedMultiplier = 0;
 
   await firestore.runTransaction(async (transaction) => {
     const [creatorSnapshot, configSnapshot, stateSnapshot, sessionSnapshot, queueSnapshot] =
@@ -410,8 +413,24 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
       0,
       Math.min(capCents, Number(entry.tabCents ?? amountCents)),
     );
-    const runSpins = Number(entry.runSpins ?? 0) + 1;
-    const step = applyTabStep(slice, tabBeforeCents, capCents, runSpins);
+    // Entries queued before a wheel could grant several spins carry none, so
+    // they resolve as the single-spin runs they were bought as.
+    const storedSpinsLeft = Number(entry.spinsLeft);
+    const spinsBefore = Number.isInteger(storedSpinsLeft)
+      ? Math.max(0, storedSpinsLeft)
+      : spinsPerPurchase(
+          entryWheelSnapshot.exists ? entryWheelSnapshot.data() : configSnapshot.data(),
+        );
+    const step = applyTabStep(
+      slice,
+      {
+        tabCents: tabBeforeCents,
+        spinsLeft: Math.max(1, spinsBefore),
+        spinsTaken: Number(entry.runSpins ?? 0),
+      },
+      capCents,
+    );
+    const runSpins = step.spinsTaken;
     const deltaCents = step.tabCents;
     const paymentId = typeof entry.paymentId === "string" ? entry.paymentId : null;
     const requiresCapture = Boolean(
@@ -429,6 +448,8 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
     selectedResultType = slice.type;
     selectedWheelId = entryWheelId;
     selectedTabBeforeCents = tabBeforeCents;
+    selectedSpinsAwarded = step.spinsAwarded;
+    selectedMultiplier = step.multiplier;
     // A run that is still open keeps the overlay on the wheel it is running on.
     selectedNextWheelId = step.continues ? entryWheelId : nextWheelId;
 
@@ -445,6 +466,7 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         capturePending: false,
         tabCents: step.tabCents,
         tabMaxCents: capCents,
+        spinsLeft: step.spinsLeft,
         runSpins,
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -483,6 +505,9 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           tabCents: step.tabCents,
           tabMaxCents: capCents,
           tabOpen: true,
+          spinsLeft: step.spinsLeft,
+          spinsAwarded: step.spinsAwarded,
+          multiplier: step.multiplier,
           startedAtMs: now,
           durationMs,
           lockedUntilMs: now + durationMs,
@@ -504,6 +529,7 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         resultAmountCents: deltaCents,
         tabCents: step.tabCents,
         tabMaxCents: capCents,
+        spinsLeft: step.spinsLeft,
         runSpins,
         captureOperationId: spinId,
         capturePending: true,
@@ -553,6 +579,7 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
       selectedSliceId: slice.id,
       tabCents: step.tabCents,
       tabMaxCents: capCents,
+      spinsLeft: step.spinsLeft,
       runSpins,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -578,6 +605,9 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         tabCents: step.tabCents,
         tabMaxCents: capCents,
         tabOpen: false,
+        spinsLeft: step.spinsLeft,
+        spinsAwarded: step.spinsAwarded,
+        multiplier: step.multiplier,
         startedAtMs: now,
         durationMs,
         lockedUntilMs: now + durationMs,
@@ -674,6 +704,9 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           tabCents: selectedResultAmountCents,
           tabMaxCents: Number(entrySnapshot.data()?.tabMaxCents ?? 0),
           tabOpen: false,
+          spinsLeft: 0,
+          spinsAwarded: selectedSpinsAwarded,
+          multiplier: selectedMultiplier,
           startedAtMs: animationStartedAt,
           durationMs,
           lockedUntilMs: animationStartedAt + durationMs,

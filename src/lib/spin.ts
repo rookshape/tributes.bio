@@ -43,6 +43,21 @@ export const MAX_MAX_CHARGE_CENTS = 500000;
 /** A new wheel caps out at five spins' worth unless the creator says otherwise. */
 export const DEFAULT_MAX_CHARGE_MULTIPLE = 5;
 
+/**
+ * Streamers often sell a run rather than a single spin — "$5 for 3 spins" —
+ * so a purchase buys this many before the wheel hands out any more.
+ */
+export const MIN_SPINS_PER_PURCHASE = 1;
+export const MAX_SPINS_PER_PURCHASE = 10;
+
+export function normalizeSpinsPerPurchase(value: unknown) {
+  const spins = Math.round(Number(value));
+
+  if (!Number.isFinite(spins)) return MIN_SPINS_PER_PURCHASE;
+
+  return Math.min(MAX_SPINS_PER_PURCHASE, Math.max(MIN_SPINS_PER_PURCHASE, spins));
+}
+
 /** The most a single slice can move the tab, used as the floor for the cap. */
 export function largestSingleResultCents(config: {
   spinPriceCents: number;
@@ -106,6 +121,7 @@ export function createDefaultSpinConfig(creatorId: string): SpinConfig {
     counterLabel: "Tribute goal",
     spinPriceCents: 1000,
     maxChargeCents: 1000 * DEFAULT_MAX_CHARGE_MULTIPLE,
+    spinsPerPurchase: 1,
     isEnabled: false,
     showOnProfile: true,
     mockModeEnabled: true,
@@ -210,6 +226,7 @@ export function validateSpinConfig(config: SpinConfig) {
     title,
     counterLabel,
     maxChargeCents,
+    spinsPerPurchase: normalizeSpinsPerPurchase(config.spinsPerPurchase),
     wheelHue,
     wheelTone,
     slices,
@@ -305,6 +322,7 @@ function mapSpinConfig(
       maxChargeCents: Number(data.maxChargeCents),
       slices,
     }),
+    spinsPerPurchase: normalizeSpinsPerPurchase(data.spinsPerPurchase),
     isEnabled: Boolean(data.isEnabled),
     showOnProfile: data.showOnProfile !== false,
     mockModeEnabled: data.mockModeEnabled !== false,
@@ -339,6 +357,9 @@ function mapSpinState(creatorId: string, data: DocumentData | undefined): SpinSt
     tabBeforeCents: Number(data?.tabBeforeCents ?? 0),
     tabMaxCents: Number(data?.tabMaxCents ?? 0),
     tabOpen: data?.tabOpen === true,
+    spinsLeft: Number(data?.spinsLeft ?? 0),
+    spinsAwarded: Number(data?.spinsAwarded ?? 0),
+    multiplier: Number(data?.multiplier ?? 0),
     startedAtMs: Number(data?.startedAtMs ?? 0),
     durationMs: Number(data?.durationMs ?? 0),
     lockedUntilMs: Number(data?.lockedUntilMs ?? 0),
@@ -372,6 +393,7 @@ function mapQueueEntry(snapshot: QueryDocumentSnapshot<DocumentData>): SpinQueue
     // Entries queued before runs could chain have no tab yet; the spin price
     // they paid is where one would have started.
     tabCents: Number(data.tabCents ?? data.amountCents ?? 0),
+    spinsLeft: Number(data.spinsLeft ?? 0),
     source:
       data.source === "bonus"
         ? "bonus"

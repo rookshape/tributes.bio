@@ -110,6 +110,8 @@ export type SpinConfig = {
    * headline of the wheel rather than fine print.
    */
   maxChargeCents: number;
+  /** Spins a viewer gets for one purchase, before anything the wheel hands out. */
+  spinsPerPurchase: number;
   isEnabled: boolean;
   showOnProfile: boolean;
   mockModeEnabled: boolean;
@@ -136,6 +138,8 @@ export type SpinQueueEntry = {
    * the spin price and climbs until an amount slice ends the run.
    */
   tabCents: number;
+  /** Spins still owed on the run they are on. */
+  spinsLeft: number;
   source: "mock" | "bonus" | "payment";
   /** The wheel this viewer paid to spin. Null on entries made before wheels
    *  were selectable. */
@@ -203,8 +207,12 @@ export type SpinState = {
   /** What the tab read before this spin, so it can tick up on the result. */
   tabBeforeCents: number;
   tabMaxCents: number;
-  /** True while the run continues — a multiplier or bonus landed. */
+  /** True while the run continues — spins are still owed. */
   tabOpen: boolean;
+  /** Spins left in the run, and what the last slice handed out. */
+  spinsLeft: number;
+  spinsAwarded: number;
+  multiplier: number;
   startedAtMs: number;
   durationMs: number;
   lockedUntilMs: number;

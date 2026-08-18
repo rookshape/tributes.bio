@@ -348,6 +348,73 @@ select:focus-visible,
     @apply overflow-x-auto rounded-card border border-line bg-surface;
   }
 
+  /**
+   * Slot-machine reels for the running total overlay.
+   *
+   * Each digit is a strip of 0-9 slid behind a one-digit window, so the number
+   * rolls into place instead of swapping. The window clips with a soft top and
+   * bottom edge the way a physical reel disappears into the housing.
+   */
+  .reel-window {
+    @apply relative inline-block overflow-hidden align-bottom;
+    height: 1em;
+    width: 0.62em;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 22%,
+      #000 78%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 22%,
+      #000 78%,
+      transparent 100%
+    );
+  }
+
+  .reel-strip {
+    @apply absolute left-0 top-0 flex w-full flex-col;
+    transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .reel-cell {
+    @apply flex w-full shrink-0 items-center justify-center;
+    height: 1em;
+  }
+}
+
+@keyframes total-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.09);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes award-flash {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

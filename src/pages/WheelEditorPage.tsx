@@ -16,6 +16,8 @@ import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../lib/money";
 import {
   MAX_MAX_CHARGE_CENTS,
+  MAX_SPINS_PER_PURCHASE,
+  MIN_SPINS_PER_PURCHASE,
   largestSingleResultCents,
   spinSessionIsLive,
   subscribeSpinSession,
@@ -247,6 +249,20 @@ export function WheelEditorPage() {
             value={wheel.spinPriceCents / 100}
           />
           </div>
+          {/* Streamers usually sell a handful of spins per payment, not one. */}
+          <div className="w-24 shrink-0">
+          <Input
+            label="Spins"
+            max={MAX_SPINS_PER_PURCHASE}
+            min={MIN_SPINS_PER_PURCHASE}
+            onChange={(event) =>
+              change({ spinsPerPurchase: Math.round(Number(event.target.value)) })
+            }
+            step="1"
+            type="number"
+            value={wheel.spinsPerPurchase}
+          />
+          </div>
           {/* The cap is the draw — "the $1k wheel" — so it sits next to the
               price rather than buried in settings. */}
           <div className="w-36 shrink-0">
@@ -291,11 +307,15 @@ export function WheelEditorPage() {
       ) : null}
 
       <p className="mt-5 text-detail text-content-muted">
-        Multipliers and bonus spins keep a run going, so a viewer pays{" "}
+        A viewer pays{" "}
         <span className="font-semibold text-content">
           {formatMoney(wheel.spinPriceCents)}
         </span>{" "}
-        to start and can reach{" "}
+        for{" "}
+        <span className="font-semibold text-content">
+          {wheel.spinsPerPurchase} {wheel.spinsPerPurchase === 1 ? "spin" : "spins"}
+        </span>
+        . Multipliers and bonus slices keep the run going from there, up to{" "}
         <span className="font-semibold text-content">
           {formatMoney(wheel.maxChargeCents)}
         </span>

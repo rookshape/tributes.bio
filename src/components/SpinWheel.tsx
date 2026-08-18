@@ -26,6 +26,7 @@ export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
   const playedSpinIdRef = useRef<string | null>(null);
   const onRestRef = useRef(onRest);
   const labelRefs = useRef<(SVGTextElement | null)[]>([]);
+  const pointerRef = useRef<HTMLDivElement>(null);
 
   onRestRef.current = onRest;
 
@@ -78,10 +79,29 @@ export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
     if (slices.length < 2) return;
 
     let frame = 0;
+    let previousRotation = wheelRef.current?.rotation ?? 0;
     const sliceAngle = 360 / slices.length;
 
     const followRotation = () => {
       const rotation = wheelRef.current?.rotation ?? 0;
+
+      // The pointer is a flapper resting on the rim: each slice boundary that
+      // passes under it knocks it aside, and it springs back. Driving it from
+      // the wheel's own rotation means it naturally slows and settles with the
+      // wheel instead of running on a timer of its own.
+      const pointer = pointerRef.current;
+
+      if (pointer) {
+        const degreesPerFrame = Math.abs(rotation - previousRotation);
+        const intoSlice = (((rotation / sliceAngle) % 1) + 1) % 1;
+        // Full deflection right as a boundary passes, decaying across the slice.
+        const kick = Math.max(0, 1 - intoSlice / 0.45);
+        // Fades out as the wheel slows so the pointer comes to rest upright.
+        const speed = Math.min(1, degreesPerFrame / 5);
+        pointer.style.transform = `translateX(-50%) rotate(${13 * kick * speed}deg)`;
+      }
+
+      previousRotation = rotation;
 
       labelRefs.current.forEach((label, index) => {
         if (!label) return;
@@ -124,7 +144,12 @@ export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
       {/* Glass disc framing the wheel, kept narrow so the pointer clears it. */}
       <div className="absolute inset-[2%] rounded-full border border-white/70 bg-white/30 shadow-[0_6px_18px_rgba(15,23,32,0.08)] backdrop-blur-md" />
       {/* Long enough that its tip reaches past the rim into the slice below. */}
-      <div className="absolute left-1/2 top-0 z-20 h-0 w-0 -translate-x-1/2 border-l-[10px] border-r-[10px] border-t-[26px] border-l-transparent border-r-transparent border-t-white drop-shadow-[0_2px_3px_rgba(15,23,32,0.3)]" />
+      <div
+        className="absolute left-1/2 top-0 z-20 h-0 w-0 -translate-x-1/2 border-l-[10px] border-r-[10px] border-t-[26px] border-l-transparent border-r-transparent border-t-white drop-shadow-[0_2px_3px_rgba(15,23,32,0.3)]"
+        ref={pointerRef}
+        // Pivots where it is pinned to the rim, like a real flapper.
+        style={{ transformOrigin: "50% 0" }}
+      />
       <div className="absolute inset-[5%]" ref={containerRef} />
       <svg
         aria-hidden="true"

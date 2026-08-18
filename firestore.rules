@@ -71,6 +71,7 @@ service cloud.firestore {
           'counterLabel',
           'spinPriceCents',
           'maxChargeCents',
+          'spinsPerPurchase',
           'isEnabled',
           'showOnProfile',
           'mockModeEnabled',
@@ -107,6 +108,11 @@ service cloud.firestore {
           || (request.resource.data.maxChargeCents is int
             && request.resource.data.maxChargeCents >= 100
             && request.resource.data.maxChargeCents <= 500000))
+        // Spins a purchase buys. Older wheels predate it and sell one.
+        && (!('spinsPerPurchase' in request.resource.data)
+          || (request.resource.data.spinsPerPurchase is int
+            && request.resource.data.spinsPerPurchase >= 1
+            && request.resource.data.spinsPerPurchase <= 10))
         && request.resource.data.isEnabled is bool
         && request.resource.data.showOnProfile is bool
         && request.resource.data.mockModeEnabled is bool
