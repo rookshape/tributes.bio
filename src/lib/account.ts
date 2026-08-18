@@ -6,7 +6,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 import { DEFAULT_APPEARANCE, normalizeAppearance } from "./pageThemes";
 import type { AppUser, CreatorProfile } from "./types";
 import type { EmailPreferences } from "./types";
@@ -48,6 +48,23 @@ export function validateUsername(value: string) {
   }
 
   return null;
+}
+
+/**
+ * Whether a username is free. `usernames/{username}` is world-readable, so this
+ * is a single document lookup rather than a query.
+ */
+export async function isUsernameAvailable(usernameValue: string) {
+  const username = normalizeUsername(usernameValue);
+
+  if (validateUsername(username)) return false;
+
+  const snapshot = await getDoc(doc(db, "usernames", username));
+
+  if (!snapshot.exists()) return true;
+
+  // Re-claiming your own reserved name is allowed, matching reserveCreatorUsername.
+  return snapshot.data().ownerUid === auth.currentUser?.uid;
 }
 
 export function suggestUsername(user: User) {
@@ -145,6 +162,22 @@ export async function completePersonalOnboarding(user: User) {
   return getUserRecord(user.uid);
 }
 
+/** Marks creator onboarding finished, once the wizard's last step is done. */
+export async function completeCreatorOnboarding(user: User) {
+  await setDoc(
+    doc(db, "users", user.uid),
+    { onboardingComplete: true, updatedAt: serverTimestamp() },
+    { merge: true },
+  );
+
+  return getUserRecord(user.uid);
+}
+
+/**
+ * Claims the username and creates the creator profile. Deliberately leaves
+ * `onboardingComplete` false: the wizard continues to the links step, and the
+ * dashboard redirect guard reads that flag.
+ */
 export async function reserveCreatorUsername(user: User, usernameValue: string) {
   const username = normalizeUsername(usernameValue);
   const validationError = validateUsername(username);
@@ -176,7 +209,6 @@ export async function reserveCreatorUsername(user: User, usernameValue: string) 
         displayName: user.displayName,
         photoURL: user.photoURL,
         accountType: "creator",
-        onboardingComplete: true,
         creatorId: user.uid,
         username,
         updatedAt: serverTimestamp(),
