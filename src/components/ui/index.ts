@@ -13,6 +13,18 @@ export type { SegmentedControlProps, ToggleProps } from "./Toggle";
 export { Badge, EmptyState, Skeleton, StatusMessage } from "./Feedback";
 export type { BadgeTone } from "./Feedback";
 
+export { TabPanel, Tabs } from "./Tabs";
+export type { TabItem, TabsProps } from "./Tabs";
+
+export { Tooltip } from "./Tooltip";
+export type { TooltipProps } from "./Tooltip";
+
+export { Menu } from "./Menu";
+export type { MenuItem, MenuProps } from "./Menu";
+
+export { Progress } from "./Progress";
+export type { ProgressProps } from "./Progress";
+
 export { Dialog } from "./Dialog";
 export type { DialogProps } from "./Dialog";
 

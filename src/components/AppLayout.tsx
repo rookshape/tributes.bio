@@ -1,16 +1,17 @@
 import { doc, onSnapshot } from "firebase/firestore";
-import { ShieldCheck } from "lucide-react";
+import { LogOut, PanelsTopLeft, Settings, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../lib/firebase";
 import { checkAdminAccess } from "../lib/admin";
 import { cn } from "../lib/cn";
-import { ButtonLink } from "./ui";
+import { ButtonLink, Menu } from "./ui";
 
 export function AppLayout() {
-  const { appUser, user } = useAuth();
+  const { appUser, signOut, user } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const onLanding = pathname === "/";
   const [creatorPhotoURL, setCreatorPhotoURL] = useState<string | null>(null);
   const [adminAccess, setAdminAccess] = useState(false);
@@ -87,23 +88,45 @@ export function AppLayout() {
                     Continue setup
                   </ButtonLink>
                 ) : null}
-                <Link
-                  aria-label="Open account settings"
-                  className={cn(
-                    "grid h-9 w-9 place-items-center overflow-hidden rounded-full border text-detail font-semibold",
-                    onLanding
-                      ? "border-white/45 bg-white/15 text-white"
-                      : "border-line bg-surface-raised text-content",
+                <Menu
+                  items={[
+                    {
+                      label: "Your page",
+                      icon: <PanelsTopLeft size={16} />,
+                      onSelect: () => navigate("/dashboard"),
+                    },
+                    {
+                      label: "Settings",
+                      icon: <Settings size={16} />,
+                      onSelect: () => navigate("/dashboard/settings"),
+                    },
+                    {
+                      label: "Sign out",
+                      icon: <LogOut size={16} />,
+                      destructive: true,
+                      onSelect: () => void signOut(),
+                    },
+                  ]}
+                  trigger={(triggerProps) => (
+                    <button
+                      {...triggerProps}
+                      aria-label={`Account menu for ${accountLabel}`}
+                      className={cn(
+                        "grid h-9 w-9 place-items-center overflow-hidden rounded-full border text-detail font-semibold",
+                        onLanding
+                          ? "border-white/45 bg-white/15 text-white"
+                          : "border-line bg-surface-raised text-content",
+                      )}
+                      type="button"
+                    >
+                      {avatarURL ? (
+                        <img alt="" className="h-full w-full object-cover" src={avatarURL} />
+                      ) : (
+                        accountInitial
+                      )}
+                    </button>
                   )}
-                  title="Account settings"
-                  to={appUser?.onboardingComplete ? "/dashboard/settings" : "/onboarding"}
-                >
-                  {avatarURL ? (
-                    <img alt="" className="h-full w-full object-cover" src={avatarURL} />
-                  ) : (
-                    accountInitial
-                  )}
-                </Link>
+                />
               </>
             ) : (
               <>
