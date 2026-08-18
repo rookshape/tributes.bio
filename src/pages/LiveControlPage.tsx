@@ -44,7 +44,6 @@ import {
   subscribeSpinGoal,
   type SpinGoal,
 } from "../lib/spinGoal";
-import { Toggle } from "../components/ui";
 import {
   activateWheel,
   saveWheel,
@@ -172,11 +171,20 @@ export function LiveControlPage() {
 
   const switchTo = (wheel: SpinConfig) => void run(() => activateWheel(wheel));
 
-  const setSpinAvailable = (isEnabled: boolean) =>
+  const toggleLive = () =>
     void run(async () => {
-      if (!activeWheel) return;
-      const saved = await saveWheel({ ...activeWheel, isEnabled });
-      await activateWheel(saved);
+      if (manualLive) {
+        await setSpinLiveStatus(creatorId, false);
+        return;
+      }
+
+      // The server refuses to start a session unless the active wheel accepts
+      // spins, so going live turns that on rather than reporting it as an error.
+      if (activeWheel && !activeWheel.isEnabled) {
+        await activateWheel(await saveWheel({ ...activeWheel, isEnabled: true }));
+      }
+
+      await setSpinLiveStatus(creatorId, true);
     });
 
   const addTestSpin = (event: FormEvent) => {
@@ -245,11 +253,8 @@ export function LiveControlPage() {
                 ? "btn-base border border-critical/30 bg-critical/10 text-critical hover:bg-critical/20"
                 : "blue-button"
             }
-            disabled={working || (!manualLive && !config.isEnabled)}
-            onClick={() => void run(() => setSpinLiveStatus(creatorId, !manualLive))}
-            title={
-              !manualLive && !config.isEnabled ? "Turn on spins for viewers first" : undefined
-            }
+            disabled={working}
+            onClick={toggleLive}
             type="button"
           >
             {manualLive ? (
@@ -288,7 +293,7 @@ export function LiveControlPage() {
               return (
                 <button
                   aria-pressed={active}
-                  className={`w-24 shrink-0 rounded-card border p-2 text-center transition-colors duration-fast disabled:cursor-not-allowed ${
+                  className={`w-36 shrink-0 rounded-card border p-3 text-center transition-colors duration-fast disabled:cursor-not-allowed ${
                     active
                       ? "border-accent bg-accent/5"
                       : "border-transparent hover:border-line hover:bg-surface-raised disabled:hover:border-transparent disabled:hover:bg-transparent"
@@ -300,7 +305,7 @@ export function LiveControlPage() {
                   type="button"
                 >
                   <WheelThumbnail slices={wheel.slices} />
-                  <span className="mt-2 block truncate text-caption font-medium text-content">
+                  <span className="mt-2.5 block truncate text-body font-medium text-content">
                     {wheel.name}
                   </span>
                   <span
@@ -313,25 +318,6 @@ export function LiveControlPage() {
                 </button>
               );
             })}
-
-          <Link
-            className="grid w-24 shrink-0 place-items-center rounded-card border border-dashed border-line text-caption font-medium text-content-muted hover:border-line-strong hover:text-content"
-            to="/dashboard/spin"
-          >
-            Manage wheels
-          </Link>
-        </div>
-
-        {/* The server refuses to start a session unless this is on, so it sits
-            with the wheel it applies to rather than inside the editor. */}
-        <div className="mt-5 border-t border-line pt-4">
-          <Toggle
-            checked={config.isEnabled}
-            description="Viewers can pay to join the spin queue while you are live."
-            disabled={working || !activeWheel}
-            label="Spins are open to viewers"
-            onChange={setSpinAvailable}
-          />
         </div>
       </section>
 
@@ -421,13 +407,7 @@ export function LiveControlPage() {
             <p className="mt-1 text-detail text-content-muted">
               Shared by every wheel. Counts everything your viewers send.
             </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-              <Input
-                label="Label"
-                maxLength={40}
-                onChange={(event) => setGoal({ ...goal, label: event.target.value })}
-                value={goal.label}
-              />
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
               <Input
                 label="Target"
                 min="0"
@@ -446,11 +426,13 @@ export function LiveControlPage() {
                 loading={savingGoal}
                 onClick={() => {
                   setSavingGoal(true);
-                  saveSpinGoal({ ...goal, creatorId })
+                  saveSpinGoal({ ...goal, creatorId, label: DEFAULT_GOAL_LABEL })
                     .then(setGoal)
                     .catch((caughtError) =>
                       setError(
-                        caughtError instanceof Error ? caughtError.message : "Could not save the goal.",
+                        caughtError instanceof Error
+                          ? caughtError.message
+                          : "Could not save the goal.",
                       ),
                     )
                     .finally(() => setSavingGoal(false));
