@@ -152,7 +152,26 @@ export async function activateWheel(wheel: SpinConfig) {
  * wheel becomes the first stored entry, so nothing is lost and the active
  * document keeps serving the same wheel throughout.
  */
-export async function ensureWheelLibrary(creatorId: string) {
+/**
+ * Concurrent callers share one migration. Without this, React's development
+ * double-invoke fires two calls that both observe an empty library and both
+ * create a wheel.
+ */
+const migrations = new Map<string, Promise<SpinConfig[]>>();
+
+export function ensureWheelLibrary(creatorId: string) {
+  const existing = migrations.get(creatorId);
+  if (existing) return existing;
+
+  const run = migrateWheelLibrary(creatorId).finally(() => {
+    migrations.delete(creatorId);
+  });
+
+  migrations.set(creatorId, run);
+  return run;
+}
+
+async function migrateWheelLibrary(creatorId: string) {
   const existing = await listWheels(creatorId);
 
   if (existing.length > 0) return existing;

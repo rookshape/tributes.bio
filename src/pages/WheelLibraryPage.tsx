@@ -1,7 +1,7 @@
 import { Check, Disc3, LoaderCircle, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { EditableSpinWheel } from "../components/EditableSpinWheel";
+import { useNavigate } from "react-router-dom";
+import { WheelThumbnail } from "../components/WheelThumbnail";
 import {
   Badge,
   Button,
@@ -12,10 +12,8 @@ import {
   StatusMessage,
 } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { spinSessionIsLive, subscribeSpinSession } from "../lib/spin";
 import {
   WHEEL_TEMPLATES,
-  activateWheel,
   createWheel,
   deleteWheel,
   duplicateWheel,
@@ -25,89 +23,58 @@ import {
   subscribeWheels,
   wheelFromTemplate,
 } from "../lib/wheels";
-import type { SpinConfig, SpinSession } from "../lib/types";
+import type { SpinConfig } from "../lib/types";
 
 function WheelCard({
   wheel,
   active,
-  locked,
-  onActivate,
   onDuplicate,
   onArchive,
   onDelete,
 }: {
   wheel: SpinConfig;
   active: boolean;
-  locked: boolean;
-  onActivate: () => void;
   onDuplicate: () => void;
   onArchive: () => void;
   onDelete: () => void;
 }) {
-  return (
-    <article className="panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-      <Link
-        aria-label={`Edit ${wheel.name}`}
-        className="mx-auto w-24 shrink-0 sm:mx-0"
-        to={`/dashboard/spin/${wheel.id}`}
-      >
-        <EditableSpinWheel
-          onAdd={() => undefined}
-          onSelect={() => undefined}
-          selectedSliceId=""
-          slices={wheel.slices}
-        />
-      </Link>
+  const navigate = useNavigate();
 
-      <div className="min-w-0 flex-1 text-center sm:text-left">
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-          <Link
-            className="text-body font-semibold text-content hover:underline"
-            to={`/dashboard/spin/${wheel.id}`}
-          >
-            {wheel.name}
-          </Link>
-          {active ? <Badge dot tone="positive">Active</Badge> : null}
-          {wheel.archived ? <Badge>Archived</Badge> : null}
-        </div>
-        <p className="mt-1 text-caption text-content-muted">
-          {wheel.slices.length} slices · ${(wheel.spinPriceCents / 100).toFixed(0)} a spin
-          {wheel.isEnabled ? " · Spin enabled" : ""}
-        </p>
+  return (
+    // The whole card opens the editor. The actions menu sits above it and stops
+    // the click from bubbling, so it does not navigate on its way through.
+    <article
+      className="panel flex cursor-pointer items-center gap-4 p-4 transition-colors duration-fast hover:border-line-strong hover:bg-surface-raised"
+      onClick={() => navigate(`/dashboard/spin/${wheel.id}`)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          navigate(`/dashboard/spin/${wheel.id}`);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <WheelThumbnail className="w-20 shrink-0" slices={wheel.slices} />
+
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <span className="truncate text-body font-semibold text-content">{wheel.name}</span>
+        {active ? <Badge dot tone="positive">Active</Badge> : null}
+        {wheel.archived ? <Badge>Archived</Badge> : null}
       </div>
 
-      <div className="flex shrink-0 items-center justify-center gap-2">
-        {active ? (
-          <Button disabled iconLeft={<Check size={16} />} size="sm" variant="secondary">
-            Active
-          </Button>
-        ) : (
-          <Button
-            disabled={locked}
-            onClick={onActivate}
-            size="sm"
-            title={locked ? "End the live session before switching wheels" : undefined}
-            variant="primary"
-          >
-            Make active
-          </Button>
-        )}
-
+      <div className="shrink-0" onClick={(event) => event.stopPropagation()}>
         <Menu
           items={[
-            { label: "Edit", onSelect: () => undefined, disabled: true },
             { label: "Duplicate", onSelect: onDuplicate },
-            {
-              label: wheel.archived ? "Restore" : "Archive",
-              onSelect: onArchive,
-            },
+            { label: wheel.archived ? "Restore" : "Archive", onSelect: onArchive },
             {
               label: "Delete",
               destructive: true,
               disabled: active,
               onSelect: onDelete,
             },
-          ].filter((item) => item.label !== "Edit")}
+          ]}
           trigger={(triggerProps) => (
             <button
               {...triggerProps}
@@ -132,7 +99,6 @@ export function WheelLibraryPage() {
 
   const [wheels, setWheels] = useState<SpinConfig[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [session, setSession] = useState<SpinSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +107,6 @@ export function WheelLibraryPage() {
   const [newName, setNewName] = useState("");
   const [templateId, setTemplateId] = useState(WHEEL_TEMPLATES[0].id);
   const [pendingDelete, setPendingDelete] = useState<SpinConfig | null>(null);
-  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     if (!isCreator || !creatorId) {
@@ -152,7 +117,6 @@ export function WheelLibraryPage() {
     const unsubscribers = [
       subscribeWheels(creatorId, setWheels),
       subscribeActiveWheelId(creatorId, setActiveId),
-      subscribeSpinSession(creatorId, setSession),
     ];
 
     // Brings pre-library creators onto it without losing their existing wheel.
@@ -166,11 +130,6 @@ export function WheelLibraryPage() {
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [creatorId, isCreator]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 5000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   if (!isCreator || !creatorId) {
     return (
@@ -187,8 +146,6 @@ export function WheelLibraryPage() {
       </div>
     );
   }
-
-  const isLive = spinSessionIsLive(session, now);
 
   const run = async (action: () => Promise<unknown>) => {
     setWorking(true);
@@ -222,9 +179,7 @@ export function WheelLibraryPage() {
         <div>
           <h1 className="page-title">Wheels</h1>
           <p className="page-subtitle">
-            {isLive
-              ? "You are live. The active wheel is locked until the session ends."
-              : "Pick which wheel your viewers spin."}
+            Open a wheel to edit it. Choose which one is active from Live.
           </p>
         </div>
         <Button iconLeft={<Plus size={17} />} onClick={() => setCreating(true)} variant="accent">
@@ -252,8 +207,6 @@ export function WheelLibraryPage() {
             <WheelCard
               active={wheel.id === activeId}
               key={wheel.id}
-              locked={isLive}
-              onActivate={() => void run(() => activateWheel(wheel))}
               onArchive={() => void run(() => setWheelArchived(wheel, !wheel.archived))}
               onDelete={() => setPendingDelete(wheel)}
               onDuplicate={() => void run(() => duplicateWheel(wheel))}

@@ -1,6 +1,6 @@
 import { ArrowLeft, Check, LoaderCircle, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { EditableSpinWheel } from "../components/EditableSpinWheel";
 import {
   Badge,
@@ -43,7 +43,6 @@ function sliceInputValue(slice: SpinSlice) {
 export function WheelEditorPage() {
   const { appUser, user } = useAuth();
   const { wheelId = "" } = useParams();
-  const navigate = useNavigate();
   const creatorId = appUser?.creatorId ?? user?.uid;
 
   const [wheel, setWheel] = useState<SpinConfig | null>(null);
@@ -176,7 +175,7 @@ export function WheelEditorPage() {
     setError(null);
 
     try {
-      const normalized = await saveWheel(wheel);
+      const normalized = await saveWheel({ ...wheel, title: wheel.name });
       setWheel(normalized);
 
       // Push straight to the live copy so the active wheel stays in step.
@@ -197,19 +196,40 @@ export function WheelEditorPage() {
   return (
     <section className="page-shell">
       <header className="page-header border-b border-line">
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <Tooltip content="Back to your wheels">
             <Link aria-label="Back to your wheels" className="icon-button" to="/dashboard/spin">
               <ArrowLeft size={17} />
             </Link>
           </Tooltip>
-          <div className="min-w-0">
-            <h1 className="page-title truncate">{wheel.name}</h1>
-            <p className="page-subtitle">
+          <div className="min-w-0 flex-1">
+            {/* The heading is the field — there is no separate name input to
+                keep in step with it. */}
+            <input
+              aria-label="Wheel name"
+              className="w-full max-w-sm rounded-control border border-transparent bg-transparent px-2 py-1 text-headline font-semibold text-content outline-none hover:border-line focus:border-accent focus:bg-surface"
+              maxLength={60}
+              onChange={(event) => change({ name: event.target.value })}
+              value={wheel.name}
+            />
+            <p className="mt-1 px-2 text-body text-content-muted">
               {isActive ? "This is your active wheel." : "Stored in your wheel library."}
             </p>
           </div>
           {isActive ? <Badge dot tone="positive">Active</Badge> : null}
+          <Input
+            className="w-28"
+            fieldClassName="w-auto"
+            label="Price a spin"
+            min="1"
+            onChange={(event) =>
+              change({ spinPriceCents: Math.round(Number(event.target.value) * 100) })
+            }
+            prefix="$"
+            step="1"
+            type="number"
+            value={wheel.spinPriceCents / 100}
+          />
         </div>
         <Button
           iconLeft={
@@ -276,31 +296,6 @@ export function WheelEditorPage() {
             </label>
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <Input
-              label="Wheel name"
-              maxLength={60}
-              onChange={(event) => change({ name: event.target.value })}
-              value={wheel.name}
-            />
-            <Input
-              label="Viewer heading"
-              maxLength={60}
-              onChange={(event) => change({ title: event.target.value })}
-              value={wheel.title}
-            />
-            <Input
-              label="Price a spin"
-              min="1"
-              onChange={(event) =>
-                change({ spinPriceCents: Math.round(Number(event.target.value) * 100) })
-              }
-              prefix="$"
-              step="1"
-              type="number"
-              value={wheel.spinPriceCents / 100}
-            />
-          </div>
         </div>
 
         {selected ? (
@@ -370,18 +365,6 @@ export function WheelEditorPage() {
         ) : null}
       </div>
 
-      {!isActive ? (
-        <div className="mt-8 border-t border-line pt-6">
-          <Button
-            onClick={() =>
-              void activateWheel(wheel).then(() => navigate("/dashboard/spin"))
-            }
-            variant="primary"
-          >
-            Make this the active wheel
-          </Button>
-        </div>
-      ) : null}
     </section>
   );
 }

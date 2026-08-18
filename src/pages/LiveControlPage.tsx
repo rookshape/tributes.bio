@@ -1,5 +1,6 @@
 import {
   Check,
+  ChevronDown,
   Clipboard,
   ExternalLink,
   LoaderCircle,
@@ -23,6 +24,7 @@ import {
   EmptyState,
   IconButton,
   Input,
+  Menu,
   StatusMessage,
 } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -43,6 +45,13 @@ import {
   subscribeSpinGoal,
   type SpinGoal,
 } from "../lib/spinGoal";
+import { Toggle } from "../components/ui";
+import {
+  activateWheel,
+  saveWheel,
+  subscribeActiveWheelId,
+  subscribeWheels,
+} from "../lib/wheels";
 import type {
   SpinConfig,
   SpinQueueEntry,
@@ -84,6 +93,8 @@ export function LiveControlPage() {
   const [error, setError] = useState<string | null>(null);
   const [viewerName, setViewerName] = useState("Test viewer");
   const [copiedPart, setCopiedPart] = useState<string | null>(null);
+  const [wheels, setWheels] = useState<SpinConfig[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -95,6 +106,8 @@ export function LiveControlPage() {
       subscribeSpinSession(creatorId, setSession),
       subscribeSpinState(creatorId, setState),
       subscribeSpinGoal(creatorId, setGoal),
+      subscribeWheels(creatorId, setWheels),
+      subscribeActiveWheelId(creatorId, setActiveId),
     ];
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
@@ -156,6 +169,17 @@ export function LiveControlPage() {
     }
   };
 
+  const activeWheel = wheels.find((wheel) => wheel.id === activeId) ?? null;
+
+  const switchTo = (wheel: SpinConfig) => void run(() => activateWheel(wheel));
+
+  const setSpinAvailable = (isEnabled: boolean) =>
+    void run(async () => {
+      if (!activeWheel) return;
+      const saved = await saveWheel({ ...activeWheel, isEnabled });
+      await activateWheel(saved);
+    });
+
   const addTestSpin = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
@@ -190,7 +214,7 @@ export function LiveControlPage() {
             </ButtonLink>
           }
           className="mt-6"
-          description="Pick a wheel to make active, then come back here to run a session."
+          description="Create a wheel and make it active, then come back here to run a session."
           title="No active wheel"
         />
       </section>
@@ -202,10 +226,34 @@ export function LiveControlPage() {
       <header className="page-header border-b border-line">
         <div className="min-w-0">
           <h1 className="page-title">Live</h1>
-          <p className="page-subtitle truncate">
-            Running <span className="font-medium text-content">{config.name}</span>
-            {config.isEnabled ? "" : " — Spin is turned off for viewers"}
-          </p>
+          <Menu
+            align="start"
+            items={wheels
+              .filter((wheel) => !wheel.archived)
+              .map((wheel) => ({
+                label: wheel.name,
+                icon:
+                  wheel.id === activeId ? (
+                    <Check size={16} />
+                  ) : (
+                    <span aria-hidden="true" className="w-4" />
+                  ),
+                disabled: isLive || wheel.id === activeId,
+                onSelect: () => switchTo(wheel),
+              }))}
+            trigger={(triggerProps) => (
+              <button
+                {...triggerProps}
+                className="mt-1 flex items-center gap-1.5 text-body text-content-muted hover:text-content disabled:opacity-60"
+                disabled={isLive}
+                title={isLive ? "End the session to switch wheels" : "Switch wheel"}
+                type="button"
+              >
+                Running <span className="font-medium text-content">{config.name}</span>
+                <ChevronDown size={15} />
+              </button>
+            )}
+          />
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -223,8 +271,11 @@ export function LiveControlPage() {
                 ? "btn-base border border-critical/30 bg-critical/10 text-critical hover:bg-critical/20"
                 : "blue-button"
             }
-            disabled={working}
+            disabled={working || (!manualLive && !config.isEnabled)}
             onClick={() => void run(() => setSpinLiveStatus(creatorId, !manualLive))}
+            title={
+              !manualLive && !config.isEnabled ? "Turn on spins for viewers first" : undefined
+            }
             type="button"
           >
             {manualLive ? (
@@ -244,6 +295,18 @@ export function LiveControlPage() {
           </button>
         </div>
       </header>
+
+      {/* The server refuses to start a session unless this is on, so it belongs
+          next to the control that fails, not buried in the wheel editor. */}
+      <div className="panel mt-5 p-4">
+        <Toggle
+          checked={config.isEnabled}
+          description="Viewers can pay to join the spin queue while you are live."
+          disabled={working || !activeWheel}
+          label="Spins are open to viewers"
+          onChange={setSpinAvailable}
+        />
+      </div>
 
       <StatusMessage className="mt-5" tone="error">{error}</StatusMessage>
 
