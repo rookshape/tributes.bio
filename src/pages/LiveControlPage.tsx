@@ -1,6 +1,5 @@
 import {
   Check,
-  ChevronDown,
   Clipboard,
   ExternalLink,
   LoaderCircle,
@@ -11,6 +10,7 @@ import {
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { type SpinAnimation } from "../components/SpinWheel";
+import { WheelThumbnail } from "../components/WheelThumbnail";
 import {
   OVERLAY_PARTS,
   OverlayGoalBar,
@@ -24,7 +24,6 @@ import {
   EmptyState,
   IconButton,
   Input,
-  Menu,
   StatusMessage,
 } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -226,34 +225,9 @@ export function LiveControlPage() {
       <header className="page-header border-b border-line">
         <div className="min-w-0">
           <h1 className="page-title">Live</h1>
-          <Menu
-            align="start"
-            items={wheels
-              .filter((wheel) => !wheel.archived)
-              .map((wheel) => ({
-                label: wheel.name,
-                icon:
-                  wheel.id === activeId ? (
-                    <Check size={16} />
-                  ) : (
-                    <span aria-hidden="true" className="w-4" />
-                  ),
-                disabled: isLive || wheel.id === activeId,
-                onSelect: () => switchTo(wheel),
-              }))}
-            trigger={(triggerProps) => (
-              <button
-                {...triggerProps}
-                className="mt-1 flex items-center gap-1.5 text-body text-content-muted hover:text-content disabled:opacity-60"
-                disabled={isLive}
-                title={isLive ? "End the session to switch wheels" : "Switch wheel"}
-                type="button"
-              >
-                Running <span className="font-medium text-content">{config.name}</span>
-                <ChevronDown size={15} />
-              </button>
-            )}
-          />
+          <p className="page-subtitle">
+            {manualLive ? "Your session is running." : "Pick a wheel, then go live."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -296,17 +270,70 @@ export function LiveControlPage() {
         </div>
       </header>
 
-      {/* The server refuses to start a session unless this is on, so it belongs
-          next to the control that fails, not buried in the wheel editor. */}
-      <div className="panel mt-5 p-4">
-        <Toggle
-          checked={config.isEnabled}
-          description="Viewers can pay to join the spin queue while you are live."
-          disabled={working || !activeWheel}
-          label="Spins are open to viewers"
-          onChange={setSpinAvailable}
-        />
-      </div>
+      <section className="panel mt-5 p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-title font-semibold text-content">Wheel</h2>
+          {isLive ? (
+            <p className="text-caption text-content-muted">
+              End the session to switch wheels.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-4 flex gap-4 overflow-x-auto pb-1">
+          {wheels
+            .filter((wheel) => !wheel.archived)
+            .map((wheel) => {
+              const active = wheel.id === activeId;
+              return (
+                <button
+                  aria-pressed={active}
+                  className={`w-24 shrink-0 rounded-card border p-2 text-center transition-colors duration-fast disabled:cursor-not-allowed ${
+                    active
+                      ? "border-accent bg-accent/5"
+                      : "border-transparent hover:border-line hover:bg-surface-raised disabled:hover:border-transparent disabled:hover:bg-transparent"
+                  } ${isLive && !active ? "opacity-45" : ""}`}
+                  disabled={isLive || working}
+                  key={wheel.id}
+                  onClick={() => switchTo(wheel)}
+                  title={active ? `${wheel.name} is active` : `Make ${wheel.name} active`}
+                  type="button"
+                >
+                  <WheelThumbnail slices={wheel.slices} />
+                  <span className="mt-2 block truncate text-caption font-medium text-content">
+                    {wheel.name}
+                  </span>
+                  <span
+                    className={`mt-0.5 block text-micro font-semibold uppercase ${
+                      active ? "text-accent" : "text-transparent"
+                    }`}
+                  >
+                    Active
+                  </span>
+                </button>
+              );
+            })}
+
+          <Link
+            className="grid w-24 shrink-0 place-items-center rounded-card border border-dashed border-line text-caption font-medium text-content-muted hover:border-line-strong hover:text-content"
+            to="/dashboard/spin"
+          >
+            Manage wheels
+          </Link>
+        </div>
+
+        {/* The server refuses to start a session unless this is on, so it sits
+            with the wheel it applies to rather than inside the editor. */}
+        <div className="mt-5 border-t border-line pt-4">
+          <Toggle
+            checked={config.isEnabled}
+            description="Viewers can pay to join the spin queue while you are live."
+            disabled={working || !activeWheel}
+            label="Spins are open to viewers"
+            onChange={setSpinAvailable}
+          />
+        </div>
+      </section>
 
       <StatusMessage className="mt-5" tone="error">{error}</StatusMessage>
 

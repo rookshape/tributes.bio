@@ -196,31 +196,27 @@ export function WheelEditorPage() {
   return (
     <section className="page-shell">
       <header className="page-header border-b border-line">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3">
           <Tooltip content="Back to your wheels">
-            <Link aria-label="Back to your wheels" className="icon-button" to="/dashboard/spin">
+            <Link
+              aria-label="Back to your wheels"
+              className="icon-button mb-0.5"
+              to="/dashboard/spin"
+            >
               <ArrowLeft size={17} />
             </Link>
           </Tooltip>
-          <div className="min-w-0 flex-1">
-            {/* The heading is the field — there is no separate name input to
-                keep in step with it. */}
-            <input
-              aria-label="Wheel name"
-              className="w-full max-w-sm rounded-control border border-transparent bg-transparent px-2 py-1 text-headline font-semibold text-content outline-none hover:border-line focus:border-accent focus:bg-surface"
-              maxLength={60}
-              onChange={(event) => change({ name: event.target.value })}
-              value={wheel.name}
-            />
-            <p className="mt-1 px-2 text-body text-content-muted">
-              {isActive ? "This is your active wheel." : "Stored in your wheel library."}
-            </p>
-          </div>
-          {isActive ? <Badge dot tone="positive">Active</Badge> : null}
           <Input
-            className="w-28"
-            fieldClassName="w-auto"
-            label="Price a spin"
+            className="text-title font-semibold"
+            fieldClassName="w-full max-w-xs"
+            label="Wheel name"
+            maxLength={60}
+            onChange={(event) => change({ name: event.target.value })}
+            value={wheel.name}
+          />
+          <Input
+            fieldClassName="w-32"
+            label="Price to spin"
             min="1"
             onChange={(event) =>
               change({ spinPriceCents: Math.round(Number(event.target.value) * 100) })
@@ -230,6 +226,11 @@ export function WheelEditorPage() {
             type="number"
             value={wheel.spinPriceCents / 100}
           />
+          {isActive ? (
+            <Badge className="mb-2.5" dot tone="positive">
+              Active
+            </Badge>
+          ) : null}
         </div>
         <Button
           iconLeft={
