@@ -2,6 +2,7 @@ import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   sendPasswordResetEmail,
@@ -30,6 +31,7 @@ type AuthContextValue = {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   createAccountWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: () => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -91,6 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email,
           password,
         );
+        if (!result.user.emailVerified) {
+          await sendEmailVerification(result.user);
+        }
         await ensureUserRecord(result.user);
         await refreshAppUser();
       },
@@ -100,6 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         await sendPasswordResetEmail(auth, auth.currentUser.email);
+      },
+      sendVerificationEmail: async () => {
+        if (!auth.currentUser || auth.currentUser.emailVerified) return;
+        await sendEmailVerification(auth.currentUser);
       },
       signOut: () => firebaseSignOut(auth),
     }),

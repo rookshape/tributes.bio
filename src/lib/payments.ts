@@ -1,7 +1,5 @@
 import { httpsCallable } from "firebase/functions";
-import { collection, getDocs, query, where } from "firebase/firestore";
 import { functions } from "./firebase";
-import { db } from "./firebase";
 
 export type StripeConnectStatus =
   | "not_started"
@@ -91,30 +89,14 @@ export type CreatorPayment = {
 };
 
 export async function getCreatorPayments(creatorId: string) {
-  const snapshot = await getDocs(
-    query(
-      collection(db, "payments"),
-      where("creatorId", "==", creatorId),
-    ),
-  );
-
-  return snapshot.docs
-    .map((payment): CreatorPayment => {
-      const data = payment.data();
-      const createdAt = data.createdAt?.toDate?.();
-
-      return {
-        id: payment.id,
-        kind: data.kind === "spin" ? "spin" : "tribute",
-        anonymous: data.anonymous === true,
-        creatorAmountCents: Number(data.creatorAmountCents ?? 0),
-        senderName: String(data.senderName ?? ""),
-        status: String(data.status ?? "pending"),
-        createdAt: createdAt instanceof Date ? createdAt : null,
-      };
-    })
-    .sort(
-      (a, b) =>
-        (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
-    );
+  void creatorId;
+  const callable = httpsCallable<
+    Record<string, never>,
+    { payments: Array<Omit<CreatorPayment, "createdAt"> & { createdAtMs: number | null }> }
+  >(functions, "getCreatorPayments");
+  const result = await callable({});
+  return result.data.payments.map((payment) => ({
+    ...payment,
+    createdAt: payment.createdAtMs ? new Date(payment.createdAtMs) : null,
+  }));
 }

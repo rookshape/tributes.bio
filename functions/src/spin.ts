@@ -7,6 +7,9 @@ import {
   captureSpinAuthorization,
   stripeSecret,
 } from "./stripe.js";
+import {
+  spinSessionIsLive,
+} from "./spin-session.js";
 
 type SpinSliceType = "amount" | "multiplier" | "bonus" | "action";
 
@@ -130,9 +133,10 @@ export const setSpinLiveStatus = onCall(
     const creatorRef = firestore.doc(`creators/${creatorId}`);
     const configRef = creatorRef.collection("spinConfigs").doc("current");
     const sessionRef = creatorRef.collection("spinSessions").doc("current");
-    const [creatorSnapshot, configSnapshot] = await Promise.all([
+    const [creatorSnapshot, configSnapshot, sessionSnapshot] = await Promise.all([
       creatorRef.get(),
       configRef.get(),
+      sessionRef.get(),
     ]);
 
     if (
@@ -149,18 +153,22 @@ export const setSpinLiveStatus = onCall(
     }
 
     const now = Date.now();
+    const session = sessionSnapshot.data();
+    const effectiveLive = isLive || session?.twitchLive === true;
     await sessionRef.set(
       {
         creatorId,
-        status: isLive ? "live" : "offline",
+        manualLive: isLive,
+        status: effectiveLive ? "live" : "offline",
         heartbeatAtMs: now,
+        manualHeartbeatAtMs: now,
         ...(isLive ? { startedAtMs: now } : { endedAtMs: now }),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
 
-    if (!isLive) {
+    if (!effectiveLive) {
       const queuedSnapshot = await creatorRef
         .collection("spinQueue")
         .where("status", "==", "queued")
@@ -175,7 +183,8 @@ export const setSpinLiveStatus = onCall(
     }
 
     return {
-      status: isLive ? "live" as const : "offline" as const,
+      status: effectiveLive ? "live" as const : "offline" as const,
+      manualLive: isLive,
       heartbeatAtMs: now,
     };
   },
@@ -195,11 +204,16 @@ export const heartbeatSpinSession = onCall(async (request) => {
     creatorRef.get(),
     sessionRef.get(),
   ]);
+  const session = sessionSnapshot.data();
+  const manualLiveRequested =
+    typeof session?.manualLive === "boolean"
+      ? session.manualLive === true
+      : session?.status === "live" && session?.twitchLive !== true;
 
   if (
     !creatorSnapshot.exists ||
     creatorSnapshot.data()?.ownerUid !== request.auth.uid ||
-    sessionSnapshot.data()?.status !== "live"
+    !manualLiveRequested
   ) {
     throw new HttpsError("failed-precondition", "Spin is not live.");
   }
@@ -208,6 +222,7 @@ export const heartbeatSpinSession = onCall(async (request) => {
   await sessionRef.set(
     {
       heartbeatAtMs,
+      manualHeartbeatAtMs: heartbeatAtMs,
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
@@ -319,8 +334,7 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
     const session = sessionSnapshot.data();
 
     if (
-      session?.status !== "live" ||
-      now - Number(session.heartbeatAtMs ?? 0) >= 120000
+      !spinSessionIsLive(session, now)
     ) {
       throw new HttpsError("failed-precondition", "Go live before spinning.");
     }

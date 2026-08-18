@@ -3,6 +3,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import Stripe from "stripe";
+import { spinSessionIsLive } from "./spin-session.js";
 
 export const stripeSecret = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
@@ -287,6 +288,41 @@ export const getCreatorPaymentAvailability = onCall(async (request) => {
   return { available };
 });
 
+export const getCreatorPayments = onCall(async (request) => {
+  const uid = requiredAuthUid(request.auth);
+  const firestore = getFirestore();
+  const creatorSnapshot = await firestore.doc(`creators/${uid}`).get();
+  if (!creatorSnapshot.exists || creatorSnapshot.data()?.ownerUid !== uid) {
+    throw new HttpsError("failed-precondition", "Creator account required.");
+  }
+
+  const snapshot = await firestore
+    .collection("payments")
+    .where("creatorId", "==", uid)
+    .limit(500)
+    .get();
+  return {
+    payments: snapshot.docs
+      .map((document) => {
+        const data = document.data();
+        return {
+          id: document.id,
+          kind: data.kind === "spin" ? "spin" : "tribute",
+          anonymous: data.anonymous === true,
+          creatorAmountCents: Number(data.creatorAmountCents ?? 0),
+          senderName:
+            data.anonymous === true ? "" : String(data.senderName ?? ""),
+          status: String(data.status ?? "pending"),
+          createdAtMs:
+            typeof data.createdAt?.toMillis === "function"
+              ? data.createdAt.toMillis()
+              : null,
+        };
+      })
+      .sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0)),
+  };
+});
+
 export const createTributeCheckoutSession = onCall(
   { secrets: [stripeSecret] },
   async (request) => {
@@ -356,6 +392,10 @@ export const createTributeCheckoutSession = onCall(
     const anonymous = data.anonymous === true;
     const senderName = anonymous ? "" : optionalText(data.senderName, 80);
     const message = optionalText(data.message, 280);
+    const payerEmail =
+      typeof request.auth?.token.email === "string"
+        ? request.auth.token.email
+        : undefined;
     const paymentRef = firestore.collection("payments").doc();
     const username = String(creator.username ?? creatorId);
 
@@ -380,6 +420,7 @@ export const createTributeCheckoutSession = onCall(
         {
           mode: "payment",
           submit_type: "donate",
+          customer_email: payerEmail,
           line_items: [
             {
               quantity: 1,
@@ -399,6 +440,7 @@ export const createTributeCheckoutSession = onCall(
           },
           payment_intent_data: {
             application_fee_amount: platformFeeCents,
+            receipt_email: payerEmail,
             transfer_data: { destination: accountId },
             metadata: {
               creatorId,
@@ -453,16 +495,13 @@ export const createSpinCheckoutSession = onCall(
     const settings = settingsSnapshot.data();
     const config = configSnapshot.data();
     const session = sessionSnapshot.data();
-    const liveHeartbeat = Number(session?.heartbeatAtMs ?? 0);
-
     if (
       !creatorSnapshot.exists ||
       creator?.isPublished !== true ||
       creator?.moderationStatus !== "active" ||
       !configSnapshot.exists ||
       config?.isEnabled !== true ||
-      session?.status !== "live" ||
-      Date.now() - liveHeartbeat >= 120000
+      !spinSessionIsLive(session)
     ) {
       throw new HttpsError("failed-precondition", "This creator is not accepting spins.");
     }
@@ -519,6 +558,10 @@ export const createSpinCheckoutSession = onCall(
     const authorizedTotalCents = totalWithServiceFee(maximumCreatorAmountCents);
     const anonymous = data.anonymous === true;
     const senderName = anonymous ? "" : optionalText(data.senderName, 40);
+    const payerEmail =
+      typeof request.auth?.token.email === "string"
+        ? request.auth.token.email
+        : undefined;
     const paymentRef = firestore.collection("payments").doc();
     const receiptId = randomBytes(24).toString("base64url");
     const receiptRef = firestore.doc(`spinReceipts/${receiptId}`);
@@ -564,6 +607,7 @@ export const createSpinCheckoutSession = onCall(
         {
           mode: "payment",
           submit_type: "pay",
+          customer_email: payerEmail,
           line_items: [
             {
               quantity: 1,
@@ -584,6 +628,7 @@ export const createSpinCheckoutSession = onCall(
           },
           payment_intent_data: {
             capture_method: "manual",
+            receipt_email: payerEmail,
             transfer_data: { destination: accountId },
             metadata: {
               creatorId,

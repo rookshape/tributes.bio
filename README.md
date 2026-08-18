@@ -9,6 +9,7 @@ Tributes is a Linktree-style profile platform for creators, with one key differe
 - Tailwind CSS
 - Firebase Auth, Firestore, Storage, and Functions
 - Stripe Connect
+- Twitch OAuth and EventSub
 
 ## Product Shape
 
@@ -34,7 +35,7 @@ Tributes is a Linktree-style profile platform for creators, with one key differe
 8. Simple creator analytics
 9. Basic settings and admin surfaces
 
-See [docs/product-scope.md](docs/product-scope.md) for the working product notes.
+See [docs/product-scope.md](docs/product-scope.md) for the working product notes. The completed functional build is tracked in [docs/development-roadmap.md](docs/development-roadmap.md), and the design-to-production plan is in [docs/development-roadmap-part-2.md](docs/development-roadmap-part-2.md).
 
 ## Local Development
 
@@ -94,3 +95,11 @@ The Stripe webhook endpoint must listen for these events:
 - `payment_intent.succeeded`
 
 `payment_intent.amount_capturable_updated` is required to turn a successful manual Spin authorization into a queue entry.
+
+## Twitch Integration
+
+Twitch credentials are stored as Firebase Functions secrets. See [docs/twitch-setup.md](docs/twitch-setup.md) for app registration and deployment, and [docs/obs-setup.md](docs/obs-setup.md) for the OBS browser source.
+
+## Operations
+
+Creator analytics, moderation reports, admin controls, audit records, suspensions, and transactional email setup are documented in [docs/operations.md](docs/operations.md).

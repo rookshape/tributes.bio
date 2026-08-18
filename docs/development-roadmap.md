@@ -1,5 +1,7 @@
 # Development Roadmap
 
+Part 1 is complete. Continue with [Development Roadmap Part 2](development-roadmap-part-2.md) for product design, Wheel Studio, the redesigned stream experience, production readiness, and launch.
+
 ## Strategy
 
 Tributes should establish the shareable bio-link product first, add one-time creator tips second, and then build the Twitch spinner as its differentiated growth feature. This order gives creators a useful public page immediately and puts identity, links, publishing, and payments in place before the real-time spinner workflow.
@@ -231,6 +233,8 @@ Exit criteria:
 
 Goal: connect Twitch identity and optional Bits/counter events.
 
+Status: Complete as of 2026-08-16. Verified against the dev Firebase project and the connected `rookshape` Twitch channel for OAuth, private token storage, all three EventSub subscription challenges, signed online and offline events, Bits counter sync, OBS alert rendering, duplicate-event suppression, token validation scheduling, and disconnect handling.
+
 Deliverables:
 
 - Twitch OAuth connection
@@ -249,6 +253,8 @@ Exit criteria:
 ### Phase 6: Analytics, Admin, And Safety
 
 Goal: make the product operable.
+
+Status: Complete as of 2026-08-16. Verified against the dev Firebase project for expanded creator analytics, private creator payment history, owner-only admin access, creator and payment lookup, public profile reporting, moderation resolution, account/profile controls, username controls, audit logging, email verification and password recovery, and Stripe receipt configuration support.
 
 Deliverables:
 
