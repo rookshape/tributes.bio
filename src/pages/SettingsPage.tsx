@@ -5,9 +5,11 @@ import {
   LoaderCircle,
   LogOut,
   Mail,
+  MailCheck,
+  RadioTower,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { updateEmailPreferences } from "../lib/account";
 import {
@@ -17,16 +19,26 @@ import {
   type StripeConnectStatus,
 } from "../lib/payments";
 import type { EmailPreferences } from "../lib/types";
+import {
+  disconnectTwitch,
+  getTwitchConnection,
+  startTwitchConnection,
+  updateTwitchSettings,
+  type TwitchConnection,
+  type TwitchSettings,
+} from "../lib/twitch";
 
 export function SettingsPage() {
   const {
     appUser,
     refreshAppUser,
     sendPasswordReset,
+    sendVerificationEmail,
     signOut,
     user,
   } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [preferences, setPreferences] = useState<EmailPreferences>({
     paymentActivity: true,
     productUpdates: false,
@@ -37,6 +49,14 @@ export function SettingsPage() {
   const [connectStatus, setConnectStatus] =
     useState<StripeConnectStatus>("not_started");
   const [connectLoading, setConnectLoading] = useState(false);
+  const [twitchConnection, setTwitchConnection] =
+    useState<TwitchConnection | null>(null);
+  const [twitchSettings, setTwitchSettings] = useState<TwitchSettings>({
+    autoLiveEnabled: true,
+    bitsCounterEnabled: false,
+    showBitsAlerts: false,
+  });
+  const [twitchLoading, setTwitchLoading] = useState(false);
   const hasPassword = user?.providerData.some(
     (provider) => provider.providerId === "password",
   );
@@ -69,6 +89,49 @@ export function SettingsPage() {
         if (active) {
           setConnectLoading(false);
         }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [appUser?.accountType]);
+
+  useEffect(() => {
+    const twitchResult = searchParams.get("twitch");
+    if (!twitchResult) return;
+
+    if (twitchResult === "connected") {
+      setMessage("Twitch connected.");
+    } else {
+      setError(searchParams.get("reason") ?? "Could not connect Twitch.");
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("twitch");
+    next.delete("reason");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (appUser?.accountType !== "creator") return;
+
+    let active = true;
+    setTwitchLoading(true);
+    getTwitchConnection()
+      .then((connection) => {
+        if (!active) return;
+        setTwitchConnection(connection);
+        setTwitchSettings({
+          autoLiveEnabled: connection.autoLiveEnabled,
+          bitsCounterEnabled: connection.bitsCounterEnabled,
+          showBitsAlerts: connection.showBitsAlerts,
+        });
+      })
+      .catch(() => {
+        if (active) setError("Could not load Twitch status.");
+      })
+      .finally(() => {
+        if (active) setTwitchLoading(false);
       });
 
     return () => {
@@ -112,6 +175,50 @@ export function SettingsPage() {
     }
   };
 
+  const connectTwitch = async () => {
+    setTwitchLoading(true);
+    setError(null);
+    try {
+      window.location.assign(await startTwitchConnection());
+    } catch {
+      setError("Could not open Twitch. Please try again.");
+      setTwitchLoading(false);
+    }
+  };
+
+  const saveTwitchSettings = async () => {
+    setTwitchLoading(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const next = await updateTwitchSettings(twitchSettings);
+      setTwitchSettings(next);
+      setTwitchConnection((current) =>
+        current ? { ...current, ...next } : current,
+      );
+      setMessage("Twitch settings saved.");
+    } catch {
+      setError("Could not save Twitch settings.");
+    } finally {
+      setTwitchLoading(false);
+    }
+  };
+
+  const removeTwitch = async () => {
+    setTwitchLoading(true);
+    setMessage(null);
+    setError(null);
+    try {
+      await disconnectTwitch();
+      setTwitchConnection(null);
+      setMessage("Twitch disconnected.");
+    } catch {
+      setError("Could not disconnect Twitch.");
+    } finally {
+      setTwitchLoading(false);
+    }
+  };
+
   const resetPassword = async () => {
     setSaving(true);
     setMessage(null);
@@ -127,30 +234,46 @@ export function SettingsPage() {
     }
   };
 
+  const verifyEmail = async () => {
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      await sendVerificationEmail();
+      setMessage("Verification email sent.");
+    } catch {
+      setError("Could not send a verification email.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const logOut = async () => {
     await signOut();
     navigate("/", { replace: true });
   };
 
   return (
-    <section className="mx-auto w-full max-w-3xl px-5 py-8">
-      <div className="border-b border-zinc-200 pb-5">
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="mt-1 text-sm text-zinc-500">Account and notifications</p>
+    <section className="page-shell max-w-3xl">
+      <div className="page-header border-b liquid-divider">
+        <div>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">Account and notifications</p>
+        </div>
       </div>
 
       {message ? (
-        <div className="mt-5 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="status-success mt-5">
           {message}
         </div>
       ) : null}
       {error ? (
-        <div className="mt-5 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="status-error mt-5">
           {error}
         </div>
       ) : null}
 
-      <section className="border-b border-zinc-200 py-7">
+      <section className="glass-panel mt-6 p-5 sm:p-6">
         <h2 className="font-semibold">Account</h2>
         <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
           <div>
@@ -167,17 +290,27 @@ export function SettingsPage() {
 
         {appUser?.accountType === "creator" && appUser.username ? (
           <Link
-            className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-tribute"
+            className="secondary-button mt-5 min-h-10"
             target="_blank"
             to={`/${appUser.username}`}
           >
             Open public page <ExternalLink size={15} />
           </Link>
         ) : null}
+        {user && !user.emailVerified && hasPassword ? (
+          <button
+            className="secondary-button mt-5 min-h-10 sm:ml-2"
+            disabled={saving}
+            onClick={() => void verifyEmail()}
+            type="button"
+          >
+            <MailCheck size={15} /> Verify email
+          </button>
+        ) : null}
       </section>
 
       {appUser?.accountType === "creator" ? (
-        <section className="border-b border-zinc-200 py-7">
+        <section className="glass-panel mt-4 p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <CreditCard size={18} />
             <h2 className="font-semibold">Payouts</h2>
@@ -192,7 +325,7 @@ export function SettingsPage() {
                   : "Connect Stripe to receive tributes."}
           </p>
           <button
-            className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-semibold text-white disabled:opacity-60"
+            className="primary-button mt-4 min-h-10"
             disabled={connectLoading}
             onClick={() => void openConnect()}
             type="button"
@@ -212,12 +345,155 @@ export function SettingsPage() {
         </section>
       ) : null}
 
-      <section className="border-b border-zinc-200 py-7">
+      {appUser?.accountType === "creator" ? (
+        <section className="glass-panel mt-4 p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <RadioTower size={18} />
+            <h2 className="font-semibold">Twitch</h2>
+          </div>
+
+          {twitchConnection?.connected ? (
+            <>
+              <div className="mt-4 flex items-center gap-3">
+                {twitchConnection.broadcasterProfileImageUrl ? (
+                  <img
+                    alt=""
+                    className="h-10 w-10 rounded-full object-cover"
+                    src={twitchConnection.broadcasterProfileImageUrl}
+                  />
+                ) : null}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {twitchConnection.broadcasterDisplayName}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {twitchConnection.isLive ? "Live on Twitch" : "Connected"}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-3 text-xs text-zinc-500">
+                {twitchConnection.subscriptions["stream.online"]?.status === "enabled" &&
+                twitchConnection.subscriptions["stream.offline"]?.status === "enabled"
+                  ? "Stream events ready"
+                  : "Stream events pending"}
+                {twitchConnection.subscriptions["channel.cheer"]?.status === "enabled"
+                  ? " | Bits events ready"
+                  : " | Bits events pending"}
+              </p>
+
+              <div className="soft-panel mt-5 grid gap-4 p-4">
+                <label className="flex items-start justify-between gap-5">
+                  <span>
+                    <span className="block text-sm font-medium">Sync live status</span>
+                    <span className="mt-1 block text-sm text-zinc-500">
+                      Open and close Spin with your Twitch stream
+                    </span>
+                  </span>
+                  <input
+                    checked={twitchSettings.autoLiveEnabled}
+                    className="mt-1 h-4 w-4 shrink-0 accent-tribute"
+                    onChange={(event) =>
+                      setTwitchSettings({
+                        ...twitchSettings,
+                        autoLiveEnabled: event.target.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                </label>
+                <label className="flex items-start justify-between gap-5 border-t border-sky/50 pt-4">
+                  <span>
+                    <span className="block text-sm font-medium">Add Bits to counter</span>
+                    <span className="mt-1 block text-sm text-zinc-500">
+                      Count one cent per Bit
+                    </span>
+                  </span>
+                  <input
+                    checked={twitchSettings.bitsCounterEnabled}
+                    className="mt-1 h-4 w-4 shrink-0 accent-tribute"
+                    onChange={(event) =>
+                      setTwitchSettings({
+                        ...twitchSettings,
+                        bitsCounterEnabled: event.target.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                </label>
+                <label className="flex items-start justify-between gap-5 border-t border-sky/50 pt-4">
+                  <span>
+                    <span className="block text-sm font-medium">Show Bits alerts</span>
+                    <span className="mt-1 block text-sm text-zinc-500">
+                      Show the name and Bits amount on the overlay
+                    </span>
+                  </span>
+                  <input
+                    checked={twitchSettings.showBitsAlerts}
+                    className="mt-1 h-4 w-4 shrink-0 accent-tribute"
+                    onChange={(event) =>
+                      setTwitchSettings({
+                        ...twitchSettings,
+                        showBitsAlerts: event.target.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  className="primary-button min-h-10"
+                  disabled={twitchLoading}
+                  onClick={() => void saveTwitchSettings()}
+                  type="button"
+                >
+                  Save Twitch settings
+                </button>
+                <button
+                  className="secondary-button min-h-10"
+                  disabled={twitchLoading}
+                  onClick={() => void removeTwitch()}
+                  type="button"
+                >
+                  Disconnect
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-sm text-zinc-500">
+                {twitchConnection?.status === "reconnect_required"
+                  ? "Reconnect Twitch to resume stream events."
+                  : "Connect your channel for live status and Bits."}
+              </p>
+              <button
+                className="primary-button mt-4 min-h-10"
+                disabled={twitchLoading}
+                onClick={() => void connectTwitch()}
+                type="button"
+              >
+                {twitchLoading ? (
+                  <LoaderCircle className="animate-spin" size={17} />
+                ) : (
+                  <RadioTower size={17} />
+                )}
+                {twitchConnection?.status === "reconnect_required"
+                  ? "Reconnect Twitch"
+                  : "Connect Twitch"}
+              </button>
+            </>
+          )}
+        </section>
+      ) : null}
+
+      <section className="glass-panel mt-4 p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Mail size={18} />
           <h2 className="font-semibold">Email notifications</h2>
         </div>
-        <div className="mt-5 grid gap-4">
+        <div className="soft-panel mt-5 grid gap-4 p-4">
           <label className="flex items-start justify-between gap-5">
             <span>
               <span className="block text-sm font-medium">Payment activity</span>
@@ -237,7 +513,7 @@ export function SettingsPage() {
               type="checkbox"
             />
           </label>
-          <label className="flex items-start justify-between gap-5 border-t border-zinc-100 pt-4">
+          <label className="flex items-start justify-between gap-5 border-t border-sky/50 pt-4">
             <span>
               <span className="block text-sm font-medium">Product updates</span>
               <span className="mt-1 block text-sm text-zinc-500">
@@ -258,7 +534,7 @@ export function SettingsPage() {
           </label>
         </div>
         <button
-          className="mt-5 bg-ink px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          className="primary-button mt-5 min-h-10"
           disabled={saving}
           onClick={() => void savePreferences()}
           type="button"
@@ -268,7 +544,7 @@ export function SettingsPage() {
       </section>
 
       {hasPassword ? (
-        <section className="border-b border-zinc-200 py-7">
+        <section className="glass-panel mt-4 p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <KeyRound size={18} />
             <h2 className="font-semibold">Password</h2>
@@ -277,7 +553,7 @@ export function SettingsPage() {
             Send a secure password-reset link to {appUser?.email}.
           </p>
           <button
-            className="mt-4 border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-zinc-50 disabled:opacity-60"
+            className="secondary-button mt-4 min-h-10"
             disabled={saving}
             onClick={() => void resetPassword()}
             type="button"
@@ -287,9 +563,9 @@ export function SettingsPage() {
         </section>
       ) : null}
 
-      <section className="py-7">
+      <section className="py-6">
         <button
-          className="inline-flex items-center gap-2 border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-zinc-50"
+          className="secondary-button min-h-10"
           onClick={() => void logOut()}
           type="button"
         >

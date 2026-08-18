@@ -65,25 +65,27 @@ export function PaymentsPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-5xl px-5 py-8">
-      <div className="border-b border-zinc-200 pb-5">
-        <h1 className="text-2xl font-semibold">Payments</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+    <section className="page-shell max-w-5xl">
+      <div className="page-header border-b liquid-divider">
+        <div>
+        <h1 className="page-title">Payments</h1>
+        <p className="page-subtitle">
           {currency(receivedCents)} received
         </p>
+        </div>
       </div>
 
-      {error ? <p className="mt-5 text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="status-error mt-5">{error}</p> : null}
 
       {!error && payments.length === 0 ? (
         <p className="py-12 text-sm text-zinc-500">No payments yet.</p>
       ) : null}
 
       {payments.length > 0 ? (
-        <div className="overflow-x-auto">
+        <div className="data-table-shell mt-6">
           <table className="w-full min-w-[560px] border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-zinc-200 text-zinc-500">
+              <tr className="border-b border-sky/60 bg-mist/60 text-zinc-500">
                 <th className="py-3 pr-4 font-medium">From</th>
                 <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Date</th>
@@ -93,7 +95,7 @@ export function PaymentsPage() {
             </thead>
             <tbody>
               {payments.map((payment) => (
-                <tr className="border-b border-zinc-100" key={payment.id}>
+                <tr className="border-b border-sky/40 last:border-0" key={payment.id}>
                   <td className="py-4 pr-4 font-medium">
                     {payment.anonymous || !payment.senderName
                       ? "Anonymous"
