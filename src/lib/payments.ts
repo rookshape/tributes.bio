@@ -67,6 +67,8 @@ type SpinCheckoutInput = {
   creatorId: string;
   senderName: string;
   anonymous: boolean;
+  /** The wheel the viewer chose to spin. */
+  wheelId: string;
 };
 
 export async function createSpinCheckout(input: SpinCheckoutInput) {

@@ -169,8 +169,6 @@ export function LiveControlPage() {
 
   const activeWheel = wheels.find((wheel) => wheel.id === activeId) ?? null;
 
-  const switchTo = (wheel: SpinConfig) => void run(() => activateWheel(wheel));
-
   const toggleLive = () =>
     void run(async () => {
       if (manualLive) {
@@ -178,11 +176,18 @@ export function LiveControlPage() {
         return;
       }
 
-      // The server refuses to start a session unless the active wheel accepts
-      // spins, so going live turns that on rather than reporting it as an error.
-      if (activeWheel && !activeWheel.isEnabled) {
-        await activateWheel(await saveWheel({ ...activeWheel, isEnabled: true }));
-      }
+      // Checkout refuses any wheel that is not enabled, and the viewer may pick
+      // any offered one, so going live opens all of them.
+      const offered = wheels.filter((wheel) => !wheel.archived && wheel.availableToViewers);
+
+      await Promise.all(
+        offered
+          .filter((wheel) => !wheel.isEnabled)
+          .map((wheel) => saveWheel({ ...wheel, isEnabled: true })),
+      );
+
+      const nowActive = offered.find((wheel) => wheel.id === activeId) ?? offered[0];
+      if (nowActive) await activateWheel({ ...nowActive, isEnabled: true });
 
       await setSpinLiveStatus(creatorId, true);
     });
@@ -234,7 +239,9 @@ export function LiveControlPage() {
         <div className="min-w-0">
           <h1 className="page-title">Live</h1>
           <p className="page-subtitle">
-            {manualLive ? "Your session is running." : "Pick a wheel, then go live."}
+            {manualLive
+              ? "Your session is running. Spin each viewer as they come up."
+              : "Go live to open spins for your viewers."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -275,49 +282,21 @@ export function LiveControlPage() {
         </div>
       </header>
 
-      <section className="panel mt-5 p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-title font-semibold text-content">Wheel</h2>
-          {isLive ? (
-            <p className="text-caption text-content-muted">
-              End the session to switch wheels.
-            </p>
-          ) : null}
-        </div>
-
-        <div className="mt-4 flex gap-4 overflow-x-auto pb-1">
-          {wheels
-            .filter((wheel) => !wheel.archived)
-            .map((wheel) => {
-              const active = wheel.id === activeId;
-              return (
-                <button
-                  aria-pressed={active}
-                  className={`w-36 shrink-0 rounded-card border p-3 text-center transition-colors duration-fast disabled:cursor-not-allowed ${
-                    active
-                      ? "border-accent bg-accent/5"
-                      : "border-transparent hover:border-line hover:bg-surface-raised disabled:hover:border-transparent disabled:hover:bg-transparent"
-                  } ${isLive && !active ? "opacity-45" : ""}`}
-                  disabled={isLive || working}
-                  key={wheel.id}
-                  onClick={() => switchTo(wheel)}
-                  title={active ? `${wheel.name} is active` : `Make ${wheel.name} active`}
-                  type="button"
-                >
-                  <WheelThumbnail slices={wheel.slices} />
-                  <span className="mt-2.5 block truncate text-body font-medium text-content">
-                    {wheel.name}
-                  </span>
-                  <span
-                    className={`mt-0.5 block text-micro font-semibold uppercase ${
-                      active ? "text-accent" : "text-transparent"
-                    }`}
-                  >
-                    Active
-                  </span>
-                </button>
-              );
-            })}
+      {/* The viewer picks the wheel when they pay, so this reports what is
+          coming rather than offering a choice. */}
+      <section className="panel mt-5 flex items-center gap-4 p-5">
+        <WheelThumbnail className="w-20 shrink-0" slices={config.slices} />
+        <div className="min-w-0">
+          <p className="text-caption text-content-muted">
+            {queued.length ? "Next up" : "On the overlay"}
+          </p>
+          <p className="truncate text-title font-semibold text-content">{config.name}</p>
+          <p className="mt-0.5 text-caption text-content-muted">
+            Viewers choose their own wheel when they pay.{" "}
+            <Link className="font-medium text-accent hover:underline" to="/dashboard/spin">
+              Manage wheels
+            </Link>
+          </p>
         </div>
       </section>
 
@@ -409,7 +388,7 @@ export function LiveControlPage() {
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
               <Input
-                label="Target"
+                label="Goal"
                 min="0"
                 onChange={(event) =>
                   setGoal({ ...goal, goalCents: Math.round(Number(event.target.value) * 100) })

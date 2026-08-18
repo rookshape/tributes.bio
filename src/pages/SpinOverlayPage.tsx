@@ -7,6 +7,7 @@ import {
   OverlayWheel,
   type OverlayPart,
 } from "../components/overlay/OverlayParts";
+import { getWheel } from "../lib/wheels";
 import {
   subscribeSpinConfig,
   subscribeSpinQueue,
@@ -34,6 +35,7 @@ export function SpinOverlayPage() {
     label: DEFAULT_GOAL_LABEL,
     goalCents: 0,
   });
+  const [queuedWheel, setQueuedWheel] = useState<SpinConfig | null>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -69,6 +71,27 @@ export function SpinOverlayPage() {
     return subscribeSpinGoal(creatorId, setGoal);
   }, [creatorId, activePart]);
 
+  // The wheel on screen follows the queue: whichever wheel the current spin ran
+  // on, then the next viewer's once it settles. It never reverts on its own.
+  useEffect(() => {
+    const midSpin = Boolean(state && state.lockedUntilMs > Date.now());
+    const wheelId = midSpin ? state?.wheelId : (state?.nextWheelId ?? state?.wheelId);
+
+    if (!creatorId || !wheelId || wheelId === "current") {
+      setQueuedWheel(null);
+      return;
+    }
+
+    let active = true;
+    getWheel(creatorId, wheelId)
+      .then((wheel) => active && setQueuedWheel(wheel))
+      .catch(() => active && setQueuedWheel(null));
+
+    return () => {
+      active = false;
+    };
+  }, [creatorId, state, state?.wheelId, state?.nextWheelId]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 200);
     return () => window.clearInterval(timer);
@@ -94,7 +117,7 @@ export function SpinOverlayPage() {
       {activePart === "wheel" ? (
         <OverlayWheel
           animation={animation}
-          config={config}
+          config={queuedWheel ?? config}
           spinning={spinning}
           state={state}
         />

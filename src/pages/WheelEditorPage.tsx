@@ -9,6 +9,7 @@ import {
   Input,
   Select,
   StatusMessage,
+  Toggle,
   Tooltip,
 } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -16,6 +17,7 @@ import { spinSessionIsLive, subscribeSpinSession } from "../lib/spin";
 import {
   activateWheel,
   getWheel,
+  listWheels,
   saveWheel,
   subscribeActiveWheelId,
 } from "../lib/wheels";
@@ -176,6 +178,15 @@ export function WheelEditorPage() {
 
     try {
       const normalized = await saveWheel({ ...wheel, title: wheel.name });
+
+      if (normalized.isDefault) {
+        const others = await listWheels(creatorId);
+        await Promise.all(
+          others
+            .filter((other) => other.id !== normalized.id && other.isDefault)
+            .map((other) => saveWheel({ ...other, isDefault: false })),
+        );
+      }
       setWheel(normalized);
 
       // Push straight to the live copy so the active wheel stays in step.
@@ -206,16 +217,17 @@ export function WheelEditorPage() {
               <ArrowLeft size={17} />
             </Link>
           </Tooltip>
+          <div className="min-w-0 flex-1 basis-48">
           <Input
             className="text-title font-semibold"
-            fieldClassName="w-full max-w-xs"
             label="Wheel name"
             maxLength={60}
             onChange={(event) => change({ name: event.target.value })}
             value={wheel.name}
           />
+          </div>
+          <div className="w-32 shrink-0">
           <Input
-            fieldClassName="w-32"
             label="Price to spin"
             min="1"
             onChange={(event) =>
@@ -226,6 +238,7 @@ export function WheelEditorPage() {
             type="number"
             value={wheel.spinPriceCents / 100}
           />
+          </div>
           {isActive ? (
             <Badge className="mb-2.5" dot tone="positive">
               Active
@@ -252,6 +265,21 @@ export function WheelEditorPage() {
           until the session ends.
         </p>
       ) : null}
+
+      <div className="panel mt-6 grid gap-4 p-5 sm:grid-cols-2">
+        <Toggle
+          checked={wheel.availableToViewers}
+          description="Viewers can choose this wheel and pay to spin it."
+          label="Offer to viewers"
+          onChange={(availableToViewers) => change({ availableToViewers })}
+        />
+        <Toggle
+          checked={wheel.isDefault}
+          description="Shown on the overlay when nobody is queued yet."
+          label="Default wheel"
+          onChange={(isDefault) => change({ isDefault })}
+        />
+      </div>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.6fr)]">
         <div className="min-w-0">

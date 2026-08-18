@@ -177,6 +177,9 @@ export type SpinState = {
   queueEntryId: string | null;
   viewerName: string | null;
   selectedIndex: number | null;
+  /** Wheel this spin ran on, and the one to show once it settles. */
+  wheelId: string | null;
+  nextWheelId: string | null;
   resultLabel: string | null;
   resultType: SpinSliceType | null;
   counterDeltaCents: number;

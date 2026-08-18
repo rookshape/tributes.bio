@@ -2,6 +2,8 @@ import { LoaderCircle } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getCreatorByUsername } from "../lib/account";
+import { WheelThumbnail } from "../components/WheelThumbnail";
+import { subscribeWheels } from "../lib/wheels";
 import {
   createSpinCheckout,
   getCreatorPaymentAvailability,
@@ -87,6 +89,8 @@ export function PublicSpinPage() {
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wheels, setWheels] = useState<SpinConfig[]>([]);
+  const [chosenWheelId, setChosenWheelId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -136,6 +140,11 @@ export function PublicSpinPage() {
   }, [creator, receiptId]);
 
   useEffect(() => {
+    if (!creator) return;
+    return subscribeWheels(creator.id, setWheels);
+  }, [creator]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 15000);
     return () => window.clearInterval(timer);
   }, []);
@@ -161,6 +170,7 @@ export function PublicSpinPage() {
         creatorId: creator.id,
         senderName: viewerName,
         anonymous,
+        wheelId: chosen.id,
       });
       window.location.assign(url);
     } catch (caughtError) {
@@ -185,7 +195,15 @@ export function PublicSpinPage() {
     return <main className="min-h-screen bg-canvas" />;
   }
 
-  const maximumCreatorCents = maxSpinAmountCents(config);
+  // Viewers choose from the wheels the streamer offers; the price and the
+  // maximum hold both come from the one they pick.
+  const offered = wheels.filter((wheel) => wheel.availableToViewers && !wheel.archived);
+  const chosen =
+    offered.find((wheel) => wheel.id === chosenWheelId) ??
+    offered.find((wheel) => wheel.isDefault) ??
+    offered[0] ??
+    config;
+  const maximumCreatorCents = maxSpinAmountCents(chosen);
   const maximumTotalCents = totalWithServiceFee(maximumCreatorCents);
 
   return (
@@ -193,6 +211,44 @@ export function PublicSpinPage() {
       <section className="panel w-full max-w-md p-6 sm:p-8">
         <p className="text-sm font-semibold text-content-muted">@{creator.username}</p>
         <h1 className="mt-2 text-3xl font-semibold">Join the spin queue</h1>
+
+        {offered.length > 1 ? (
+          <fieldset className="mt-6">
+            <legend className="text-sm font-medium text-content-muted">
+              Pick your wheel
+            </legend>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {offered.map((wheel) => {
+                const selected = wheel.id === chosen.id;
+                return (
+                  <label
+                    className={`cursor-pointer rounded-card border p-3 text-center transition-colors duration-fast ${
+                      selected
+                        ? "border-accent bg-accent/5"
+                        : "border-line hover:border-line-strong"
+                    }`}
+                    key={wheel.id}
+                  >
+                    <input
+                      checked={selected}
+                      className="sr-only"
+                      name="wheel"
+                      onChange={() => setChosenWheelId(wheel.id)}
+                      type="radio"
+                    />
+                    <WheelThumbnail slices={wheel.slices} />
+                    <span className="mt-2 block truncate text-sm font-medium text-content">
+                      {wheel.name}
+                    </span>
+                    <span className="block text-xs text-content-muted">
+                      {formatMoney(wheel.spinPriceCents)} a spin
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ) : null}
         <p className="mt-6 text-sm text-content-muted">Maximum authorization</p>
         <p className="mt-1 text-4xl font-semibold">{formatMoney(maximumTotalCents)}</p>
         <p className="mt-3 text-sm leading-6 text-content-muted">

@@ -252,6 +252,8 @@ function mapSpinState(creatorId: string, data: DocumentData | undefined): SpinSt
     queueEntryId: typeof data?.queueEntryId === "string" ? data.queueEntryId : null,
     viewerName: typeof data?.viewerName === "string" ? data.viewerName : null,
     selectedIndex: typeof data?.selectedIndex === "number" ? data.selectedIndex : null,
+    wheelId: typeof data?.wheelId === "string" ? data.wheelId : null,
+    nextWheelId: typeof data?.nextWheelId === "string" ? data.nextWheelId : null,
     resultLabel: typeof data?.resultLabel === "string" ? data.resultLabel : null,
     resultType:
       data?.resultType === "amount" ||
