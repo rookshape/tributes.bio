@@ -24,6 +24,8 @@ type SpinCheckoutRequest = {
   creatorId?: unknown;
   origin?: unknown;
   senderName?: unknown;
+  /** Library wheel the viewer chose. Falls back to the active wheel. */
+  wheelId?: unknown;
 };
 
 type SpinSlice = {
@@ -484,23 +486,36 @@ export const createSpinCheckoutSession = onCall(
     const creatorId = requiredId(data.creatorId, "creator ID");
     const origin = allowedOrigin(data.origin);
     const firestore = getFirestore();
+    // The viewer picks the wheel, so the price and slices come from the wheel
+    // they chose rather than from whichever one the streamer last activated.
+    const wheelId =
+      typeof data.wheelId === "string" && data.wheelId.trim()
+        ? data.wheelId.trim()
+        : "current";
     const [creatorSnapshot, settingsSnapshot, configSnapshot, sessionSnapshot] =
       await Promise.all([
         firestore.doc(`creators/${creatorId}`).get(),
         firestore.doc(`creatorSettings/${creatorId}`).get(),
-        firestore.doc(`creators/${creatorId}/spinConfigs/current`).get(),
+        firestore.doc(`creators/${creatorId}/spinConfigs/${wheelId}`).get(),
         firestore.doc(`creators/${creatorId}/spinSessions/current`).get(),
       ]);
     const creator = creatorSnapshot.data();
     const settings = settingsSnapshot.data();
     const config = configSnapshot.data();
     const session = sessionSnapshot.data();
+    // A wheel the streamer has not offered to viewers cannot be bought into,
+    // whatever id the client sends.
+    const offeredToViewers =
+      wheelId === "current"
+        ? config?.isEnabled === true
+        : config?.availableToViewers === true && config?.archived !== true;
+
     if (
       !creatorSnapshot.exists ||
       creator?.isPublished !== true ||
       creator?.moderationStatus !== "active" ||
       !configSnapshot.exists ||
-      config?.isEnabled !== true ||
+      !offeredToViewers ||
       !spinSessionIsLive(session)
     ) {
       throw new HttpsError("failed-precondition", "This creator is not accepting spins.");
@@ -570,6 +585,8 @@ export const createSpinCheckoutSession = onCall(
     const batch = firestore.batch();
     batch.set(paymentRef, {
         kind: "spin",
+        wheelId,
+        wheelName: typeof config?.name === "string" ? config.name : null,
         creatorId,
         payerUid: request.auth?.uid ?? null,
         senderName,
@@ -745,6 +762,8 @@ async function updatePaymentAndSpinQueue(
         amountCents: Number(payment.baseAmountCents ?? 0),
         authorizedTotalCents: Number(payment.authorizedTotalCents ?? 0),
         source: "payment",
+        wheelId: typeof payment.wheelId === "string" ? payment.wheelId : "current",
+        wheelName: typeof payment.wheelName === "string" ? payment.wheelName : null,
         updatedAt: FieldValue.serverTimestamp(),
       };
 

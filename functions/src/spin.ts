@@ -23,6 +23,7 @@ type SpinSlice = {
 };
 
 type SpinConfig = {
+  name: string;
   title: string;
   counterLabel: string;
   spinPriceCents: number;
@@ -96,6 +97,7 @@ function parseConfig(data: FirebaseFirestore.DocumentData | undefined): SpinConf
     title: data.title,
     counterLabel: data.counterLabel,
     spinPriceCents: data.spinPriceCents,
+    name: typeof data?.name === "string" ? data.name : "Wheel",
     isEnabled: data.isEnabled === true,
     showOnProfile: data.showOnProfile !== false,
     mockModeEnabled: data.mockModeEnabled === true,
@@ -279,6 +281,8 @@ export const createMockSpinEntry = onCall(async (request) => {
       viewerName: name,
       amountCents: config.spinPriceCents,
       source: "mock",
+      wheelId: "current",
+      wheelName: typeof config.name === "string" ? config.name : null,
       status: "queued",
       resultLabel: null,
       createdAt: FieldValue.serverTimestamp(),
@@ -329,7 +333,6 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
       throw new HttpsError("permission-denied", "Only the creator can trigger a spin.");
     }
 
-    const config = parseConfig(configSnapshot.data());
     const state = stateSnapshot.data();
     const session = sessionSnapshot.data();
 
@@ -343,13 +346,40 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
       throw new HttpsError("failed-precondition", "The wheel is already spinning.");
     }
 
-    const queueEntry = queueSnapshot.docs.find(
+    const queuedEntries = queueSnapshot.docs.filter(
       (snapshot) => snapshot.data().status === "queued",
     );
+    const queueEntry = queuedEntries[0];
 
     if (!queueEntry) {
       throw new HttpsError("failed-precondition", "The queue is empty.");
     }
+
+    // Every read must precede the first write in a transaction, so the
+    // paid-for wheel is fetched here rather than alongside the others above.
+    const entryWheelId =
+      typeof queueEntry.data().wheelId === "string"
+        ? (queueEntry.data().wheelId as string)
+        : "current";
+    const entryWheelSnapshot =
+      entryWheelId === "current"
+        ? configSnapshot
+        : await transaction.get(
+            creatorRef.collection("spinConfigs").doc(entryWheelId),
+          );
+    // A wheel deleted since the viewer paid falls back to the active one, so a
+    // paid entry still resolves rather than being stranded in the queue.
+    const config = parseConfig(
+      entryWheelSnapshot.exists ? entryWheelSnapshot.data() : configSnapshot.data(),
+    );
+
+    // What the overlay shows next: the following viewer's wheel if there is
+    // one, otherwise it stays on the wheel just spun.
+    const nextEntry = queuedEntries[1];
+    const nextWheelId =
+      nextEntry && typeof nextEntry.data().wheelId === "string"
+        ? (nextEntry.data().wheelId as string)
+        : entryWheelId;
 
     const previousSelectedIndex = Number(queueEntry.data().selectedIndex);
     selectedIndex =
@@ -486,6 +516,10 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         spinId,
         queueEntryId: queueEntry.id,
         viewerName: String(entry.viewerName ?? "Viewer"),
+        // The wheel this spin ran on, and the one the overlay should show once
+        // it settles — the next viewer's, or this one if nobody is waiting.
+        wheelId: entryWheelId,
+        nextWheelId,
         selectedIndex,
         resultLabel: slice.label,
         resultType: slice.type,

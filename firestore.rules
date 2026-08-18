@@ -63,6 +63,8 @@ service cloud.firestore {
           'creatorId',
           'name',
           'archived',
+          'availableToViewers',
+          'isDefault',
           'activeWheelId',
           'createdAt',
           'title',
@@ -82,6 +84,10 @@ service cloud.firestore {
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 60
         && request.resource.data.archived is bool
+        && (!('availableToViewers' in request.resource.data)
+          || request.resource.data.availableToViewers is bool)
+        && (!('isDefault' in request.resource.data)
+          || request.resource.data.isDefault is bool)
         // Only the active document carries a pointer, and only ever to a string id.
         && (!('activeWheelId' in request.resource.data)
           || request.resource.data.activeWheelId is string)
@@ -178,10 +184,10 @@ service cloud.firestore {
 
       match /spinConfigs/{configId} {
         allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
-          || (configId == 'current'
-            && resource.data.isEnabled == true
-            && get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
-            && get(/databases/$(database)/documents/creators/$(creatorId)).data.moderationStatus == 'active');
+          || (get(/databases/$(database)/documents/creators/$(creatorId)).data.isPublished == true
+            && get(/databases/$(database)/documents/creators/$(creatorId)).data.moderationStatus == 'active'
+            && (resource.data.availableToViewers == true
+              || (configId == 'current' && resource.data.isEnabled == true)));
         allow create, update: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
           && validSpinConfig(creatorId);
         allow delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
@@ -207,7 +213,8 @@ service cloud.firestore {
       }
 
       match /spinQueue/{entryId} {
-        allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
+        allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+          || publicSpinAvailable(creatorId);
         allow write: if false;
       }
 

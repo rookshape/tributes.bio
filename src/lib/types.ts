@@ -95,6 +95,10 @@ export type SpinConfig = {
   /** Library name, shown in the wheel list. */
   name: string;
   archived: boolean;
+  /** Offered to viewers on the public spin page. */
+  availableToViewers: boolean;
+  /** Shown when nothing in the queue determines the wheel. */
+  isDefault: boolean;
   creatorId: string;
   title: string;
   counterLabel: string;

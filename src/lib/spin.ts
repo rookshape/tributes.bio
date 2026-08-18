@@ -56,6 +56,8 @@ export function createDefaultSpinConfig(creatorId: string): SpinConfig {
     id: "current",
     name: "Default wheel",
     archived: false,
+    availableToViewers: true,
+    isDefault: true,
     creatorId,
     title: "Spin the wheel",
     counterLabel: "Tribute goal",
@@ -218,6 +220,10 @@ function mapSpinConfig(
     id,
     name: typeof data.name === "string" && data.name.trim() ? data.name : defaults.name,
     archived: data.archived === true,
+    // Existing wheels predate these flags; offering them keeps the viewer page
+    // from going empty on upgrade.
+    availableToViewers: data.availableToViewers !== false,
+    isDefault: data.isDefault === true,
     creatorId,
     title: typeof data.title === "string" ? data.title : defaults.title,
     // "Tribute total" was the previous default; move those wheels onto the new
