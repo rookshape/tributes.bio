@@ -20,9 +20,19 @@ const AdminPage = lazy(() =>
   })),
 );
 
-const SpinDashboardPage = lazy(() =>
-  import("./pages/SpinDashboardPage").then((module) => ({
-    default: module.SpinDashboardPage,
+const WheelEditorPage = lazy(() =>
+  import("./pages/WheelEditorPage").then((module) => ({
+    default: module.WheelEditorPage,
+  })),
+);
+const LiveControlPage = lazy(() =>
+  import("./pages/LiveControlPage").then((module) => ({
+    default: module.LiveControlPage,
+  })),
+);
+const WheelLibraryPage = lazy(() =>
+  import("./pages/WheelLibraryPage").then((module) => ({
+    default: module.WheelLibraryPage,
   })),
 );
 const PublicSpinPage = lazy(() =>
@@ -85,7 +95,9 @@ function AppRoutes() {
             path="dashboard"
           >
             <Route index element={<DashboardPage />} />
-            <Route element={<SpinDashboardPage />} path="spin" />
+            <Route element={<WheelLibraryPage />} path="spin" />
+            <Route element={<WheelEditorPage />} path="spin/:wheelId" />
+            <Route element={<LiveControlPage />} path="live" />
             <Route element={<AnalyticsPage />} path="analytics" />
             <Route element={<PaymentsPage />} path="payments" />
             <Route element={<SettingsPage />} path="settings" />

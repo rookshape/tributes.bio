@@ -103,9 +103,12 @@ service cloud.firestore {
         && request.resource.data.wheelTone is int
         && request.resource.data.wheelTone >= 0
         && request.resource.data.wheelTone <= 100
-        && request.resource.data.goalCents is int
-        && request.resource.data.goalCents >= 0
-        && request.resource.data.goalCents <= 10000000
+        // Legacy field: the goal moved to spinSettings, so documents written
+        // now omit it while older ones still carry it through a merge.
+        && (!('goalCents' in request.resource.data)
+          || (request.resource.data.goalCents is int
+            && request.resource.data.goalCents >= 0
+            && request.resource.data.goalCents <= 10000000))
         && request.resource.data.slices is list
         && request.resource.data.slices.size() >= 2
         && request.resource.data.slices.size() <= 12;

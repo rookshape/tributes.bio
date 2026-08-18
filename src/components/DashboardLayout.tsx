@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Disc3,
+  Radio,
   PanelsTopLeft,
   Settings,
   UserRound,
@@ -11,7 +12,8 @@ import { useAuth } from "../context/AuthContext";
 
 const creatorLinks = [
   { label: "Page", path: "/dashboard", icon: PanelsTopLeft, end: true },
-  { label: "Wheel", path: "/dashboard/spin", icon: Disc3, end: false },
+  { label: "Wheels", path: "/dashboard/spin", icon: Disc3, end: false },
+  { label: "Live", path: "/dashboard/live", icon: Radio, end: false },
   { label: "Analytics", path: "/dashboard/analytics", icon: BarChart3, end: false },
   { label: "Payments", path: "/dashboard/payments", icon: WalletCards, end: false },
   { label: "Settings", path: "/dashboard/settings", icon: Settings, end: false },
