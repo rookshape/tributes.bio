@@ -152,11 +152,19 @@ export function OverlayQueue({
       {visible.length ? (
         <ol className="mt-3 grid gap-1.5">
           {visible.map((entry, index) => (
-            <li className="flex items-center gap-2.5 text-sm" key={entry.id}>
-              <span className="w-4 shrink-0 text-center text-xs opacity-50">
+            <li className="flex items-start gap-2.5 text-sm" key={entry.id}>
+              <span className="w-4 shrink-0 text-center text-xs leading-5 opacity-50">
                 {index + 1}
               </span>
-              <span className="truncate font-semibold">{entry.viewerName}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold">{entry.viewerName}</span>
+                {/* Which wheel they bought into, since viewers pick their own. */}
+                {entry.wheelName ? (
+                  <span className="block truncate text-xs opacity-60">
+                    {entry.wheelName}
+                  </span>
+                ) : null}
+              </span>
             </li>
           ))}
           {overflow > 0 ? (
