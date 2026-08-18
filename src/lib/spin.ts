@@ -565,6 +565,11 @@ const adjustCounterCall = httpsCallable<
   { counterCents: number }
 >(functions, "adjustSpinCounter");
 
+const cancelQueueEntryCall = httpsCallable<
+  { creatorId: string; entryId: string },
+  { entryId: string; refunded: boolean }
+>(functions, "cancelSpinQueueEntry");
+
 const setLiveStatusCall = httpsCallable<
   { creatorId: string; isLive: boolean },
   { status: "offline" | "live"; manualLive: boolean; heartbeatAtMs: number }
@@ -582,6 +587,12 @@ export async function createMockSpinEntry(creatorId: string, viewerName: string)
 
 export async function triggerNextSpin(creatorId: string) {
   const result = await triggerSpinCall({ creatorId });
+  return result.data;
+}
+
+/** Drops a waiting viewer and releases whatever hold their card is carrying. */
+export async function cancelSpinQueueEntry(creatorId: string, entryId: string) {
+  const result = await cancelQueueEntryCall({ creatorId, entryId });
   return result.data;
 }
 

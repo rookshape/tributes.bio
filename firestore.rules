@@ -213,15 +213,31 @@ service cloud.firestore {
         allow create, update: if settingsId == 'current'
           && owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
           && request.resource.data.keys().hasOnly([
-            'creatorId', 'label', 'goalCents', 'updatedAt'
+            'creatorId', 'label', 'goalCents',
+            'soundEnabled', 'soundVolume', 'soundSpin', 'soundTick',
+            'soundResult', 'soundWin', 'soundQueue',
+            'queueMaxVisible', 'queueHideNames',
+            'updatedAt'
           ])
           && request.resource.data.creatorId == creatorId
-          && request.resource.data.label is string
-          && request.resource.data.label.size() > 0
-          && request.resource.data.label.size() <= 40
-          && request.resource.data.goalCents is int
-          && request.resource.data.goalCents >= 0
-          && request.resource.data.goalCents <= 10000000;
+          // Goal and overlay settings share this document and are written
+          // independently, so each group is only checked when present.
+          && (!('label' in request.resource.data)
+            || (request.resource.data.label is string
+              && request.resource.data.label.size() > 0
+              && request.resource.data.label.size() <= 40))
+          && (!('goalCents' in request.resource.data)
+            || (request.resource.data.goalCents is int
+              && request.resource.data.goalCents >= 0
+              && request.resource.data.goalCents <= 10000000))
+          && (!('soundVolume' in request.resource.data)
+            || (request.resource.data.soundVolume is int
+              && request.resource.data.soundVolume >= 0
+              && request.resource.data.soundVolume <= 100))
+          && (!('queueMaxVisible' in request.resource.data)
+            || (request.resource.data.queueMaxVisible is int
+              && request.resource.data.queueMaxVisible >= 1
+              && request.resource.data.queueMaxVisible <= 10));
         allow delete: if false;
       }
 

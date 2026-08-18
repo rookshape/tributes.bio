@@ -14,21 +14,25 @@ type SpinWheelProps = {
   slices: SpinSlice[];
   animation?: SpinAnimation | null;
   onRest?: () => void;
+  /** Fires as each slice boundary passes the pointer, for the tick sound. */
+  onTick?: () => void;
 };
 
 /** Label placement inside the 100-unit overlay viewBox. */
 const LABEL_CENTER = 50;
 const LABEL_RADIUS = 33;
 
-export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
+export function SpinWheel({ slices, animation, onRest, onTick }: SpinWheelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<Wheel | null>(null);
   const playedSpinIdRef = useRef<string | null>(null);
   const onRestRef = useRef(onRest);
+  const onTickRef = useRef(onTick);
   const labelRefs = useRef<(SVGTextElement | null)[]>([]);
   const pointerRef = useRef<HTMLDivElement>(null);
 
   onRestRef.current = onRest;
+  onTickRef.current = onTick;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -80,6 +84,7 @@ export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
 
     let frame = 0;
     let previousRotation = wheelRef.current?.rotation ?? 0;
+    let previousIntoSlice = 0;
     const sliceAngle = 360 / slices.length;
 
     const followRotation = () => {
@@ -91,9 +96,10 @@ export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
       // wheel instead of running on a timer of its own.
       const pointer = pointerRef.current;
 
+      const degreesPerFrame = Math.abs(rotation - previousRotation);
+      const intoSlice = (((rotation / sliceAngle) % 1) + 1) % 1;
+
       if (pointer) {
-        const degreesPerFrame = Math.abs(rotation - previousRotation);
-        const intoSlice = (((rotation / sliceAngle) % 1) + 1) % 1;
         // Full deflection right as a boundary passes, decaying across the slice.
         const kick = Math.max(0, 1 - intoSlice / 0.45);
         // Fades out as the wheel slows so the pointer comes to rest upright.
@@ -101,6 +107,13 @@ export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
         pointer.style.transform = `translateX(-50%) rotate(${13 * kick * speed}deg)`;
       }
 
+      // The phase wrapping is the boundary crossing the pointer, so the ticks
+      // land on the same events that deflect it and slow down with the wheel.
+      if (degreesPerFrame > 0 && intoSlice < previousIntoSlice) {
+        onTickRef.current?.();
+      }
+
+      previousIntoSlice = intoSlice;
       previousRotation = rotation;
 
       labelRefs.current.forEach((label, index) => {

@@ -5,6 +5,7 @@ import {
   Play,
   Radio,
   ChevronDown,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -22,10 +23,14 @@ import {
   EmptyState,
   IconButton,
   StatusMessage,
+  Toggle,
+  Tooltip,
 } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../lib/money";
 import {
+  adjustSpinCounter,
+  cancelSpinQueueEntry,
   createMockSpinEntry,
   heartbeatSpinSession,
   setSpinLiveStatus,
@@ -38,10 +43,19 @@ import {
 } from "../lib/spin";
 import {
   DEFAULT_GOAL_LABEL,
+  DEFAULT_OVERLAY_SETTINGS,
+  saveOverlaySettings,
   saveSpinGoal,
+  subscribeOverlaySettings,
   subscribeSpinGoal,
   type SpinGoal,
+  type SpinOverlaySettings,
 } from "../lib/spinGoal";
+import {
+  SOUND_LABELS,
+  playOverlaySound,
+  unlockOverlayAudio,
+} from "../lib/overlaySounds";
 import {
   activateWheel,
   getActiveWheelId,
@@ -76,63 +90,95 @@ const STAGE = {
 } as const;
 
 /**
- * The goal is the one number a streamer changes mid-stream, so the target
- * figure in the bar *is* the input — no popup, no separate field. The bar is
- * still the unmodified overlay component, so what is edited here is exactly
- * what the stream shows.
+ * A figure inside the goal bar that is edited in place. Used for both the
+ * running total and the target, so a correction after a refund and a mid-stream
+ * goal change work the same way: click the number and type.
+ */
+function InlineAmount({
+  label,
+  valueCents,
+  onCommit,
+}: {
+  label: string;
+  valueCents: number;
+  onCommit: (cents: number) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const settled = valueCents ? String(Math.round(valueCents / 100)) : "";
+  const value = draft ?? settled;
+
+  const commit = async () => {
+    const pending = draft;
+    setDraft(null);
+    if (pending === null) return;
+
+    const cents = Math.max(0, Math.round(Number(pending) * 100) || 0);
+    if (cents === valueCents) return;
+
+    await onCommit(cents);
+  };
+
+  return (
+    <span className="inline-flex items-baseline">
+      $
+      <input
+        aria-label={label}
+        className="-my-1 rounded bg-transparent py-1 text-inherit outline-none transition-colors duration-fast hover:bg-black/[0.06] focus:bg-black/[0.06]"
+        inputMode="numeric"
+        onBlur={() => void commit()}
+        onChange={(event) => setDraft(event.target.value.replace(/[^\d]/g, ""))}
+        onFocus={(event) => event.target.select()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") {
+            setDraft(null);
+            event.currentTarget.blur();
+          }
+        }}
+        placeholder="0"
+        // Grows with the number so the bar does not jump as digits are typed.
+        style={{ width: `${Math.max(1, value.length)}ch` }}
+        value={value}
+      />
+    </span>
+  );
+}
+
+/**
+ * Both figures in the bar are editable: the target because a streamer moves it
+ * mid-stream, and the total because refunds and disputes need correcting. The
+ * bar is still the unmodified overlay component.
  */
 function LiveGoalBar({
   config,
   goal,
-  onSave,
+  onSaveGoal,
+  onCorrectTotal,
   state,
 }: {
   config: SpinConfig;
   goal: SpinGoal;
-  onSave: (goalCents: number) => Promise<void>;
+  onSaveGoal: (goalCents: number) => Promise<void>;
+  onCorrectTotal: (totalCents: number) => Promise<void>;
   state: SpinState | null;
 }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const dollars = goal.goalCents ? String(goal.goalCents / 100) : "";
-  const value = draft ?? dollars;
-
-  const commit = async () => {
-    setDraft(null);
-    if (draft === null) return;
-
-    const goalCents = Math.max(0, Math.round(Number(draft) * 100) || 0);
-    if (goalCents === goal.goalCents) return;
-
-    await onSave(goalCents);
-  };
-
   return (
     <OverlayGoalBar
       config={config}
+      currentControl={
+        <InlineAmount
+          label="Tribute total"
+          onCommit={onCorrectTotal}
+          valueCents={state?.counterCents ?? 0}
+        />
+      }
       goalCents={goal.goalCents}
       goalControl={
-        <span className="inline-flex items-baseline">
-          $
-          <input
-            aria-label="Tribute Goal"
-            className="-my-1 rounded bg-transparent py-1 text-inherit outline-none transition-colors duration-fast hover:bg-black/[0.06] focus:bg-black/[0.06]"
-            inputMode="numeric"
-            onBlur={() => void commit()}
-            onChange={(event) => setDraft(event.target.value.replace(/[^\d]/g, ""))}
-            onFocus={(event) => event.target.select()}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur();
-              if (event.key === "Escape") {
-                setDraft(null);
-                event.currentTarget.blur();
-              }
-            }}
-            placeholder="0"
-            // Grows with the number so the bar does not jump as digits are typed.
-            style={{ width: `${Math.max(1, value.length)}ch` }}
-            value={value}
-          />
-        </span>
+        <InlineAmount
+          label="Tribute Goal"
+          onCommit={onSaveGoal}
+          valueCents={goal.goalCents}
+        />
       }
       goalLabel={goal.label}
       state={state}
@@ -157,6 +203,10 @@ export function LiveControlPage() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedPart, setCopiedPart] = useState<string | null>(null);
+  const [settings, setSettings] = useState<SpinOverlaySettings>({
+    creatorId: "",
+    ...DEFAULT_OVERLAY_SETTINGS,
+  });
   const [wheels, setWheels] = useState<SpinConfig[]>([]);
   const [now, setNow] = useState(Date.now());
 
@@ -169,6 +219,7 @@ export function LiveControlPage() {
       subscribeSpinSession(creatorId, setSession),
       subscribeSpinState(creatorId, setState),
       subscribeSpinGoal(creatorId, setGoal),
+      subscribeOverlaySettings(creatorId, setSettings),
       subscribeWheels(creatorId, setWheels),
     ];
 
@@ -255,6 +306,13 @@ export function LiveControlPage() {
 
       await setSpinLiveStatus(creatorId, true);
     });
+
+  const saveSettings = (next: SpinOverlaySettings) => {
+    setSettings(next);
+    saveOverlaySettings({ ...next, creatorId }).catch(() =>
+      setError("Could not save the overlay settings."),
+    );
+  };
 
   const copyOverlayUrl = (path: string) => {
     navigator.clipboard
@@ -436,6 +494,110 @@ export function LiveControlPage() {
             Adds a fake viewer so you can check the sources land in your scene.
           </p>
         </div>
+
+        {/* Sound plays from the Wheel source only, so a streamer running all
+            four does not hear every effect four times over. */}
+        <div className="mt-5 grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+          <div>
+            <Toggle
+              checked={settings.sound.enabled}
+              description="Played by the Wheel source, so add it to your scene with audio enabled."
+              label="Overlay sound"
+              onChange={(enabled) =>
+                saveSettings({ ...settings, sound: { ...settings.sound, enabled } })
+              }
+            />
+            {settings.sound.enabled ? (
+              <>
+                <label className="mt-4 block" htmlFor="sound-volume">
+                  <span className="mb-2 block text-detail font-medium text-content-muted">
+                    Volume — {settings.sound.volume}%
+                  </span>
+                  <input
+                    className="theme-slider"
+                    id="sound-volume"
+                    max={100}
+                    min={0}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        sound: { ...settings.sound, volume: Number(event.target.value) },
+                      })
+                    }
+                    onPointerUp={() => saveSettings(settings)}
+                    step={5}
+                    type="range"
+                    value={settings.sound.volume}
+                  />
+                </label>
+                <div className="mt-4 grid gap-2">
+                  {SOUND_LABELS.map((sound) => (
+                    <div className="flex items-center gap-2" key={sound.id}>
+                      <div className="min-w-0 flex-1">
+                        <Toggle
+                          checked={settings.sound[sound.id]}
+                          description={sound.hint}
+                          label={sound.label}
+                          onChange={(on) =>
+                            saveSettings({
+                              ...settings,
+                              sound: { ...settings.sound, [sound.id]: on },
+                            })
+                          }
+                        />
+                      </div>
+                      <Button
+                        onClick={() => {
+                          unlockOverlayAudio();
+                          playOverlaySound(sound.id, { ...settings.sound, enabled: true });
+                        }}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        Test
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <div>
+            <Toggle
+              checked={settings.queueHideNames}
+              description="Show positions instead of viewer names on the Queue source."
+              label="Hide names"
+              onChange={(queueHideNames) =>
+                saveSettings({ ...settings, queueHideNames })
+              }
+            />
+            <label className="mt-4 block" htmlFor="queue-visible">
+              <span className="mb-2 block text-detail font-medium text-content-muted">
+                Show {settings.queueMaxVisible} in the queue
+              </span>
+              <input
+                className="theme-slider"
+                id="queue-visible"
+                max={10}
+                min={1}
+                onChange={(event) =>
+                  setSettings({
+                    ...settings,
+                    queueMaxVisible: Number(event.target.value),
+                  })
+                }
+                onPointerUp={() => saveSettings(settings)}
+                step={1}
+                type="range"
+                value={settings.queueMaxVisible}
+              />
+            </label>
+            <p className="mt-2 text-caption text-content-subtle">
+              Anyone past that shows as an overflow count.
+            </p>
+          </div>
+        </div>
       </details>
       {/* The overlay itself, at working size. */}
       <div
@@ -455,7 +617,13 @@ export function LiveControlPage() {
             <LiveGoalBar
               config={config}
               goal={goal}
-              onSave={(goalCents) =>
+              onCorrectTotal={async (totalCents) => {
+                // The callable takes a delta, so a corrected figure becomes the
+                // difference from whatever the counter reads right now.
+                const delta = totalCents - (state?.counterCents ?? 0);
+                if (delta !== 0) await adjustSpinCounter(creatorId, delta);
+              }}
+              onSaveGoal={(goalCents) =>
                 saveSpinGoal({
                   ...goal,
                   creatorId,
@@ -467,7 +635,25 @@ export function LiveControlPage() {
             />
           </div>
           <div className="mx-auto w-full max-w-[320px] lg:mx-0">
-            <OverlayQueue config={config} entries={queued} state={state} />
+            <OverlayQueue
+              config={config}
+              entries={queued}
+              entryControl={(entry) => (
+                <Tooltip content="Remove and release their hold">
+                  <IconButton
+                    className="h-7 w-7 border-none bg-transparent opacity-40 hover:opacity-100"
+                    icon={<X size={14} />}
+                    label={`Remove ${entry.viewerName} from the queue`}
+                    onClick={() =>
+                      void run(() => cancelSpinQueueEntry(creatorId, entry.id))
+                    }
+                  />
+                </Tooltip>
+              )}
+              hideNames={settings.queueHideNames}
+              maxVisible={settings.queueMaxVisible}
+              state={state}
+            />
           </div>
         </div>
       </div>

@@ -743,6 +743,90 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
   return { spinId, selectedIndex };
 });
 
+/**
+ * Remove a viewer from the queue mid-stream — they left, the wheel is wrong for
+ * them, or the streamer needs to clear a stuck entry.
+ *
+ * The authorization is released first: cancelling in Firestore while a hold is
+ * still open on the viewer's card would leave them out of pocket for a spin
+ * that never happens. A run already capturing is refused rather than raced.
+ */
+export const cancelSpinQueueEntry = onCall(
+  { secrets: [stripeSecret] },
+  async (request) => {
+    const creatorId = requiredId(request.data?.creatorId, "creator ID");
+    const entryId = requiredId(request.data?.entryId, "queue entry ID");
+
+    if (!request.auth || request.auth.uid !== creatorId) {
+      throw new HttpsError("permission-denied", "Only the creator can change the queue.");
+    }
+
+    const firestore = getFirestore();
+    const creatorRef = firestore.doc(`creators/${creatorId}`);
+    const entryRef = creatorRef.collection("spinQueue").doc(entryId);
+    const [creatorSnapshot, entrySnapshot] = await Promise.all([
+      creatorRef.get(),
+      entryRef.get(),
+    ]);
+
+    if (
+      !creatorSnapshot.exists ||
+      creatorSnapshot.data()?.ownerUid !== request.auth.uid
+    ) {
+      throw new HttpsError("permission-denied", "Only the creator can change the queue.");
+    }
+
+    const entry = entrySnapshot.data();
+
+    if (!entrySnapshot.exists || !entry) {
+      throw new HttpsError("not-found", "That queue entry is gone.");
+    }
+
+    if (entry.status === "capturing" || entry.capturePending === true) {
+      throw new HttpsError(
+        "failed-precondition",
+        "That spin is being charged right now. Try again in a moment.",
+      );
+    }
+
+    if (entry.status !== "queued") {
+      throw new HttpsError("failed-precondition", "That viewer is not waiting.");
+    }
+
+    const paymentId = typeof entry.paymentId === "string" ? entry.paymentId : null;
+
+    if (paymentId) {
+      await cancelSpinAuthorization(paymentId);
+    }
+
+    const batch = firestore.batch();
+    batch.set(
+      entryRef,
+      {
+        status: "canceled",
+        canceledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    if (typeof entry.receiptId === "string") {
+      batch.set(
+        firestore.doc(`spinReceipts/${entry.receiptId}`),
+        {
+          status: "canceled",
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedAtMs: Date.now(),
+        },
+        { merge: true },
+      );
+    }
+
+    await batch.commit();
+    return { entryId, refunded: Boolean(paymentId) };
+  },
+);
+
 export const adjustSpinCounter = onCall(async (request) => {
   const creatorId = requiredId(request.data?.creatorId, "creator ID");
   const deltaCents = Number(request.data?.deltaCents);

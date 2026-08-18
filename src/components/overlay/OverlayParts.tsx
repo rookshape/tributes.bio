@@ -37,13 +37,15 @@ function appearanceOf(config: SpinConfig): WheelAppearance {
 export function OverlayWheel({
   config,
   animation,
+  onTick,
 }: {
   config: SpinConfig;
   animation: SpinAnimation | null;
+  onTick?: () => void;
 }) {
   return (
     <div className="w-full max-w-[520px]">
-      <SpinWheel animation={animation} slices={config.slices} />
+      <SpinWheel animation={animation} onTick={onTick} slices={config.slices} />
     </div>
   );
 }
@@ -156,7 +158,7 @@ export function OverlayTotal({
         ))}
       </p>
 
-      <div className="mt-2.5 flex items-center justify-center gap-3 text-xs font-semibold uppercase tracking-wide lg:text-sm">
+      <div className="mt-2.5 flex items-center justify-center gap-3 text-xs font-semibold tracking-wide lg:text-sm">
         {spinsLeft > 0 ? (
           <span className="flex items-center gap-1.5">
             {/* Pips read faster than a number at stream distance. */}
@@ -174,7 +176,7 @@ export function OverlayTotal({
             </span>
           </span>
         ) : (
-          <span className="opacity-55">Run complete</span>
+          <span className="opacity-55">Round complete</span>
         )}
       </div>
     </div>
@@ -187,17 +189,19 @@ export function OverlayGoalBar({
   goalLabel,
   goalCents,
   goalControl,
+  currentControl,
 }: {
   config: SpinConfig;
   state: SpinState | null;
   goalLabel: string;
   goalCents: number;
   /**
-   * Replaces the target figure with an editable control on the Live page. The
-   * OBS source passes nothing, so the two stay the same component and what the
-   * streamer edits is literally what the stream shows.
+   * Replace the figures with editable controls on the Live page. The OBS source
+   * passes nothing, so the two stay the same component and what the streamer
+   * edits is literally what the stream shows.
    */
   goalControl?: ReactNode;
+  currentControl?: ReactNode;
 }) {
   const appearance = appearanceOf(config);
   const ink = wheelInk(appearance);
@@ -219,7 +223,7 @@ export function OverlayGoalBar({
           style={wheelGlass(appearance, 0.85)}
         >
           <p className="flex items-baseline text-base font-bold leading-none lg:text-xl">
-            {formatMoney(current)}
+            {currentControl ?? formatMoney(current)}
             {goalControl ? (
               <span className="opacity-55">/{goalControl}</span>
             ) : goalCents > 0 ? (
@@ -246,11 +250,17 @@ export function OverlayQueue({
   entries,
   state,
   maxVisible = 5,
+  hideNames = false,
+  entryControl,
 }: {
   config: SpinConfig;
   entries: SpinQueueEntry[];
   state?: SpinState | null;
   maxVisible?: number;
+  /** Show positions only, for creators who would rather not name viewers. */
+  hideNames?: boolean;
+  /** Per-row action rendered on the Live page only, never on the OBS source. */
+  entryControl?: (entry: SpinQueueEntry) => ReactNode;
 }) {
   const appearance = appearanceOf(config);
   const ink = wheelInk(appearance);
@@ -292,7 +302,9 @@ export function OverlayQueue({
             />
             Spinning now
           </p>
-          <p className="mt-0.5 truncate text-sm font-bold">{spinningNow}</p>
+          <p className="mt-0.5 truncate text-sm font-bold">
+            {hideNames ? "A viewer" : spinningNow}
+          </p>
         </div>
       ) : null}
 
@@ -304,7 +316,9 @@ export function OverlayQueue({
                 {index + 1}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{entry.viewerName}</span>
+                <span className="block truncate font-semibold">
+                  {hideNames ? "Waiting" : entry.viewerName}
+                </span>
                 {/* Which wheel they bought into, since viewers pick their own. */}
                 {entry.wheelName ? (
                   <span className="block truncate text-xs opacity-60">
@@ -312,6 +326,9 @@ export function OverlayQueue({
                   </span>
                 ) : null}
               </span>
+              {entryControl ? (
+                <span className="shrink-0">{entryControl(entry)}</span>
+              ) : null}
             </li>
           ))}
           {overflow > 0 ? (

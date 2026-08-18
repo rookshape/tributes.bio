@@ -7,6 +7,10 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import {
+  DEFAULT_SOUND_SETTINGS,
+  type SoundSettings,
+} from "./overlaySounds";
 
 /**
  * The tribute goal belongs to the creator, not to a wheel.
@@ -22,6 +26,84 @@ export type SpinGoal = {
 };
 
 export const DEFAULT_GOAL_LABEL = "Tribute Goal";
+
+/**
+ * Overlay sound settings live beside the goal because both are creator-level
+ * and both have to be readable by the OBS browser source, which is signed out.
+ */
+export type SpinOverlaySettings = {
+  creatorId: string;
+  sound: SoundSettings;
+  /** Names shown on the queue source before it collapses into a count. */
+  queueMaxVisible: number;
+  /** Hide viewer names entirely, showing only positions. */
+  queueHideNames: boolean;
+};
+
+export const DEFAULT_OVERLAY_SETTINGS: Omit<SpinOverlaySettings, "creatorId"> = {
+  sound: DEFAULT_SOUND_SETTINGS,
+  queueMaxVisible: 5,
+  queueHideNames: false,
+};
+
+function mapOverlaySettings(
+  creatorId: string,
+  data: Record<string, unknown> | undefined,
+): SpinOverlaySettings {
+  const bool = (key: string, fallback: boolean) =>
+    typeof data?.[key] === "boolean" ? (data[key] as boolean) : fallback;
+  const volume = Number(data?.soundVolume);
+
+  return {
+    creatorId,
+    sound: {
+      enabled: bool("soundEnabled", DEFAULT_SOUND_SETTINGS.enabled),
+      volume: Number.isFinite(volume)
+        ? Math.min(100, Math.max(0, Math.round(volume)))
+        : DEFAULT_SOUND_SETTINGS.volume,
+      spin: bool("soundSpin", DEFAULT_SOUND_SETTINGS.spin),
+      tick: bool("soundTick", DEFAULT_SOUND_SETTINGS.tick),
+      result: bool("soundResult", DEFAULT_SOUND_SETTINGS.result),
+      win: bool("soundWin", DEFAULT_SOUND_SETTINGS.win),
+      queue: bool("soundQueue", DEFAULT_SOUND_SETTINGS.queue),
+    },
+    queueMaxVisible: Math.min(
+      10,
+      Math.max(1, Math.round(Number(data?.queueMaxVisible)) || DEFAULT_OVERLAY_SETTINGS.queueMaxVisible),
+    ),
+    queueHideNames: bool("queueHideNames", DEFAULT_OVERLAY_SETTINGS.queueHideNames),
+  };
+}
+
+export async function saveOverlaySettings(settings: SpinOverlaySettings) {
+  await setDoc(
+    goalRef(settings.creatorId),
+    {
+      creatorId: settings.creatorId,
+      soundEnabled: settings.sound.enabled,
+      soundVolume: Math.min(100, Math.max(0, Math.round(settings.sound.volume))),
+      soundSpin: settings.sound.spin,
+      soundTick: settings.sound.tick,
+      soundResult: settings.sound.result,
+      soundWin: settings.sound.win,
+      soundQueue: settings.sound.queue,
+      queueMaxVisible: Math.min(10, Math.max(1, Math.round(settings.queueMaxVisible))),
+      queueHideNames: settings.queueHideNames,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+  return settings;
+}
+
+export function subscribeOverlaySettings(
+  creatorId: string,
+  onChange: (settings: SpinOverlaySettings) => void,
+): Unsubscribe {
+  return onSnapshot(goalRef(creatorId), (snapshot) => {
+    onChange(mapOverlaySettings(creatorId, snapshot.data()));
+  });
+}
 
 function goalRef(creatorId: string) {
   return doc(db, "creators", creatorId, "spinSettings", "current");

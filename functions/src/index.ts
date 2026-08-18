@@ -34,6 +34,7 @@ export {
 
 export {
   adjustSpinCounter,
+  cancelSpinQueueEntry,
   createMockSpinEntry,
   heartbeatSpinSession,
   setSpinLiveStatus,
