@@ -144,10 +144,10 @@ export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
       {/* Glass disc framing the wheel, kept narrow so the pointer clears it. */}
       <div className="absolute inset-[2%] rounded-full border border-white/70 bg-white/30 shadow-[0_6px_18px_rgba(15,23,32,0.08)] backdrop-blur-md" />
       {/* Sized in percentages rather than pixels so the tip reaches the same
-          way into the slice at any wheel size. The wheel starts 5% in, so 17%
-          puts a good third of the pointer over the colour. */}
+          way into the slice at any wheel size. The wheel starts 5% in, so 11%
+          leaves the tip sitting just over the colour. */}
       <div
-        className="absolute left-1/2 top-0 z-20 h-[17%] w-[7.5%] -translate-x-1/2 bg-white drop-shadow-[0_2px_4px_rgba(15,23,32,0.35)]"
+        className="absolute left-1/2 top-0 z-20 h-[11%] w-[6%] -translate-x-1/2 bg-white drop-shadow-[0_2px_4px_rgba(15,23,32,0.35)]"
         ref={pointerRef}
         style={{
           clipPath: "polygon(50% 100%, 0 0, 100% 0)",

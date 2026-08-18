@@ -268,7 +268,7 @@ export const createMockSpinEntry = onCall(async (request) => {
       viewerName: name,
       amountCents: config.spinPriceCents,
       // A test run behaves like a paid one so the streamer sees the real tab.
-      tabCents: config.spinPriceCents,
+      tabCents: 0,
       tabMaxCents: maxChargeCents(
         configSnapshot.data(),
         config.spinPriceCents,
@@ -320,6 +320,9 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
   /** What the tab read before this spin, so the overlay holds the old number
    *  through the animation and ticks up only when the result lands. */
   let selectedTabBeforeCents = 0;
+  /** The run's winnings, which is what the overlay shows — not the charge. */
+  let selectedTabCents = 0;
+  let selectedTabCapCents = 0;
   let selectedSpinsAwarded = 0;
   let selectedMultiplier = 0;
 
@@ -397,41 +400,42 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
     const entry = queueEntry.data();
     const amountCents = Number(entry.amountCents ?? config.spinPriceCents);
 
-    // A run accumulates: the viewer owes the spin price the moment they pay,
-    // and multipliers and bonus slices keep the run going from there. The
-    // wheel's ceiling — the amount Stripe already authorized — bounds it.
-    const capCents = Math.max(
+    const entryWheelData = entryWheelSnapshot.exists
+      ? entryWheelSnapshot.data()
+      : configSnapshot.data();
+
+    // What the viewer paid to enter is the price of playing, not a win, so it
+    // stays out of the tab. It is still charged: the capture is entry price
+    // plus whatever the wheel handed them, and the ceiling covers both.
+    const chargeCapCents = Math.max(
       amountCents,
       Number(entry.tabMaxCents ?? 0) ||
-        maxChargeCents(
-          entryWheelSnapshot.exists ? entryWheelSnapshot.data() : configSnapshot.data(),
-          config.spinPriceCents,
-          config.slices,
-        ),
+        maxChargeCents(entryWheelData, config.spinPriceCents, config.slices),
     );
+    const tabCapCents = Math.max(0, chargeCapCents - amountCents);
     const tabBeforeCents = Math.max(
       0,
-      Math.min(capCents, Number(entry.tabCents ?? amountCents)),
+      Math.min(tabCapCents, Number(entry.tabCents ?? 0)),
     );
     // Entries queued before a wheel could grant several spins carry none, so
     // they resolve as the single-spin runs they were bought as.
     const storedSpinsLeft = Number(entry.spinsLeft);
     const spinsBefore = Number.isInteger(storedSpinsLeft)
       ? Math.max(0, storedSpinsLeft)
-      : spinsPerPurchase(
-          entryWheelSnapshot.exists ? entryWheelSnapshot.data() : configSnapshot.data(),
-        );
+      : spinsPerPurchase(entryWheelData);
     const step = applyTabStep(
       slice,
       {
         tabCents: tabBeforeCents,
         spinsLeft: Math.max(1, spinsBefore),
         spinsTaken: Number(entry.runSpins ?? 0),
+        pendingMultiplier: Number(entry.pendingMultiplier ?? 1),
       },
-      capCents,
+      tabCapCents,
     );
     const runSpins = step.spinsTaken;
-    const deltaCents = step.tabCents;
+    // Entry price plus winnings: what is captured, and what the goal counts.
+    const deltaCents = amountCents + step.tabCents;
     const paymentId = typeof entry.paymentId === "string" ? entry.paymentId : null;
     const requiresCapture = Boolean(
       paymentId &&
@@ -448,6 +452,8 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
     selectedResultType = slice.type;
     selectedWheelId = entryWheelId;
     selectedTabBeforeCents = tabBeforeCents;
+    selectedTabCents = step.tabCents;
+    selectedTabCapCents = tabCapCents;
     selectedSpinsAwarded = step.spinsAwarded;
     selectedMultiplier = step.multiplier;
     // A run that is still open keeps the overlay on the wheel it is running on.
@@ -465,8 +471,9 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         selectedSliceId: slice.id,
         capturePending: false,
         tabCents: step.tabCents,
-        tabMaxCents: capCents,
+        tabMaxCents: chargeCapCents,
         spinsLeft: step.spinsLeft,
+        pendingMultiplier: step.pendingMultiplier,
         runSpins,
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -503,7 +510,7 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           // The tab is on screen while the run is open, climbing with each spin.
           tabBeforeCents,
           tabCents: step.tabCents,
-          tabMaxCents: capCents,
+          tabMaxCents: tabCapCents,
           tabOpen: true,
           spinsLeft: step.spinsLeft,
           spinsAwarded: step.spinsAwarded,
@@ -528,8 +535,9 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         // the slice that ended it.
         resultAmountCents: deltaCents,
         tabCents: step.tabCents,
-        tabMaxCents: capCents,
+        tabMaxCents: chargeCapCents,
         spinsLeft: step.spinsLeft,
+        pendingMultiplier: step.pendingMultiplier,
         runSpins,
         captureOperationId: spinId,
         capturePending: true,
@@ -578,8 +586,9 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
       resultLabel: slice.label,
       selectedSliceId: slice.id,
       tabCents: step.tabCents,
-      tabMaxCents: capCents,
+      tabMaxCents: chargeCapCents,
       spinsLeft: step.spinsLeft,
+      pendingMultiplier: step.pendingMultiplier,
       runSpins,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -603,7 +612,7 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         // The run closed on this spin, so the tab is final.
         tabBeforeCents,
         tabCents: step.tabCents,
-        tabMaxCents: capCents,
+        tabMaxCents: tabCapCents,
         tabOpen: false,
         spinsLeft: step.spinsLeft,
         spinsAwarded: step.spinsAwarded,
@@ -701,8 +710,8 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           counterDeltaCents: selectedResultAmountCents,
           // The captured tab is the run's final number.
           tabBeforeCents: selectedTabBeforeCents,
-          tabCents: selectedResultAmountCents,
-          tabMaxCents: Number(entrySnapshot.data()?.tabMaxCents ?? 0),
+          tabCents: selectedTabCents,
+          tabMaxCents: selectedTabCapCents,
           tabOpen: false,
           spinsLeft: 0,
           spinsAwarded: selectedSpinsAwarded,

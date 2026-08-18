@@ -76,9 +76,10 @@ const STAGE = {
 } as const;
 
 /**
- * The goal is the one number a streamer changes mid-stream, so the bar itself
- * is the control: click it and type. The bar stays the unmodified overlay
- * component so what is on screen here is exactly what is on stream.
+ * The goal is the one number a streamer changes mid-stream, so the target
+ * figure in the bar *is* the input — no popup, no separate field. The bar is
+ * still the unmodified overlay component, so what is edited here is exactly
+ * what the stream shows.
  */
 function LiveGoalBar({
   config,
@@ -91,70 +92,51 @@ function LiveGoalBar({
   onSave: (goalCents: number) => Promise<void>;
   state: SpinState | null;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing) inputRef.current?.select();
-  }, [editing]);
-
-  const open = () => {
-    setDraft(goal.goalCents ? String(goal.goalCents / 100) : "");
-    setEditing(true);
-  };
+  const [draft, setDraft] = useState<string | null>(null);
+  const dollars = goal.goalCents ? String(goal.goalCents / 100) : "";
+  const value = draft ?? dollars;
 
   const commit = async () => {
+    setDraft(null);
+    if (draft === null) return;
+
     const goalCents = Math.max(0, Math.round(Number(draft) * 100) || 0);
-    setSaving(true);
-    try {
-      await onSave(goalCents);
-      setEditing(false);
-    } finally {
-      setSaving(false);
-    }
+    if (goalCents === goal.goalCents) return;
+
+    await onSave(goalCents);
   };
 
   return (
-    <div className="relative w-full max-w-[600px]">
-      <button
-        aria-label="Edit the tribute goal"
-        className="block w-full rounded-3xl text-left transition-transform duration-fast ease-standard hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-        onClick={open}
-        type="button"
-      >
-        <OverlayGoalBar
-          config={config}
-          goalCents={goal.goalCents}
-          goalLabel={goal.label}
-          state={state}
-        />
-      </button>
-
-      {editing ? (
-        <div className="panel absolute left-1/2 top-full z-10 mt-2 flex w-64 -translate-x-1/2 items-center gap-2 p-2 shadow-lg">
+    <OverlayGoalBar
+      config={config}
+      goalCents={goal.goalCents}
+      goalControl={
+        <span className="inline-flex items-baseline">
+          $
           <input
-            className="field h-10 flex-1"
-            inputMode="decimal"
-            min="0"
-            onChange={(event) => setDraft(event.target.value)}
+            aria-label="Tribute Goal"
+            className="-my-1 rounded bg-transparent py-1 text-inherit outline-none transition-colors duration-fast hover:bg-black/[0.06] focus:bg-black/[0.06]"
+            inputMode="numeric"
+            onBlur={() => void commit()}
+            onChange={(event) => setDraft(event.target.value.replace(/[^\d]/g, ""))}
+            onFocus={(event) => event.target.select()}
             onKeyDown={(event) => {
-              if (event.key === "Enter") void commit();
-              if (event.key === "Escape") setEditing(false);
+              if (event.key === "Enter") event.currentTarget.blur();
+              if (event.key === "Escape") {
+                setDraft(null);
+                event.currentTarget.blur();
+              }
             }}
-            placeholder="Goal"
-            ref={inputRef}
-            step="1"
-            type="number"
-            value={draft}
+            placeholder="0"
+            // Grows with the number so the bar does not jump as digits are typed.
+            style={{ width: `${Math.max(1, value.length)}ch` }}
+            value={value}
           />
-          <Button loading={saving} onClick={() => void commit()} variant="accent">
-            Set
-          </Button>
-        </div>
-      ) : null}
-    </div>
+        </span>
+      }
+      goalLabel={goal.label}
+      state={state}
+    />
   );
 }
 

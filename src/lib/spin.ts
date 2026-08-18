@@ -58,35 +58,41 @@ export function normalizeSpinsPerPurchase(value: unknown) {
   return Math.min(MAX_SPINS_PER_PURCHASE, Math.max(MIN_SPINS_PER_PURCHASE, spins));
 }
 
-/** The most a single slice can move the tab, used as the floor for the cap. */
-export function largestSingleResultCents(config: {
-  spinPriceCents: number;
-  slices: SpinSlice[];
-}) {
-  return config.slices.reduce((largest, slice) => {
-    if (slice.type === "amount") return Math.max(largest, slice.value);
-    if (slice.type === "multiplier") {
-      return Math.max(largest, config.spinPriceCents * Math.max(1, slice.value));
-    }
-    return largest;
-  }, config.spinPriceCents);
+/** The biggest cash result on the wheel, before any multiplier. */
+export function largestSingleResultCents(config: { slices: SpinSlice[] }) {
+  return config.slices.reduce(
+    (largest, slice) => (slice.type === "amount" ? Math.max(largest, slice.value) : largest),
+    0,
+  );
 }
 
 /**
- * A cap below the biggest single result would be hit on the first spin, which
- * would read as the wheel lying about its own slices.
+ * The cap has to clear entry price plus one full cash result, or the wheel
+ * would be advertising a slice it cannot pay out.
  */
+export function maxChargeFloorCents(config: {
+  spinPriceCents: number;
+  slices: SpinSlice[];
+}) {
+  return Math.max(
+    MIN_MAX_CHARGE_CENTS,
+    config.spinPriceCents + largestSingleResultCents(config),
+  );
+}
+
 export function normalizeMaxChargeCents(config: {
   spinPriceCents: number;
   maxChargeCents?: number;
   slices: SpinSlice[];
 }) {
-  const floor = largestSingleResultCents(config);
   const requested = Number.isFinite(config.maxChargeCents)
     ? Math.round(Number(config.maxChargeCents))
     : config.spinPriceCents * DEFAULT_MAX_CHARGE_MULTIPLE;
 
-  return Math.min(MAX_MAX_CHARGE_CENTS, Math.max(floor, requested));
+  return Math.min(
+    MAX_MAX_CHARGE_CENTS,
+    Math.max(maxChargeFloorCents(config), requested),
+  );
 }
 
 const defaultSlicesWithoutColor: Omit<SpinSlice, "color">[] = [
@@ -118,7 +124,7 @@ export function createDefaultSpinConfig(creatorId: string): SpinConfig {
     isDefault: true,
     creatorId,
     title: "Spin the wheel",
-    counterLabel: "Tribute goal",
+    counterLabel: "Tribute Goal",
     spinPriceCents: 1000,
     maxChargeCents: 1000 * DEFAULT_MAX_CHARGE_MULTIPLE,
     spinsPerPurchase: 1,
@@ -311,7 +317,8 @@ function mapSpinConfig(
     // "Tribute total" was the previous default; move those wheels onto the new
     // wording while leaving any label a creator actually chose alone.
     counterLabel:
-      typeof data.counterLabel === "string" && data.counterLabel !== "Tribute total"
+      typeof data.counterLabel === "string" &&
+      !["Tribute total", "Tribute goal"].includes(data.counterLabel)
         ? data.counterLabel
         : defaults.counterLabel,
     spinPriceCents: Number(data.spinPriceCents ?? defaults.spinPriceCents),

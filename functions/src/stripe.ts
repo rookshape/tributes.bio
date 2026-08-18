@@ -746,9 +746,10 @@ async function updatePaymentAndSpinQueue(
             : String(payment.senderName).slice(0, 40),
         amountCents: Number(payment.baseAmountCents ?? 0),
         authorizedTotalCents: Number(payment.authorizedTotalCents ?? 0),
-        // The run starts owing the spin price and climbs from there, bounded by
-        // the ceiling this authorization was taken against.
-        tabCents: Number(payment.baseAmountCents ?? 0),
+        // The tab counts winnings only — what they paid to enter is charged on
+        // top of it, and the ceiling this authorization was taken against
+        // covers both.
+        tabCents: 0,
         tabMaxCents: Number(payment.maximumCreatorAmountCents ?? 0),
         spinsLeft: Number(payment.spinsPerPurchase ?? 1),
         runSpins: 0,

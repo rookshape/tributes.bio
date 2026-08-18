@@ -1,18 +1,23 @@
 /**
  * A spin is a *run*, not a single event.
  *
- * A viewer buys a run and gets the wheel's spins-per-purchase to use. Slices
- * hand out more spins, multiply what they owe, or add cash, and the tab
- * accumulates across the whole run:
+ * A viewer buys a run and gets the wheel's spins-per-purchase to use. What they
+ * paid to enter is not part of the running total — that is the price of playing
+ * — so the tab starts at zero and only counts what the wheel hands them:
  *
- *   pay $5 for 3 spins  ->  tab $5, 3 spins
- *   land 2x             ->  tab $10, still 3 spins (a multiplier is free)
- *   land +2 spins       ->  tab $10, 4 spins
- *   land $20            ->  tab $30, 3 spins
- *   ...until the spins run out
+ *   pay $5 for 3 spins  ->  tab $0, 3 spins
+ *   land 2x             ->  tab $0, 2x armed, still 3 spins (a multiplier is free)
+ *   land $10            ->  tab $20, 2 spins
+ *   land +2 spins       ->  tab $20, 3 spins
+ *   ...until the spins run out, then they are charged $5 + $20
+ *
+ * Because the tab starts empty, a multiplier cannot act on it — doubling zero
+ * would make the slice dead on the first spin. It arms the *next* cash result
+ * instead, which is also how the format is played on stream ("2X NEXT").
+ * Multipliers stack while armed.
  *
  * Stripe needs the amount agreed up front, so the wheel's max charge bounds the
- * run: the tab clamps there and the run ends. That ceiling is what gets
+ * run: entry price plus tab can never exceed it. That ceiling is what gets
  * authorized at checkout, so a capture can never exceed the hold.
  *
  * Shared by the checkout path and the spin path so the number a viewer agrees
@@ -45,27 +50,28 @@ export function spinsPerPurchase(config: FirebaseFirestore.DocumentData | undefi
   return Math.min(MAX_SPINS_PER_PURCHASE, Math.max(MIN_SPINS_PER_PURCHASE, stored));
 }
 
-/**
- * The most one slice can move a tab. The cap can never sit below this, or the
- * wheel would be advertising a result it cannot pay out.
- */
-export function largestSingleResultCents(
-  spinPriceCents: number,
-  slices: TabSlice[],
-) {
+/** The biggest cash result on the wheel, before any multiplier. */
+export function largestSingleResultCents(slices: TabSlice[]) {
   return slices.reduce((largest, slice) => {
     const value = Number(slice?.value ?? 0);
 
-    if (slice?.type === "amount") {
-      return Math.max(largest, Number.isInteger(value) ? Math.max(0, value) : 0);
-    }
-
-    if (slice?.type === "multiplier") {
-      return Math.max(largest, spinPriceCents * Math.max(1, value));
+    if (slice?.type === "amount" && Number.isInteger(value)) {
+      return Math.max(largest, Math.max(0, value));
     }
 
     return largest;
-  }, spinPriceCents);
+  }, 0);
+}
+
+/**
+ * The cap has to clear entry price plus one full cash result, or the wheel
+ * would be advertising a slice it cannot pay out.
+ */
+export function maxChargeFloorCents(spinPriceCents: number, slices: TabSlice[]) {
+  return Math.max(
+    MIN_MAX_CHARGE_CENTS,
+    spinPriceCents + largestSingleResultCents(slices),
+  );
 }
 
 /** The wheel's ceiling, defaulted and floored for wheels that predate it. */
@@ -82,17 +88,19 @@ export function maxChargeCents(
 
   return Math.min(
     MAX_MAX_CHARGE_CENTS,
-    Math.max(largestSingleResultCents(spinPriceCents, slices), requested),
+    Math.max(maxChargeFloorCents(spinPriceCents, slices), requested),
   );
 }
 
 export type TabRun = {
-  /** What the viewer owes so far, never above the cap. */
+  /** Winnings so far. Excludes what they paid to enter. */
   tabCents: number;
   /** Spins still owed to them. */
   spinsLeft: number;
   /** Spins already taken in this run. */
   spinsTaken: number;
+  /** Multiplier armed by earlier slices, applied to the next cash result. */
+  pendingMultiplier: number;
 };
 
 export type TabStep = TabRun & {
@@ -102,29 +110,37 @@ export type TabStep = TabRun & {
   capped: boolean;
   /** Spins this slice handed out, for the overlay to call out. */
   spinsAwarded: number;
-  /** Multiplier this slice applied, or 0. */
+  /** Multiplier this slice armed, or 0. */
   multiplier: number;
 };
 
-/** Apply one landed slice to a run. */
+/**
+ * Apply one landed slice to a run.
+ *
+ * `tabCapCents` is what the tab alone may reach — the wheel's max charge less
+ * what the viewer already paid to enter.
+ */
 export function applyTabStep(
   slice: TabSlice,
   run: TabRun,
-  capCents: number,
+  tabCapCents: number,
 ): TabStep {
   const value = Number(slice?.value ?? 0);
   const spinsTaken = run.spinsTaken + 1;
   // The spin they just used is spent whatever it landed on.
   let spinsLeft = Math.max(0, run.spinsLeft - 1);
   let tabCents = run.tabCents;
+  let pendingMultiplier = Math.max(1, run.pendingMultiplier || 1);
   let spinsAwarded = 0;
   let multiplier = 0;
 
   if (slice?.type === "amount") {
-    tabCents = run.tabCents + Math.max(0, value);
+    tabCents = run.tabCents + Math.max(0, value) * pendingMultiplier;
+    // Armed multipliers are spent on the result they boosted.
+    pendingMultiplier = 1;
   } else if (slice?.type === "multiplier") {
     multiplier = Math.max(1, value);
-    tabCents = run.tabCents * multiplier;
+    pendingMultiplier *= multiplier;
     // A multiplier costs nothing to land on — it escalates the run rather than
     // spending one of the spins the viewer paid for.
     spinsLeft += 1;
@@ -135,17 +151,18 @@ export function applyTabStep(
   }
   // An action slice costs nothing extra and just uses up a spin.
 
-  const clamped = Math.max(0, Math.min(capCents, Math.round(tabCents)));
+  const clamped = Math.max(0, Math.min(tabCapCents, Math.round(tabCents)));
 
   // Once the ceiling is reached nothing further can be charged, so the run ends
   // there rather than spinning for nothing.
-  const capped = clamped >= capCents;
+  const capped = clamped >= tabCapCents;
   const exhausted = spinsTaken >= MAX_RUN_SPINS;
 
   return {
     tabCents: clamped,
     spinsLeft,
     spinsTaken,
+    pendingMultiplier,
     continues: spinsLeft > 0 && !capped && !exhausted,
     capped,
     spinsAwarded,

@@ -21,14 +21,17 @@ export type SpinGoal = {
   goalCents: number;
 };
 
-export const DEFAULT_GOAL_LABEL = "Tribute goal";
+export const DEFAULT_GOAL_LABEL = "Tribute Goal";
 
 function goalRef(creatorId: string) {
   return doc(db, "creators", creatorId, "spinSettings", "current");
 }
 
 function mapGoal(creatorId: string, data: Record<string, unknown> | undefined): SpinGoal {
-  const label = typeof data?.label === "string" ? data.label : DEFAULT_GOAL_LABEL;
+  // "Tribute goal" was the previous default casing; move those creators onto
+  // the new one rather than leaving a stored label frozen at the old spelling.
+  const stored = typeof data?.label === "string" ? data.label : DEFAULT_GOAL_LABEL;
+  const label = stored === "Tribute goal" ? DEFAULT_GOAL_LABEL : stored;
   const goalCents = Number(data?.goalCents ?? 0);
 
   return {

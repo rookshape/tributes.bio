@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SpinWheel, type SpinAnimation } from "../SpinWheel";
 import {
   wheelAccent,
@@ -21,7 +21,7 @@ export type OverlayPart = "wheel" | "total" | "bar" | "queue";
 export const OVERLAY_PARTS: { id: OverlayPart; label: string; hint: string }[] = [
   { id: "wheel", label: "Wheel", hint: "The wheel and its result" },
   { id: "total", label: "Running total", hint: "The tab climbing as they spin" },
-  { id: "bar", label: "Progress bar", hint: "Tribute goal progress" },
+  { id: "bar", label: "Progress bar", hint: "Tribute Goal progress" },
   { id: "queue", label: "Queue", hint: "Who is waiting to spin" },
 ];
 
@@ -186,11 +186,18 @@ export function OverlayGoalBar({
   state,
   goalLabel,
   goalCents,
+  goalControl,
 }: {
   config: SpinConfig;
   state: SpinState | null;
   goalLabel: string;
   goalCents: number;
+  /**
+   * Replaces the target figure with an editable control on the Live page. The
+   * OBS source passes nothing, so the two stay the same component and what the
+   * streamer edits is literally what the stream shows.
+   */
+  goalControl?: ReactNode;
 }) {
   const appearance = appearanceOf(config);
   const ink = wheelInk(appearance);
@@ -211,9 +218,11 @@ export function OverlayGoalBar({
           className="shrink-0 rounded-full border px-3.5 py-1.5"
           style={wheelGlass(appearance, 0.85)}
         >
-          <p className="text-base font-bold leading-none lg:text-xl">
+          <p className="flex items-baseline text-base font-bold leading-none lg:text-xl">
             {formatMoney(current)}
-            {goalCents > 0 ? (
+            {goalControl ? (
+              <span className="opacity-55">/{goalControl}</span>
+            ) : goalCents > 0 ? (
               <span className="opacity-55">/{formatMoney(goalCents)}</span>
             ) : null}
           </p>

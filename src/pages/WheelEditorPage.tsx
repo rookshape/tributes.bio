@@ -18,7 +18,7 @@ import {
   MAX_MAX_CHARGE_CENTS,
   MAX_SPINS_PER_PURCHASE,
   MIN_SPINS_PER_PURCHASE,
-  largestSingleResultCents,
+  maxChargeFloorCents,
   spinSessionIsLive,
   subscribeSpinSession,
 } from "../lib/spin";
@@ -119,8 +119,8 @@ export function WheelEditorPage() {
   // Editing the active wheel while live would change what viewers are paying
   // into mid-session, so the live copy is only refreshed when not live.
   const lockedByLiveSession = isActive && isLive;
-  // A cap under the biggest single slice would be hit on the very first spin.
-  const maxChargeFloor = largestSingleResultCents(wheel);
+  // A cap that cannot cover entry plus one cash result would be hit instantly.
+  const maxChargeFloor = maxChargeFloorCents(wheel);
 
   const change = (changes: Partial<SpinConfig>) => {
     setWheel((current) => (current ? { ...current, ...changes } : current));
@@ -322,12 +322,13 @@ export function WheelEditorPage() {
         <span className="font-semibold text-content">
           {wheel.spinsPerPurchase} {wheel.spinsPerPurchase === 1 ? "spin" : "spins"}
         </span>
-        . Multipliers and bonus slices keep the run going from there, up to{" "}
+. What the wheel hands them is added on top, and a multiplier boosts
+        whatever cash they land next — up to{" "}
         <span className="font-semibold text-content">
           {formatMoney(wheel.maxChargeCents)}
-        </span>
-        . That ceiling is what they agree to before paying, and their run stops
-        there.
+        </span>{" "}
+        all in. That ceiling is what they agree to before paying, and their run
+        stops there.
       </p>
 
       <div className="panel mt-6 grid gap-4 p-5 sm:grid-cols-2">
