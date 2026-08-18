@@ -6,7 +6,8 @@ import {
   setDoc,
   type Unsubscribe,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "./firebase";
 import {
   DEFAULT_SOUND_SETTINGS,
   type SoundSettings,
@@ -94,6 +95,47 @@ export async function saveOverlaySettings(settings: SpinOverlaySettings) {
     { merge: true },
   );
   return settings;
+}
+
+/**
+ * Which OBS sources have checked in recently. A source that has not reported
+ * within this window is treated as disconnected — long enough to survive a
+ * missed beat, short enough that a closed OBS shows up quickly.
+ */
+export const OVERLAY_STALE_MS = 45000;
+export const OVERLAY_PING_MS = 15000;
+
+export type OverlayStatus = Record<string, number>;
+
+const reportOverlayCall = httpsCallable<
+  { creatorId: string; part: string },
+  { part: string }
+>(functions, "reportOverlayConnected");
+
+export async function reportOverlayConnected(creatorId: string, part: string) {
+  await reportOverlayCall({ creatorId, part });
+}
+
+export function subscribeOverlayStatus(
+  creatorId: string,
+  onChange: (status: OverlayStatus) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, "creators", creatorId, "spinSettings", "overlayStatus"),
+    (snapshot) => {
+      const data = snapshot.data() ?? {};
+      const status: OverlayStatus = {};
+
+      for (const [key, value] of Object.entries(data)) {
+        if (key.endsWith("AtMs") && typeof value === "number") {
+          status[key.replace(/AtMs$/, "")] = value;
+        }
+      }
+
+      onChange(status);
+    },
+    () => onChange({}),
+  );
 }
 
 export function subscribeOverlaySettings(

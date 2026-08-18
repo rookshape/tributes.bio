@@ -23,6 +23,7 @@ import {
   type SpinOverlaySettings,
 } from "../lib/spinGoal";
 import { playOverlaySound } from "../lib/overlaySounds";
+import { OVERLAY_PING_MS, reportOverlayConnected } from "../lib/spinGoal";
 import type { SpinConfig, SpinQueueEntry, SpinState } from "../lib/types";
 
 function isOverlayPart(value: string | undefined): value is OverlayPart {
@@ -163,6 +164,18 @@ export function SpinOverlayPage() {
     const timer = window.setInterval(() => setNow(Date.now()), 200);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Tell the dashboard this source is alive, so a streamer can see whether OBS
+  // is actually receiving state rather than showing a frozen frame.
+  useEffect(() => {
+    if (!creatorId) return;
+
+    const ping = () =>
+      reportOverlayConnected(creatorId, activePart).catch(() => undefined);
+    ping();
+    const timer = window.setInterval(ping, OVERLAY_PING_MS);
+    return () => window.clearInterval(timer);
+  }, [creatorId, activePart]);
 
   if (!config?.isEnabled) {
     return <main className="min-h-screen bg-transparent" />;

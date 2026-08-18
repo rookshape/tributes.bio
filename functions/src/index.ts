@@ -37,6 +37,7 @@ export {
   cancelSpinQueueEntry,
   createMockSpinEntry,
   heartbeatSpinSession,
+  reportOverlayConnected,
   setSpinLiveStatus,
   triggerSpin,
 } from "./spin.js";

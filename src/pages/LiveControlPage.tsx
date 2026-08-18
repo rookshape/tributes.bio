@@ -44,10 +44,13 @@ import {
 import {
   DEFAULT_GOAL_LABEL,
   DEFAULT_OVERLAY_SETTINGS,
+  OVERLAY_STALE_MS,
   saveOverlaySettings,
   saveSpinGoal,
   subscribeOverlaySettings,
+  subscribeOverlayStatus,
   subscribeSpinGoal,
+  type OverlayStatus,
   type SpinGoal,
   type SpinOverlaySettings,
 } from "../lib/spinGoal";
@@ -207,6 +210,9 @@ export function LiveControlPage() {
     creatorId: "",
     ...DEFAULT_OVERLAY_SETTINGS,
   });
+  const [overlayStatus, setOverlayStatus] = useState<OverlayStatus>({});
+  /** Lets the key handler stay mounted once while calling the latest handler. */
+  const spinRef = useRef<(() => void) | null>(null);
   const [wheels, setWheels] = useState<SpinConfig[]>([]);
   const [now, setNow] = useState(Date.now());
 
@@ -220,6 +226,7 @@ export function LiveControlPage() {
       subscribeSpinState(creatorId, setState),
       subscribeSpinGoal(creatorId, setGoal),
       subscribeOverlaySettings(creatorId, setSettings),
+      subscribeOverlayStatus(creatorId, setOverlayStatus),
       subscribeWheels(creatorId, setWheels),
     ];
 
@@ -229,6 +236,26 @@ export function LiveControlPage() {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
+  }, []);
+
+  // Space spins. A streamer running a session is looking at their scene, not
+  // at this page, so the primary action needs to work without aiming a cursor.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat) return;
+
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target?.tagName ?? "");
+      if (typing) return;
+
+      event.preventDefault();
+      spinRef.current?.();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   useEffect(() => {
@@ -325,6 +352,14 @@ export function LiveControlPage() {
   };
 
   const overlayBase = `/overlay/${creatorId}/spin`;
+  // A source that has not checked in recently is treated as gone, so closing
+  // OBS shows up here rather than leaving a stale green dot.
+  const connected = Object.fromEntries(
+    OVERLAY_PARTS.map((part) => [
+      part.id,
+      now - (overlayStatus[part.id] ?? 0) < OVERLAY_STALE_MS,
+    ]),
+  );
 
   // No wheel activated yet, so there is nothing to run a session with.
   if (!config) {
@@ -355,6 +390,11 @@ export function LiveControlPage() {
   const shownWheel = wheels.find((wheel) => wheel.id === shownWheelId) ?? config;
   const nextUp = queued[0] ?? null;
   const runOpen = state?.tabOpen === true && !spinning;
+
+  const canSpin = manualLive && queued.length > 0 && !spinning && !working;
+  spinRef.current = canSpin
+    ? () => void run(() => triggerNextSpin(creatorId))
+    : null;
 
   const spinBlockedReason = !manualLive
     ? "Go live to open spins for your viewers."
@@ -412,7 +452,7 @@ export function LiveControlPage() {
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
         <Button
           className="min-w-48"
-          disabled={spinning || queued.length === 0 || !manualLive}
+          disabled={!canSpin}
           iconLeft={working ? undefined : <Play size={19} />}
           loading={working}
           onClick={() => void run(() => triggerNextSpin(creatorId))}
@@ -422,6 +462,11 @@ export function LiveControlPage() {
           {spinning ? "Spinning" : runOpen ? "Spin again" : "Spin"}
         </Button>
         <p className="min-w-0 flex-1 text-detail text-content-muted">
+          {manualLive && queued.length > 0 && !spinning ? (
+            <span className="mr-1.5 rounded border border-line bg-surface-sunken px-1.5 py-0.5 text-caption font-semibold">
+              Space
+            </span>
+          ) : null}
           {spinBlockedReason ??
             (runOpen
               ? `${state?.viewerName} is on ${formatMoney(state?.tabCents ?? 0)}, ${state?.spinsLeft ?? 0} to go`
@@ -449,11 +494,25 @@ export function LiveControlPage() {
                 key={part.id}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-detail font-semibold text-content">
-                    {part.label}
+                  <p className="flex items-center gap-1.5 text-detail font-semibold text-content">
+                    {/* Whether OBS is actually pulling this source right now. */}
+                    <Tooltip
+                      content={
+                        connected[part.id]
+                          ? "Receiving live state"
+                          : "Not connected — add this URL as a browser source"
+                      }
+                    >
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          connected[part.id] ? "bg-positive" : "bg-line-strong"
+                        }`}
+                      />
+                    </Tooltip>
+                    <span className="truncate">{part.label}</span>
                   </p>
                   <p className="truncate text-caption text-content-subtle">
-                    {part.hint}
+                    {part.hint} · {part.size.width}×{part.size.height}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">

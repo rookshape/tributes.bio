@@ -744,6 +744,40 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
 });
 
 /**
+ * An OBS browser source checking in.
+ *
+ * The overlay runs signed out, so it cannot write to Firestore directly — and
+ * opening a public write path just for a timestamp would be a spam surface.
+ * This callable takes the report instead and records only which part was seen
+ * and when, so the dashboard can tell a streamer whether their sources are
+ * actually receiving state or whether OBS is showing a stale frame.
+ */
+export const reportOverlayConnected = onCall(async (request) => {
+  const creatorId = requiredId(request.data?.creatorId, "creator ID");
+  const part = String(request.data?.part ?? "");
+
+  if (!["wheel", "total", "bar", "queue"].includes(part)) {
+    throw new HttpsError("invalid-argument", "Unknown overlay part.");
+  }
+
+  const firestore = getFirestore();
+  const creatorSnapshot = await firestore.doc(`creators/${creatorId}`).get();
+
+  if (
+    !creatorSnapshot.exists ||
+    creatorSnapshot.data()?.moderationStatus !== "active"
+  ) {
+    throw new HttpsError("not-found", "Creator not found.");
+  }
+
+  await firestore
+    .doc(`creators/${creatorId}/spinSettings/overlayStatus`)
+    .set({ creatorId, [`${part}AtMs`]: Date.now() }, { merge: true });
+
+  return { part };
+});
+
+/**
  * Remove a viewer from the queue mid-stream — they left, the wheel is wrong for
  * them, or the streamer needs to clear a stuck entry.
  *

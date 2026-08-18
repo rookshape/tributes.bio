@@ -18,11 +18,37 @@ import type { SpinConfig, SpinQueueEntry, SpinState } from "../../lib/types";
  */
 export type OverlayPart = "wheel" | "total" | "bar" | "queue";
 
-export const OVERLAY_PARTS: { id: OverlayPart; label: string; hint: string }[] = [
-  { id: "wheel", label: "Wheel", hint: "The wheel and its result" },
-  { id: "total", label: "Running total", hint: "The tab climbing as they spin" },
-  { id: "bar", label: "Progress bar", hint: "Tribute Goal progress" },
-  { id: "queue", label: "Queue", hint: "Who is waiting to spin" },
+export const OVERLAY_PARTS: {
+  id: OverlayPart;
+  label: string;
+  hint: string;
+  /** Browser-source size that fits the component without cropping it. */
+  size: { width: number; height: number };
+}[] = [
+  {
+    id: "wheel",
+    label: "Wheel",
+    hint: "The wheel and its result",
+    size: { width: 520, height: 520 },
+  },
+  {
+    id: "total",
+    label: "Running total",
+    hint: "The tab climbing as they spin",
+    size: { width: 420, height: 180 },
+  },
+  {
+    id: "bar",
+    label: "Progress bar",
+    hint: "Tribute Goal progress",
+    size: { width: 600, height: 120 },
+  },
+  {
+    id: "queue",
+    label: "Queue",
+    hint: "Who is waiting to spin",
+    size: { width: 340, height: 320 },
+  },
 ];
 
 function appearanceOf(config: SpinConfig): WheelAppearance {
@@ -241,6 +267,11 @@ export function OverlayGoalBar({
           style={{ width: `${progress * 100}%`, backgroundColor: accent }}
         />
       </div>
+      {/* The one piece of branding on the overlay, on the source that is always
+          on screen rather than on the wheel, which is an event element. */}
+      <p className="mt-2 text-right text-[0.6rem] font-semibold tracking-[0.1em] opacity-35">
+        tributes.bio
+      </p>
     </div>
   );
 }

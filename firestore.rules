@@ -208,6 +208,8 @@ service cloud.firestore {
 
       // The tribute goal is creator-level, shared by every wheel.
       match /spinSettings/{settingsId} {
+        // 'overlayStatus' is written only by the reportOverlayConnected
+        // callable; the creator reads it to see which sources are live.
         allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
           || (settingsId == 'current' && publicSpinAvailable(creatorId));
         allow create, update: if settingsId == 'current'
