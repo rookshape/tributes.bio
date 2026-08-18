@@ -24,6 +24,7 @@ import {
 } from "../lib/spin";
 import {
   activateWheel,
+  getActiveWheelId,
   getWheel,
   listWheels,
   saveWheel,
@@ -199,8 +200,14 @@ export function WheelEditorPage() {
       }
       setWheel(normalized);
 
-      // Push straight to the live copy so the active wheel stays in step.
-      if (isActive && !isLive) await activateWheel(normalized);
+      // Push straight to the live copy so the active wheel stays in step. The
+      // active id is read fresh rather than taken from subscription state: if
+      // that snapshot has not landed yet, the edit would save to the library
+      // and quietly never reach the stream.
+      const currentActiveId = await getActiveWheelId(creatorId);
+      if (currentActiveId === normalized.id && !isLive) {
+        await activateWheel(normalized);
+      }
 
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1600);

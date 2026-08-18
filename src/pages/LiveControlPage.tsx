@@ -44,8 +44,9 @@ import {
 } from "../lib/spinGoal";
 import {
   activateWheel,
+  getActiveWheelId,
+  listWheels,
   saveWheel,
-  subscribeActiveWheelId,
   subscribeWheels,
 } from "../lib/wheels";
 import type {
@@ -175,7 +176,6 @@ export function LiveControlPage() {
   const [error, setError] = useState<string | null>(null);
   const [copiedPart, setCopiedPart] = useState<string | null>(null);
   const [wheels, setWheels] = useState<SpinConfig[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -188,7 +188,6 @@ export function LiveControlPage() {
       subscribeSpinState(creatorId, setState),
       subscribeSpinGoal(creatorId, setGoal),
       subscribeWheels(creatorId, setWheels),
-      subscribeActiveWheelId(creatorId, setActiveId),
     ];
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
@@ -252,9 +251,14 @@ export function LiveControlPage() {
         return;
       }
 
+      // Read the library rather than trusting subscription state: if the
+      // snapshot has not arrived yet this would silently go live on a stale
+      // active copy, and the streamer's latest wheel edits would never reach
+      // the stream.
+      const library = await listWheels(creatorId);
       // Checkout refuses any wheel that is not enabled, and the viewer may pick
       // any offered one, so going live opens all of them.
-      const offered = wheels.filter((wheel) => !wheel.archived && wheel.availableToViewers);
+      const offered = library.filter((wheel) => !wheel.archived && wheel.availableToViewers);
 
       await Promise.all(
         offered
@@ -262,7 +266,9 @@ export function LiveControlPage() {
           .map((wheel) => saveWheel({ ...wheel, isEnabled: true })),
       );
 
-      const nowActive = offered.find((wheel) => wheel.id === activeId) ?? offered[0];
+      const currentActiveId = await getActiveWheelId(creatorId);
+      const nowActive =
+        offered.find((wheel) => wheel.id === currentActiveId) ?? offered[0];
       if (nowActive) await activateWheel({ ...nowActive, isEnabled: true });
 
       await setSpinLiveStatus(creatorId, true);
@@ -456,15 +462,14 @@ export function LiveControlPage() {
       >
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
           <div className="flex min-w-0 flex-col items-center gap-6">
-            <div className="w-full max-w-[420px]">
-              <OverlayWheel
-                animation={animation}
-                config={shownWheel}
-                spinning={spinning}
-                state={state}
-              />
+            {/* The total sits beside the wheel, where the eye already is during
+                a spin, rather than stacked underneath it. */}
+            <div className="flex w-full flex-wrap items-center justify-center gap-6">
+              <div className="w-full max-w-[380px]">
+                <OverlayWheel animation={animation} config={shownWheel} />
+              </div>
+              <OverlayTotal config={shownWheel} spinning={spinning} state={state} />
             </div>
-            <OverlayTotal config={shownWheel} spinning={spinning} state={state} />
             <LiveGoalBar
               config={config}
               goal={goal}
@@ -480,7 +485,7 @@ export function LiveControlPage() {
             />
           </div>
           <div className="mx-auto w-full max-w-[320px] lg:mx-0">
-            <OverlayQueue config={config} entries={queued} />
+            <OverlayQueue config={config} entries={queued} state={state} />
           </div>
         </div>
       </div>

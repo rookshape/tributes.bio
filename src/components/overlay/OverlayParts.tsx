@@ -29,40 +29,21 @@ function appearanceOf(config: SpinConfig): WheelAppearance {
   return { hue: config.wheelHue, tone: config.wheelTone };
 }
 
+/**
+ * Just the wheel. Who is spinning comes from the queue, what they landed on is
+ * under the pointer, and what they owe is on the running total — so a caption
+ * here would only repeat the rest of the scene.
+ */
 export function OverlayWheel({
   config,
-  state,
   animation,
-  spinning,
 }: {
   config: SpinConfig;
-  state: SpinState | null;
   animation: SpinAnimation | null;
-  spinning: boolean;
 }) {
-  const appearance = appearanceOf(config);
-
   return (
-    <div className="flex w-full flex-col items-center gap-3">
-      <div className="w-full max-w-[520px]">
-        <SpinWheel animation={animation} slices={config.slices} />
-      </div>
-      {/* Only shown once there is a viewer and a result — no idle caption. */}
-      {state?.viewerName ? (
-        <div
-          className="rounded-3xl border px-5 py-2.5 text-center backdrop-blur-md"
-          style={{ ...wheelGlass(appearance), color: wheelInk(appearance) }}
-        >
-          <p className="text-sm font-medium opacity-70 lg:text-base">
-            {state.viewerName}
-          </p>
-          {/* The money lives on the Running total source, which the streamer
-              places wherever it suits their scene. */}
-          <p className="text-xl font-bold leading-tight lg:text-3xl">
-            {spinning ? "Spinning" : state.resultLabel}
-          </p>
-        </div>
-      ) : null}
+    <div className="w-full max-w-[520px]">
+      <SpinWheel animation={animation} slices={config.slices} />
     </div>
   );
 }
@@ -139,14 +120,14 @@ export function OverlayTotal({
   // multiplier rather than as "+1 spin".
   const award =
     multiplier > 1
-      ? `${multiplier}×`
+      ? `${multiplier}\u00d7`
       : spinsAwarded > 0
         ? `+${spinsAwarded} ${spinsAwarded === 1 ? "spin" : "spins"}`
         : null;
 
   return (
     <div
-      className="relative w-full max-w-[420px] rounded-3xl border px-6 py-4 text-center backdrop-blur-md"
+      className="relative w-full max-w-[360px] rounded-3xl border px-6 py-4 text-center backdrop-blur-md"
       style={{ ...wheelGlass(appearance), color: ink }}
     >
       {award ? (
@@ -163,12 +144,10 @@ export function OverlayTotal({
         </span>
       ) : null}
 
-      <p className="truncate text-xs font-semibold uppercase tracking-[0.14em] opacity-65 lg:text-sm">
-        {state.viewerName}
-      </p>
-
+      {/* No viewer name: the queue's "Spinning now" line already says whose run
+          this is, and repeating it costs room the number wants. */}
       <p
-        className="mt-1 flex items-center justify-center text-4xl font-black leading-none lg:text-6xl"
+        className="flex items-center justify-center text-4xl font-black leading-none lg:text-6xl"
         key={`total-${pulseKey}`}
         style={{ animation: "total-pop 480ms var(--ease-standard)" }}
       >
@@ -256,16 +235,29 @@ export function OverlayGoalBar({
 export function OverlayQueue({
   config,
   entries,
+  state,
   maxVisible = 5,
 }: {
   config: SpinConfig;
   entries: SpinQueueEntry[];
+  state?: SpinState | null;
   maxVisible?: number;
 }) {
   const appearance = appearanceOf(config);
   const ink = wheelInk(appearance);
-  const visible = entries.slice(0, maxVisible);
-  const overflow = entries.length - visible.length;
+  const accent = wheelAccent(appearance);
+
+  // A run in progress keeps its queue entry — it is re-queued between spins —
+  // so the viewer on the wheel is lifted out of the waiting list and called out
+  // above it rather than sitting at position one.
+  const spinningId = state?.tabOpen ? state.queueEntryId : null;
+  const spinningNow =
+    entries.find((entry) => entry.id === spinningId)?.viewerName ??
+    (spinningId ? state?.viewerName : null) ??
+    null;
+  const waiting = entries.filter((entry) => entry.id !== spinningId);
+  const visible = waiting.slice(0, maxVisible);
+  const overflow = waiting.length - visible.length;
 
   return (
     <div
@@ -278,9 +270,23 @@ export function OverlayQueue({
           className="rounded-full px-2 py-0.5 text-xs font-bold"
           style={{ backgroundColor: `${ink}1f` }}
         >
-          {entries.length}
+          {waiting.length}
         </span>
       </div>
+
+      {spinningNow ? (
+        <div className="mt-3 border-b pb-2.5" style={{ borderColor: `${ink}1f` }}>
+          <p className="flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] opacity-70">
+            <span
+              className="h-1.5 w-1.5 animate-pulse rounded-full"
+              style={{ backgroundColor: accent }}
+            />
+            Spinning now
+          </p>
+          <p className="mt-0.5 truncate text-sm font-bold">{spinningNow}</p>
+        </div>
+      ) : null}
+
       {visible.length ? (
         <ol className="mt-3 grid gap-1.5">
           {visible.map((entry, index) => (

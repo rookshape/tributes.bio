@@ -143,12 +143,17 @@ export function SpinWheel({ slices, animation, onRest }: SpinWheelProps) {
     <div className="relative aspect-square w-full" aria-label="Spin wheel">
       {/* Glass disc framing the wheel, kept narrow so the pointer clears it. */}
       <div className="absolute inset-[2%] rounded-full border border-white/70 bg-white/30 shadow-[0_6px_18px_rgba(15,23,32,0.08)] backdrop-blur-md" />
-      {/* Long enough that its tip reaches past the rim into the slice below. */}
+      {/* Sized in percentages rather than pixels so the tip reaches the same
+          way into the slice at any wheel size. The wheel starts 5% in, so 17%
+          puts a good third of the pointer over the colour. */}
       <div
-        className="absolute left-1/2 top-0 z-20 h-0 w-0 -translate-x-1/2 border-l-[10px] border-r-[10px] border-t-[26px] border-l-transparent border-r-transparent border-t-white drop-shadow-[0_2px_3px_rgba(15,23,32,0.3)]"
+        className="absolute left-1/2 top-0 z-20 h-[17%] w-[7.5%] -translate-x-1/2 bg-white drop-shadow-[0_2px_4px_rgba(15,23,32,0.35)]"
         ref={pointerRef}
-        // Pivots where it is pinned to the rim, like a real flapper.
-        style={{ transformOrigin: "50% 0" }}
+        style={{
+          clipPath: "polygon(50% 100%, 0 0, 100% 0)",
+          // Pivots where it is pinned to the rim, like a real flapper.
+          transformOrigin: "50% 0",
+        }}
       />
       <div className="absolute inset-[5%]" ref={containerRef} />
       <svg

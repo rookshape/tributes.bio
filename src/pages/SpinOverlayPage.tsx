@@ -118,12 +118,7 @@ export function SpinOverlayPage() {
   return (
     <main className="flex min-h-screen w-full items-center justify-center bg-transparent p-4">
       {activePart === "wheel" ? (
-        <OverlayWheel
-          animation={animation}
-          config={queuedWheel ?? config}
-          spinning={spinning}
-          state={state}
-        />
+        <OverlayWheel animation={animation} config={queuedWheel ?? config} />
       ) : null}
       {activePart === "total" ? (
         <OverlayTotal
@@ -144,6 +139,7 @@ export function SpinOverlayPage() {
         <OverlayQueue
           config={config}
           entries={queue.filter((entry) => entry.status === "queued")}
+          state={state}
         />
       ) : null}
     </main>
