@@ -299,6 +299,7 @@ function mapQueueEntry(snapshot: QueryDocumentSnapshot<DocumentData>): SpinQueue
         : data.source === "payment"
           ? "payment"
           : "mock",
+    wheelName: typeof data.wheelName === "string" ? data.wheelName : null,
     status: ["queued", "capturing", "completed", "payment_failed", "canceled"].includes(
       data.status,
     )

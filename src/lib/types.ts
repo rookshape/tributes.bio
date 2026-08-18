@@ -125,6 +125,9 @@ export type SpinQueueEntry = {
   amountCents: number;
   authorizedTotalCents: number;
   source: "mock" | "bonus" | "payment";
+  /** The wheel this viewer paid to spin. Null on entries made before wheels
+   *  were selectable. */
+  wheelName: string | null;
   status: SpinQueueStatus;
   resultLabel: string | null;
   createdAtMs: number;

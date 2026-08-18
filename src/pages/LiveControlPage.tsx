@@ -321,7 +321,14 @@ export function LiveControlPage() {
                       <p className="truncate text-body font-semibold text-content">
                         {entry.viewerName}
                       </p>
-                      <p className="text-caption text-content-muted">
+                      {/* Which wheel they bought into matters once viewers
+                          pick their own. */}
+                      {entry.wheelName ? (
+                        <p className="truncate text-caption text-content-muted">
+                          {entry.wheelName}
+                        </p>
+                      ) : null}
+                      <p className="text-caption text-content-subtle">
                         {entry.source === "bonus"
                           ? "Bonus spin"
                           : entry.source === "payment"
