@@ -18,10 +18,6 @@ service cloud.firestore {
       ];
     }
 
-    function validColor(value) {
-      return value is string && value.matches('^#[0-9a-fA-F]{6}$');
-    }
-
     function validPublicCreator() {
       return request.resource.data.keys().hasOnly(publicCreatorFields())
         && request.resource.data.ownerUid is string
@@ -33,18 +29,13 @@ service cloud.firestore {
         && request.resource.data.bio.size() <= 160
         && request.resource.data.isPublished is bool
         && request.resource.data.appearance is map
-        && request.resource.data.appearance.keys().hasOnly([
-          'backgroundColor',
-          'textColor',
-          'buttonColor',
-          'buttonTextColor',
-          'buttonStyle'
-        ])
-        && validColor(request.resource.data.appearance.backgroundColor)
-        && validColor(request.resource.data.appearance.textColor)
-        && validColor(request.resource.data.appearance.buttonColor)
-        && validColor(request.resource.data.appearance.buttonTextColor)
-        && request.resource.data.appearance.buttonStyle in ['solid', 'outline'];
+        && request.resource.data.appearance.keys().hasOnly(['hue', 'tone'])
+        && request.resource.data.appearance.hue is int
+        && request.resource.data.appearance.hue >= 0
+        && request.resource.data.appearance.hue <= 345
+        && request.resource.data.appearance.tone is int
+        && request.resource.data.appearance.tone >= 0
+        && request.resource.data.appearance.tone <= 100;
     }
 
     function validCreatorLink() {
@@ -76,6 +67,9 @@ service cloud.firestore {
           'isEnabled',
           'showOnProfile',
           'mockModeEnabled',
+          'wheelHue',
+          'wheelTone',
+          'goalCents',
           'slices',
           'updatedAt'
         ])
@@ -92,6 +86,15 @@ service cloud.firestore {
         && request.resource.data.isEnabled is bool
         && request.resource.data.showOnProfile is bool
         && request.resource.data.mockModeEnabled is bool
+        && request.resource.data.wheelHue is int
+        && request.resource.data.wheelHue >= 0
+        && request.resource.data.wheelHue <= 345
+        && request.resource.data.wheelTone is int
+        && request.resource.data.wheelTone >= 0
+        && request.resource.data.wheelTone <= 100
+        && request.resource.data.goalCents is int
+        && request.resource.data.goalCents >= 0
+        && request.resource.data.goalCents <= 10000000
         && request.resource.data.slices is list
         && request.resource.data.slices.size() >= 2
         && request.resource.data.slices.size() <= 12;
@@ -117,7 +120,12 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, create, update: if owns(uid);
+      allow read, create: if owns(uid);
+      allow update: if owns(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'accountStatus',
+          'accountStatusReason'
+        ]);
     }
 
     match /usernames/{username} {
@@ -166,6 +174,25 @@ service cloud.firestore {
         allow delete: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
       }
 
+      // The tribute goal is creator-level, shared by every wheel.
+      match /spinSettings/{settingsId} {
+        allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+          || (settingsId == 'current' && publicSpinAvailable(creatorId));
+        allow create, update: if settingsId == 'current'
+          && owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid)
+          && request.resource.data.keys().hasOnly([
+            'creatorId', 'label', 'goalCents', 'updatedAt'
+          ])
+          && request.resource.data.creatorId == creatorId
+          && request.resource.data.label is string
+          && request.resource.data.label.size() > 0
+          && request.resource.data.label.size() <= 40
+          && request.resource.data.goalCents is int
+          && request.resource.data.goalCents >= 0
+          && request.resource.data.goalCents <= 10000000;
+        allow delete: if false;
+      }
+
       match /spinQueue/{entryId} {
         allow read: if owns(get(/databases/$(database)/documents/creators/$(creatorId)).data.ownerUid);
         allow write: if false;
@@ -199,14 +226,38 @@ service cloud.firestore {
     }
 
     match /payments/{paymentId} {
-      allow read: if signedIn() && (
-        resource.data.payerUid == request.auth.uid
-        || ownsCreator(resource.data.creatorId)
-      );
-      allow write: if false;
+      allow read, write: if false;
     }
 
     match /stripeEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /twitchConnections/{creatorId} {
+      allow read, write: if false;
+    }
+
+    match /twitchBroadcasters/{broadcasterId} {
+      allow read, write: if false;
+    }
+
+    match /twitchOAuthStates/{stateId} {
+      allow read, write: if false;
+    }
+
+    match /twitchEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /contentReports/{reportId} {
+      allow read, write: if false;
+    }
+
+    match /reportRateLimits/{rateId} {
+      allow read, write: if false;
+    }
+
+    match /adminAuditLogs/{auditId} {
       allow read, write: if false;
     }
 

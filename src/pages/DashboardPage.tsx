@@ -34,8 +34,8 @@ import {
   spinSessionIsLive,
   subscribeSpinSession,
 } from "../lib/spin";
+import { HUE_MAX, HUE_STEP, TONE_STEP, hueTrack, toneTrack } from "../lib/pageThemes";
 import type {
-  ButtonStyle,
   CreatorLink,
   CreatorProfile,
   ProfileAppearance,
@@ -47,18 +47,18 @@ type EditorTab = "profile" | "links" | "appearance";
 type SaveStatus = "idle" | "saving" | "saved";
 
 const fieldClass =
-  "w-full border border-zinc-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-600";
+  "field py-2.5";
 
 function PersonalDashboard() {
   const { appUser } = useAuth();
 
   return (
-    <section className="mx-auto w-full max-w-3xl px-5 py-12">
-      <p className="text-sm font-semibold text-tribute">Personal account</p>
-      <h1 className="mt-2 text-3xl font-semibold">
+    <section className="page-shell max-w-3xl">
+      <p className="eyebrow">Personal account</p>
+      <h1 className="mt-2 text-3xl font-semibold text-ink">
         {appUser?.displayName ?? appUser?.email ?? "Account"}
       </h1>
-      <p className="mt-4 text-zinc-600">
+      <p className="mt-4 text-zinc-500">
         Payment history will appear here after tips launch.
       </p>
     </section>
@@ -148,7 +148,7 @@ export function DashboardPage() {
 
   if (!profile) {
     return (
-      <section className="mx-auto max-w-xl px-5 py-14">
+      <section className="page-shell max-w-xl">
         <h1 className="text-2xl font-semibold">Could not load your page</h1>
         {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
       </section>
@@ -327,16 +327,12 @@ export function DashboardPage() {
     }
   };
 
-  const updateAppearance = (
-    key: keyof ProfileAppearance,
-    value: string,
-  ) => {
+  // Slider drags update locally on every step so the preview tracks the thumb,
+  // then write once on release rather than on each intermediate value.
+  const changeAppearance = (changes: Partial<ProfileAppearance>) => {
     setProfile((current) =>
       current
-        ? {
-            ...current,
-            appearance: { ...current.appearance, [key]: value },
-          }
+        ? { ...current, appearance: { ...current.appearance, ...changes } }
         : current,
     );
   };
@@ -354,11 +350,11 @@ export function DashboardPage() {
   };
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-5 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-5">
+    <section className="page-shell">
+      <div className="page-header border-b liquid-divider">
         <div>
-          <h1 className="text-2xl font-semibold">Your page</h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <h1 className="page-title">Your page</h1>
+          <p className="page-subtitle">
             tributes.bio/{profile.username}
           </p>
         </div>
@@ -373,7 +369,7 @@ export function DashboardPage() {
           </span>
           <button
             aria-label="Copy page link"
-            className="grid h-10 w-10 place-items-center border border-zinc-300 bg-white hover:bg-zinc-50"
+            className="icon-button"
             onClick={copyPageUrl}
             title="Copy page link"
             type="button"
@@ -382,14 +378,14 @@ export function DashboardPage() {
           </button>
           <Link
             aria-label="Open public page"
-            className="grid h-10 w-10 place-items-center border border-zinc-300 bg-white hover:bg-zinc-50"
+            className="icon-button"
             target="_blank"
             title="Open public page"
             to={`/${profile.username}`}
           >
             <ExternalLink size={17} />
           </Link>
-          <label className="flex h-10 cursor-pointer items-center gap-2 border border-zinc-300 bg-white px-3 text-sm font-medium">
+          <label className="secondary-button min-h-10 cursor-pointer px-4">
             <input
               checked={profile.isPublished}
               className="h-4 w-4 accent-tribute"
@@ -402,19 +398,21 @@ export function DashboardPage() {
       </div>
 
       {error ? (
-        <div className="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="status-error mt-4">
           {error}
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_390px]">
-        <div>
-          <div className="grid grid-cols-3 border border-zinc-300 bg-white p-1">
+      {/* Below lg the editor and preview stack, so both are capped and centred
+          rather than stretching across a narrow viewport. */}
+      <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_390px] lg:gap-8">
+        <div className="mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
+          <div className="segmented-control w-full grid-cols-3">
             {(["profile", "links", "appearance"] as EditorTab[]).map(
               (item) => (
                 <button
-                  className={`px-3 py-2 text-sm font-medium capitalize ${
-                    tab === item ? "bg-ink text-white" : "hover:bg-zinc-100"
+                  className={`segmented-item capitalize ${
+                    tab === item ? "segmented-item-active" : ""
                   }`}
                   key={item}
                   onClick={() => setTab(item)}
@@ -428,7 +426,7 @@ export function DashboardPage() {
 
           {tab === "profile" ? (
             <div className="mt-7 grid gap-6">
-              <div className="flex items-center gap-4 border-b border-zinc-200 pb-6">
+              <div className="glass-panel flex items-center gap-4 p-5">
                 {profile.photoURL ? (
                   <img
                     alt="Profile"
@@ -436,11 +434,11 @@ export function DashboardPage() {
                     src={profile.photoURL}
                   />
                 ) : (
-                  <div className="grid h-20 w-20 place-items-center rounded-full bg-ink text-xl font-semibold text-white">
+                  <div className="grid h-20 w-20 place-items-center rounded-full bg-ink text-xl font-semibold text-white shadow-sm">
                     {profile.displayName.charAt(0).toUpperCase() || "T"}
                   </div>
                 )}
-                <label className="inline-flex cursor-pointer items-center gap-2 border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50">
+                <label className="secondary-button min-h-10 cursor-pointer px-4">
                   <ImagePlus size={17} />
                   Upload photo
                   <input
@@ -480,7 +478,7 @@ export function DashboardPage() {
               </label>
 
               <button
-                className="w-fit bg-ink px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="primary-button w-fit"
                 disabled={status === "saving"}
                 onClick={() => saveProfile()}
                 type="button"
@@ -493,7 +491,7 @@ export function DashboardPage() {
           {tab === "links" ? (
             <div className="mt-7">
               <form
-                className="grid gap-3 border-b border-zinc-200 pb-6 sm:grid-cols-[1fr_1.4fr_auto]"
+                className="glass-panel grid gap-3 p-5 sm:grid-cols-[1fr_1.4fr_auto]"
                 onSubmit={addLink}
               >
                 <label className="grid gap-2 text-sm font-medium">
@@ -519,7 +517,7 @@ export function DashboardPage() {
                 </label>
                 <button
                   aria-label="Add link"
-                  className="mt-auto grid h-10 w-10 place-items-center bg-ink text-white disabled:opacity-60"
+                  className="icon-button mt-auto border-ink bg-ink text-white hover:bg-zinc-700 hover:text-white"
                   disabled={status === "saving"}
                   title="Add link"
                   type="submit"
@@ -530,13 +528,13 @@ export function DashboardPage() {
 
               <div className="mt-5 grid gap-3">
                 {links.length === 0 ? (
-                  <div className="flex items-center gap-2 py-8 text-sm text-zinc-500">
+                  <div className="soft-panel flex items-center justify-center gap-2 py-10 text-sm text-zinc-500">
                     <Link2 size={18} /> Add your first link above.
                   </div>
                 ) : null}
                 {links.map((link, index) => (
                   <article
-                    className="border border-zinc-300 bg-white p-4"
+                    className="glass-panel p-4"
                     key={link.id}
                   >
                     <div className="grid gap-3 sm:grid-cols-[1fr_1.5fr_auto]">
@@ -558,14 +556,14 @@ export function DashboardPage() {
                         value={link.url}
                       />
                       <button
-                        className="bg-ink px-3 py-2 text-sm font-semibold text-white"
+                        className="primary-button min-h-10 px-4"
                         onClick={() => saveLink(link)}
                         type="button"
                       >
                         Save
                       </button>
                     </div>
-                    <div className="mt-3 flex items-center justify-between border-t border-zinc-100 pt-3">
+                    <div className="mt-3 flex items-center justify-between border-t border-sky/50 pt-3">
                       <label className="flex items-center gap-2 text-sm font-medium">
                         <input
                           checked={link.isActive}
@@ -578,7 +576,7 @@ export function DashboardPage() {
                       <div className="flex items-center gap-1">
                         <button
                           aria-label="Move link up"
-                          className="grid h-9 w-9 place-items-center hover:bg-zinc-100 disabled:opacity-30"
+                          className="icon-button h-9 w-9 border-transparent bg-transparent disabled:opacity-30"
                           disabled={index === 0}
                           onClick={() => moveLink(index, -1)}
                           title="Move up"
@@ -588,7 +586,7 @@ export function DashboardPage() {
                         </button>
                         <button
                           aria-label="Move link down"
-                          className="grid h-9 w-9 place-items-center hover:bg-zinc-100 disabled:opacity-30"
+                          className="icon-button h-9 w-9 border-transparent bg-transparent disabled:opacity-30"
                           disabled={index === links.length - 1}
                           onClick={() => moveLink(index, 1)}
                           title="Move down"
@@ -598,7 +596,7 @@ export function DashboardPage() {
                         </button>
                         <button
                           aria-label="Delete link"
-                          className="grid h-9 w-9 place-items-center text-red-600 hover:bg-red-50"
+                          className="icon-button h-9 w-9 border-transparent bg-transparent text-red-600 hover:bg-red-50"
                           onClick={() => removeLink(link)}
                           title="Delete link"
                           type="button"
@@ -615,83 +613,75 @@ export function DashboardPage() {
 
           {tab === "appearance" ? (
             <div className="mt-7 grid gap-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                {(
-                  [
-                    ["backgroundColor", "Page"],
-                    ["textColor", "Text"],
-                    ["buttonColor", "Button"],
-                    ["buttonTextColor", "Button text"],
-                  ] as [keyof ProfileAppearance, string][]
-                ).map(([key, label]) => (
-                  <label
-                    className="flex items-center justify-between border-b border-zinc-200 py-3 text-sm font-medium"
-                    key={key}
-                  >
-                    {label}
-                    <span className="flex items-center gap-2 font-mono text-xs text-zinc-500">
-                      {profile.appearance[key]}
-                      <input
-                        aria-label={`${label} color`}
-                        className="h-9 w-9 cursor-pointer border-0 bg-transparent p-0"
-                        onChange={(event) =>
-                          updateAppearance(key, event.target.value)
-                        }
-                        type="color"
-                        value={profile.appearance[key]}
-                      />
-                    </span>
-                  </label>
-                ))}
+              <div className="grid gap-5">
+                <label className="block" htmlFor="page-hue">
+                  <span className="mb-2 block text-detail font-medium text-content-muted">
+                    Color
+                  </span>
+                  <input
+                    className="theme-slider"
+                    id="page-hue"
+                    max={HUE_MAX}
+                    min={0}
+                    onChange={(event) =>
+                      changeAppearance({ hue: Number(event.target.value) })
+                    }
+                    onKeyUp={() => void saveProfile()}
+                    onPointerUp={() => void saveProfile()}
+                    step={HUE_STEP}
+                    style={{ background: hueTrack(profile.appearance.tone) }}
+                    type="range"
+                    value={profile.appearance.hue}
+                  />
+                </label>
+
+                <label className="block" htmlFor="page-tone">
+                  <span className="mb-2 block text-detail font-medium text-content-muted">
+                    Light to dark
+                  </span>
+                  <input
+                    className="theme-slider"
+                    id="page-tone"
+                    max={100}
+                    min={0}
+                    onChange={(event) =>
+                      changeAppearance({ tone: Number(event.target.value) })
+                    }
+                    onKeyUp={() => void saveProfile()}
+                    onPointerUp={() => void saveProfile()}
+                    step={TONE_STEP}
+                    style={{ background: toneTrack(profile.appearance.hue) }}
+                    type="range"
+                    value={profile.appearance.tone}
+                  />
+                </label>
               </div>
 
-              <fieldset>
-                <legend className="text-sm font-medium">Button style</legend>
-                <div className="mt-2 grid grid-cols-2 border border-zinc-300 bg-white p-1">
-                  {(["solid", "outline"] as ButtonStyle[]).map((style) => (
-                    <button
-                      className={`px-3 py-2 text-sm font-medium capitalize ${
-                        profile.appearance.buttonStyle === style
-                          ? "bg-ink text-white"
-                          : "hover:bg-zinc-100"
-                      }`}
-                      key={style}
-                      onClick={() => updateAppearance("buttonStyle", style)}
-                      type="button"
-                    >
-                      {style}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <button
-                className="w-fit bg-ink px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                disabled={status === "saving"}
-                onClick={() => saveProfile()}
-                type="button"
-              >
-                Save appearance
-              </button>
+              <p className="text-caption text-content-subtle">
+                Text and buttons adjust themselves to stay readable against whatever
+                you pick. Changes save when you let go of the slider.
+              </p>
             </div>
           ) : null}
         </div>
 
-        <aside className="lg:sticky lg:top-6 lg:self-start">
-          <p className="mb-3 text-xs font-semibold uppercase text-zinc-500">
+        <aside className="mx-auto w-full max-w-[380px] lg:sticky lg:top-6 lg:max-w-none lg:self-start">
+          <p className="mb-3 text-center text-detail font-medium text-content-muted lg:text-left">
             Preview
           </p>
-          <div className="mx-auto h-[640px] w-full max-w-[360px] overflow-y-auto border-[8px] border-ink bg-white shadow-sm">
-            <BioPageView
-              links={links}
-              preview
-              profile={profile}
-              topContent={
-                spinConfig?.isEnabled && spinSessionIsLive(spinSession, now) ? (
-                  <LiveSpinCard config={spinConfig} preview profile={profile} />
-                ) : null
-              }
-            />
+          <div className="preview-window mx-auto h-[620px] w-full max-w-[360px]">
+            <div className="preview-screen">
+              <BioPageView
+                links={links}
+                preview
+                profile={profile}
+                topContent={
+                  spinConfig?.isEnabled && spinSessionIsLive(spinSession, now) ? (
+                    <LiveSpinCard config={spinConfig} preview profile={profile} />
+                  ) : null
+                }
+              />
+            </div>
           </div>
         </aside>
       </div>

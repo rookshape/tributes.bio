@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BioPageView } from "../components/BioPageView";
 import { LiveSpinCard } from "../components/LiveSpinCard";
+import { ReportDialog } from "../components/ReportDialog";
 import { TributeForm } from "../components/TributeForm";
 import { getCreatorByUsername } from "../lib/account";
 import { trackCreatorLinkClick, trackProfileView } from "../lib/analytics";
@@ -28,6 +29,7 @@ export function PublicProfilePage() {
   const [spinSession, setSpinSession] = useState<SpinSession | null>(null);
   const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -162,7 +164,7 @@ export function PublicProfilePage() {
       <main className="grid min-h-screen place-items-center bg-paper px-5 text-center">
         <div>
           <h1 className="text-2xl font-semibold">Profile not found</h1>
-          <Link className="mt-5 inline-block font-semibold text-tribute" to="/">
+          <Link className="mt-5 inline-block font-semibold text-ink underline decoration-zinc-300 underline-offset-4" to="/">
             Go home
           </Link>
         </div>
@@ -177,12 +179,13 @@ export function PublicProfilePage() {
   );
 
   return (
-    <main className="min-h-screen">
+    <main className="flex min-h-screen flex-col">
       <BioPageView
         links={links}
         onLinkClick={(link) =>
           trackCreatorLinkClick(creator.id, creator.username, link.id)
         }
+        onReport={() => setReportOpen(true)}
         profile={creator}
         topContent={
           paymentsAvailable || spinAvailable ? (
@@ -205,6 +208,13 @@ export function PublicProfilePage() {
           ) : null
         }
       />
+      {reportOpen ? (
+        <ReportDialog
+          links={links}
+          onClose={() => setReportOpen(false)}
+          profile={creator}
+        />
+      ) : null}
     </main>
   );
 }

@@ -26,6 +26,8 @@ declare module "spin-wheel/dist/spin-wheel-esm.js" {
 
   export class Wheel {
     constructor(container: Element, props?: WheelProps);
+    /** Current rotation in degrees; used to place the SVG label layer. */
+    rotation: number;
     remove(): void;
     spinToItem(
       itemIndex?: number,

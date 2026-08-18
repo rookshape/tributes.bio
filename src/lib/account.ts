@@ -7,16 +7,11 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "./firebase";
+import { DEFAULT_APPEARANCE, normalizeAppearance } from "./pageThemes";
 import type { AppUser, CreatorProfile } from "./types";
 import type { EmailPreferences } from "./types";
 
-const defaultAppearance = {
-  backgroundColor: "#fbfaf7",
-  textColor: "#101114",
-  buttonColor: "#101114",
-  buttonTextColor: "#ffffff",
-  buttonStyle: "solid" as const,
-};
+const defaultAppearance = DEFAULT_APPEARANCE;
 
 const reservedUsernames = new Set([
   "admin",
@@ -111,6 +106,7 @@ export async function getUserRecord(uid: string): Promise<AppUser | null> {
     displayName: data.displayName ?? null,
     photoURL: data.photoURL ?? null,
     accountType: data.accountType ?? null,
+    accountStatus: data.accountStatus === "disabled" ? "disabled" : "active",
     onboardingComplete: Boolean(data.onboardingComplete),
     creatorId: data.creatorId,
     username: data.username,
@@ -254,10 +250,7 @@ export async function getCreatorByUsername(
     bio: data.bio ?? "",
     photoPath: data.photoPath ?? null,
     photoURL: data.photoURL ?? null,
-    appearance: {
-      ...defaultAppearance,
-      ...(data.appearance ?? {}),
-    },
+    appearance: normalizeAppearance(data.appearance),
     isPublished: Boolean(data.isPublished),
     moderationStatus: data.moderationStatus ?? "active",
   };

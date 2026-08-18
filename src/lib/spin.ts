@@ -13,6 +13,13 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "./firebase";
+import {
+  DEFAULT_WHEEL_APPEARANCE,
+  normalizeWheelHue,
+  normalizeWheelTone,
+  sliceColor,
+  type WheelAppearance,
+} from "./wheelPalette";
 import type {
   SpinConfig,
   SpinQueueEntry,
@@ -24,42 +31,51 @@ import type {
   SpinState,
 } from "./types";
 
-const sliceColors = [
-  "#111827",
-  "#0f8f6f",
-  "#f05d4e",
-  "#d99a2b",
-  "#2f5f9f",
-  "#7a4f9f",
+const defaultSlicesWithoutColor: Omit<SpinSlice, "color">[] = [
+  { id: "five", label: "$5", type: "amount", value: 500, action: "" },
+  { id: "double", label: "2x", type: "multiplier", value: 2, action: "" },
+  { id: "bonus", label: "+1", type: "bonus", value: 1, action: "" },
+  { id: "twenty", label: "$20", type: "amount", value: 2000, action: "" },
+  { id: "prompt", label: "Chat", type: "action", value: 0, action: "Chat chooses" },
+  { id: "ten", label: "$10", type: "amount", value: 1000, action: "" },
 ];
 
-export const defaultSpinSlices: SpinSlice[] = [
-  { id: "five", label: "$5", type: "amount", value: 500, action: "", color: sliceColors[1] },
-  { id: "double", label: "2x", type: "multiplier", value: 2, action: "", color: sliceColors[2] },
-  { id: "bonus", label: "+1", type: "bonus", value: 1, action: "", color: sliceColors[3] },
-  { id: "twenty", label: "$20", type: "amount", value: 2000, action: "", color: sliceColors[4] },
-  { id: "prompt", label: "Chat", type: "action", value: 0, action: "Chat chooses", color: sliceColors[5] },
-  { id: "ten", label: "$10", type: "amount", value: 1000, action: "", color: sliceColors[0] },
-];
+export const defaultSpinSlices: SpinSlice[] = defaultSlicesWithoutColor.map(
+  (slice, index) => ({
+    ...slice,
+    color: sliceColor(
+      DEFAULT_WHEEL_APPEARANCE,
+      index,
+      defaultSlicesWithoutColor.length,
+    ),
+  }),
+);
 
 export function createDefaultSpinConfig(creatorId: string): SpinConfig {
   return {
     creatorId,
     title: "Spin the wheel",
-    counterLabel: "Tribute total",
+    counterLabel: "Tribute goal",
     spinPriceCents: 1000,
     isEnabled: false,
     showOnProfile: true,
     mockModeEnabled: true,
+    wheelHue: DEFAULT_WHEEL_APPEARANCE.hue,
+    wheelTone: DEFAULT_WHEEL_APPEARANCE.tone,
     slices: defaultSpinSlices.map((slice) => ({ ...slice })),
   };
 }
 
-function validColor(value: string) {
-  return /^#[0-9a-f]{6}$/i.test(value);
-}
-
-function normalizeSlice(slice: SpinSlice, index: number): SpinSlice {
+/**
+ * Slice colors are always recomputed from the wheel's hue and tone, never read
+ * back from storage, so a wheel can only ever use the two alternating shades.
+ */
+function normalizeSlice(
+  slice: Omit<SpinSlice, "color"> & { color?: string },
+  index: number,
+  appearance: WheelAppearance,
+  total: number,
+): SpinSlice {
   const type: SpinSliceType = ["amount", "multiplier", "bonus", "action"].includes(slice.type)
     ? slice.type
     : "action";
@@ -70,7 +86,7 @@ function normalizeSlice(slice: SpinSlice, index: number): SpinSlice {
     type,
     value: Number.isFinite(slice.value) ? Math.max(0, Math.round(slice.value)) : 0,
     action: slice.action.trim().slice(0, 80),
-    color: validColor(slice.color) ? slice.color : sliceColors[index % sliceColors.length],
+    color: sliceColor(appearance, index, total),
   };
 }
 
@@ -90,11 +106,21 @@ export function validateSpinConfig(config: SpinConfig) {
     throw new Error("Spin price must be between $1 and $1,000.");
   }
 
-  if (config.slices.length < 2 || config.slices.length > 12) {
-    throw new Error("Use between 2 and 12 wheel slices.");
+  if (config.slices.length < 4 || config.slices.length > 12) {
+    throw new Error("Use between 4 and 12 wheel slices.");
   }
 
-  const slices = config.slices.map(normalizeSlice);
+  // Only two shades alternate, so an odd count would put two identical slices
+  // next to each other where the wheel closes.
+  if (config.slices.length % 2 !== 0) {
+    throw new Error("Use an even number of wheel slices.");
+  }
+
+  const wheelHue = normalizeWheelHue(config.wheelHue);
+  const wheelTone = normalizeWheelTone(config.wheelTone);
+  const slices = config.slices.map((slice, index) =>
+    normalizeSlice(slice, index, { hue: wheelHue, tone: wheelTone }, config.slices.length),
+  );
 
   if (slices.some((slice) => !slice.label)) {
     throw new Error("Every slice needs a label.");
@@ -111,7 +137,7 @@ export function validateSpinConfig(config: SpinConfig) {
     throw new Error("Every paid result must be between $1 and $1,000.");
   }
 
-  return { ...config, title, counterLabel, slices };
+  return { ...config, title, counterLabel, wheelHue, wheelTone, slices };
 }
 
 function configRef(creatorId: string) {
@@ -161,24 +187,42 @@ export function totalWithServiceFee(amountCents: number) {
 
 function mapSpinConfig(creatorId: string, data: DocumentData): SpinConfig {
   const defaults = createDefaultSpinConfig(creatorId);
-  const slices = Array.isArray(data.slices)
-    ? data.slices.map((slice, index) => normalizeSlice(slice as SpinSlice, index))
+  const wheelHue = normalizeWheelHue(data.wheelHue);
+  const wheelTone = normalizeWheelTone(data.wheelTone);
+  const storedSlices = Array.isArray(data.slices) ? data.slices : null;
+  const slices = storedSlices
+    ? storedSlices.map((slice, index) =>
+        normalizeSlice(
+          slice as SpinSlice,
+          index,
+          { hue: wheelHue, tone: wheelTone },
+          storedSlices.length,
+        ),
+      )
     : defaults.slices;
 
   return {
     creatorId,
     title: typeof data.title === "string" ? data.title : defaults.title,
+    // "Tribute total" was the previous default; move those wheels onto the new
+    // wording while leaving any label a creator actually chose alone.
     counterLabel:
-      typeof data.counterLabel === "string" ? data.counterLabel : defaults.counterLabel,
+      typeof data.counterLabel === "string" && data.counterLabel !== "Tribute total"
+        ? data.counterLabel
+        : defaults.counterLabel,
     spinPriceCents: Number(data.spinPriceCents ?? defaults.spinPriceCents),
     isEnabled: Boolean(data.isEnabled),
     showOnProfile: data.showOnProfile !== false,
     mockModeEnabled: data.mockModeEnabled !== false,
+    wheelHue,
+    wheelTone,
     slices,
   };
 }
 
 function mapSpinState(creatorId: string, data: DocumentData | undefined): SpinState {
+  const alert = data?.twitchBitsAlert;
+
   return {
     creatorId,
     counterCents: Number(data?.counterCents ?? 0),
@@ -198,6 +242,21 @@ function mapSpinState(creatorId: string, data: DocumentData | undefined): SpinSt
     startedAtMs: Number(data?.startedAtMs ?? 0),
     durationMs: Number(data?.durationMs ?? 0),
     lockedUntilMs: Number(data?.lockedUntilMs ?? 0),
+    twitchBitsAlert:
+      alert &&
+      typeof alert.id === "string" &&
+      typeof alert.viewerName === "string" &&
+      Number.isInteger(alert.bits) &&
+      Number.isInteger(alert.amountCents) &&
+      Number.isFinite(alert.createdAtMs)
+        ? {
+            id: alert.id,
+            viewerName: alert.viewerName,
+            bits: alert.bits,
+            amountCents: alert.amountCents,
+            createdAtMs: alert.createdAtMs,
+          }
+        : null,
   };
 }
 
@@ -228,11 +287,20 @@ function mapQueueEntry(snapshot: QueryDocumentSnapshot<DocumentData>): SpinQueue
 }
 
 function mapSpinSession(creatorId: string, data: DocumentData | undefined): SpinSession {
+  const hasManualState = typeof data?.manualLive === "boolean";
+
   return {
     creatorId,
     status: data?.status === "live" ? "live" : "offline",
     startedAtMs: Number(data?.startedAtMs ?? 0),
     heartbeatAtMs: Number(data?.heartbeatAtMs ?? 0),
+    manualHeartbeatAtMs: Number(
+      data?.manualHeartbeatAtMs ?? data?.heartbeatAtMs ?? 0,
+    ),
+    manualLive: hasManualState
+      ? data?.manualLive === true
+      : data?.status === "live" && data?.twitchLive !== true,
+    twitchLive: data?.twitchLive === true,
   };
 }
 
@@ -326,10 +394,12 @@ export function subscribeSpinReceipt(
 }
 
 export function spinSessionIsLive(session: SpinSession | null, now = Date.now()) {
-  return Boolean(
-    session?.status === "live" &&
-      session.heartbeatAtMs > 0 &&
-      now - session.heartbeatAtMs < 120000,
+  if (!session) return false;
+  return (
+    session.twitchLive ||
+    (session.manualLive &&
+      session.manualHeartbeatAtMs > 0 &&
+      now - session.manualHeartbeatAtMs < 120000)
   );
 }
 
@@ -360,7 +430,7 @@ const adjustCounterCall = httpsCallable<
 
 const setLiveStatusCall = httpsCallable<
   { creatorId: string; isLive: boolean },
-  { status: "offline" | "live"; heartbeatAtMs: number }
+  { status: "offline" | "live"; manualLive: boolean; heartbeatAtMs: number }
 >(functions, "setSpinLiveStatus");
 
 const heartbeatCall = httpsCallable<

@@ -1,21 +1,39 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { SpinWheel, type SpinAnimation } from "../components/SpinWheel";
-import { subscribeSpinConfig, subscribeSpinState } from "../lib/spin";
-import type { SpinConfig, SpinState } from "../lib/types";
+import type { SpinAnimation } from "../components/SpinWheel";
+import {
+  OverlayGoalBar,
+  OverlayQueue,
+  OverlayWheel,
+  type OverlayPart,
+} from "../components/overlay/OverlayParts";
+import {
+  subscribeSpinConfig,
+  subscribeSpinQueue,
+  subscribeSpinState,
+} from "../lib/spin";
+import {
+  DEFAULT_GOAL_LABEL,
+  subscribeSpinGoal,
+  type SpinGoal,
+} from "../lib/spinGoal";
+import type { SpinConfig, SpinQueueEntry, SpinState } from "../lib/types";
 
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
+function isOverlayPart(value: string | undefined): value is OverlayPart {
+  return value === "wheel" || value === "bar" || value === "queue";
 }
 
 export function SpinOverlayPage() {
-  const { creatorId = "" } = useParams();
+  const { creatorId = "", part } = useParams();
+  const activePart: OverlayPart = isOverlayPart(part) ? part : "wheel";
   const [config, setConfig] = useState<SpinConfig | null>(null);
   const [state, setState] = useState<SpinState | null>(null);
+  const [queue, setQueue] = useState<SpinQueueEntry[]>([]);
+  const [goal, setGoal] = useState<SpinGoal>({
+    creatorId,
+    label: DEFAULT_GOAL_LABEL,
+    goalCents: 0,
+  });
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -40,6 +58,17 @@ export function SpinOverlayPage() {
     };
   }, [creatorId]);
 
+  // Only the queue source needs the queue collection open.
+  useEffect(() => {
+    if (!creatorId || activePart !== "queue") return;
+    return subscribeSpinQueue(creatorId, setQueue);
+  }, [creatorId, activePart]);
+
+  useEffect(() => {
+    if (!creatorId || activePart !== "bar") return;
+    return subscribeSpinGoal(creatorId, setGoal);
+  }, [creatorId, activePart]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 200);
     return () => window.clearInterval(timer);
@@ -61,28 +90,29 @@ export function SpinOverlayPage() {
   const spinning = Boolean(state && state.lockedUntilMs > now);
 
   return (
-    <main className="grid min-h-screen w-full grid-cols-[minmax(0,1fr)_minmax(260px,34%)] items-center gap-10 overflow-hidden bg-transparent p-10 text-white">
-      <section className="mx-auto w-full max-w-[760px]">
-        <SpinWheel animation={animation} slices={config.slices} />
-      </section>
-
-      <section className="min-w-0 border-l-2 border-white/40 bg-black/75 px-10 py-12">
-        <p className="text-xl font-semibold text-white/70">{config.counterLabel}</p>
-        <p className="mt-2 text-7xl font-bold">{formatMoney(state?.counterCents ?? 0)}</p>
-
-        <div className="mt-14 min-h-36">
-          {state?.viewerName ? (
-            <>
-              <p className="truncate text-2xl text-white/70">{state.viewerName}</p>
-              <p className="mt-2 text-5xl font-bold">
-                {spinning ? "Spinning" : state.resultLabel}
-              </p>
-            </>
-          ) : null}
-        </div>
-
-        <p className="mt-12 text-sm font-semibold text-white/55">Powered by Tributes</p>
-      </section>
+    <main className="flex min-h-screen w-full items-center justify-center bg-transparent p-4">
+      {activePart === "wheel" ? (
+        <OverlayWheel
+          animation={animation}
+          config={config}
+          spinning={spinning}
+          state={state}
+        />
+      ) : null}
+      {activePart === "bar" ? (
+        <OverlayGoalBar
+          config={config}
+          goalCents={goal.goalCents}
+          goalLabel={goal.label}
+          state={state}
+        />
+      ) : null}
+      {activePart === "queue" ? (
+        <OverlayQueue
+          config={config}
+          entries={queue.filter((entry) => entry.status === "queued")}
+        />
+      ) : null}
     </main>
   );
 }

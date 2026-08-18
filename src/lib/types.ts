@@ -1,3 +1,5 @@
+import type { PageAppearance } from "./pageThemes";
+
 export type AccountType = "personal" | "creator";
 
 export type AppUser = {
@@ -6,6 +8,7 @@ export type AppUser = {
   displayName: string | null;
   photoURL: string | null;
   accountType: AccountType | null;
+  accountStatus: "active" | "disabled";
   onboardingComplete: boolean;
   creatorId?: string;
   username?: string;
@@ -17,15 +20,8 @@ export type EmailPreferences = {
   productUpdates: boolean;
 };
 
-export type ButtonStyle = "solid" | "outline";
-
-export type ProfileAppearance = {
-  backgroundColor: string;
-  textColor: string;
-  buttonColor: string;
-  buttonTextColor: string;
-  buttonStyle: ButtonStyle;
-};
+/** Hue and light/dark tone; every page color derives from these. */
+export type ProfileAppearance = PageAppearance;
 
 export type CreatorProfile = {
   id: string;
@@ -51,16 +47,35 @@ export type CreatorLink = {
 export type AnalyticsSummary = {
   profileViews: number;
   linkClicks: number;
+  earningsCents: number;
+  tipCount: number;
+  spinCount: number;
+  successfulPayments: number;
+  averageTipCents: number;
+  conversionRate: number;
 };
 
-export type DailyAnalytics = AnalyticsSummary & {
+export type DailyAnalytics = {
   date: string;
+  profileViews: number;
+  linkClicks: number;
+  earningsCents: number;
+  tipCount: number;
+  spinCount: number;
 };
 
 export type LinkAnalytics = {
   id: string;
   title: string;
   clicks: number;
+  clickThroughRate: number;
+};
+
+export type ReferrerAnalytics = {
+  source: string;
+  views: number;
+  clicks: number;
+  total: number;
 };
 
 export type SpinSliceType = "amount" | "multiplier" | "bonus" | "action";
@@ -82,6 +97,9 @@ export type SpinConfig = {
   isEnabled: boolean;
   showOnProfile: boolean;
   mockModeEnabled: boolean;
+  /** Hue and tone the two alternating slice shades are derived from. */
+  wheelHue: number;
+  wheelTone: number;
   slices: SpinSlice[];
 };
 
@@ -108,6 +126,17 @@ export type SpinSession = {
   status: "offline" | "live";
   startedAtMs: number;
   heartbeatAtMs: number;
+  manualHeartbeatAtMs: number;
+  manualLive: boolean;
+  twitchLive: boolean;
+};
+
+export type TwitchBitsAlert = {
+  id: string;
+  viewerName: string;
+  bits: number;
+  amountCents: number;
+  createdAtMs: number;
 };
 
 export type SpinReceiptStatus =
@@ -145,4 +174,5 @@ export type SpinState = {
   startedAtMs: number;
   durationMs: number;
   lockedUntilMs: number;
+  twitchBitsAlert: TwitchBitsAlert | null;
 };

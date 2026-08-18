@@ -20,19 +20,23 @@ import {
   uploadBytes,
 } from "firebase/storage";
 import { db, storage } from "./firebase";
+import { DEFAULT_APPEARANCE, normalizeAppearance } from "./pageThemes";
 import type {
   CreatorLink,
   CreatorProfile,
   ProfileAppearance,
 } from "./types";
 
-export const defaultAppearance: ProfileAppearance = {
-  backgroundColor: "#fbfaf7",
-  textColor: "#101114",
-  buttonColor: "#101114",
-  buttonTextColor: "#ffffff",
-  buttonStyle: "solid",
-};
+export const defaultAppearance: ProfileAppearance = DEFAULT_APPEARANCE;
+
+/**
+ * Older profiles carry either the original per-color map or the interim
+ * themeId. Both are discarded in favour of the default hue/tone, which the
+ * next save rewrites in the current shape.
+ */
+function readAppearance(value: unknown): ProfileAppearance {
+  return normalizeAppearance(value);
+}
 
 type ProfileChanges = Pick<
   CreatorProfile,
@@ -53,10 +57,7 @@ function mapProfile(id: string, data: Record<string, unknown>): CreatorProfile {
     bio: String(data.bio ?? ""),
     photoPath: typeof data.photoPath === "string" ? data.photoPath : null,
     photoURL: typeof data.photoURL === "string" ? data.photoURL : null,
-    appearance: {
-      ...defaultAppearance,
-      ...((data.appearance as Partial<ProfileAppearance> | undefined) ?? {}),
-    },
+    appearance: readAppearance(data.appearance),
     isPublished: Boolean(data.isPublished),
     moderationStatus:
       data.moderationStatus === "review" || data.moderationStatus === "suspended"
@@ -73,10 +74,6 @@ function mapLink(id: string, data: Record<string, unknown>): CreatorLink {
     position: Number(data.position ?? 0),
     isActive: Boolean(data.isActive),
   };
-}
-
-function validColor(value: string) {
-  return /^#[0-9a-f]{6}$/i.test(value);
 }
 
 export function normalizeExternalUrl(value: string) {
@@ -116,18 +113,11 @@ function validateProfile(profile: ProfileChanges) {
     throw new Error("Bio must be 160 characters or fewer.");
   }
 
-  const colors = [
-    profile.appearance.backgroundColor,
-    profile.appearance.textColor,
-    profile.appearance.buttonColor,
-    profile.appearance.buttonTextColor,
-  ];
-
-  if (!colors.every(validColor)) {
-    throw new Error("Choose valid profile colors.");
-  }
-
-  return { displayName, bio };
+  return {
+    displayName,
+    bio,
+    appearance: normalizeAppearance(profile.appearance),
+  };
 }
 
 async function migratePrivateCreatorFields(
@@ -151,10 +141,7 @@ async function migratePrivateCreatorFields(
   );
   batch.update(doc(db, "creators", creatorId), {
     photoURL: data.photoURL ?? null,
-    appearance: {
-      ...defaultAppearance,
-      ...((data.appearance as Partial<ProfileAppearance> | undefined) ?? {}),
-    },
+    appearance: readAppearance(data.appearance),
     stripeAccountId: deleteField(),
     stripeOnboardingStatus: deleteField(),
     updatedAt: serverTimestamp(),
@@ -202,14 +189,14 @@ export async function updateCreatorProfile(
   creatorId: string,
   changes: ProfileChanges,
 ) {
-  const { displayName, bio } = validateProfile(changes);
+  const { displayName, bio, appearance } = validateProfile(changes);
 
   await updateDoc(doc(db, "creators", creatorId), {
     displayName,
     bio,
     photoPath: changes.photoPath,
     photoURL: changes.photoURL,
-    appearance: changes.appearance,
+    appearance,
     isPublished: changes.isPublished,
     updatedAt: serverTimestamp(),
   });
