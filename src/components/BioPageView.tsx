@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { Check, Share2 } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import type { CreatorLink, CreatorProfile } from "../lib/types";
 import { derivePageTheme, glassSurface } from "../lib/pageThemes";
 
@@ -22,6 +23,38 @@ export function BioPageView({
   const theme = derivePageTheme(profile.appearance);
   const visibleLinks = links.filter((link) => link.isActive);
   const linkStyle = glassSurface(theme);
+  const [shared, setShared] = useState(false);
+  const [showUrl, setShowUrl] = useState(false);
+  const pageUrl = `${window.location.origin}/${profile.username}`;
+
+  /**
+   * Share sheet where there is one, clipboard otherwise, and if both are
+   * unavailable — blocked permissions, an embedded browser, a hung request —
+   * the URL is revealed so it can be copied by hand. The clipboard promise is
+   * raced against a timeout because a blocked one can hang indefinitely, which
+   * would otherwise leave the button looking dead.
+   */
+  const share = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: profile.displayName, url: pageUrl });
+        return;
+      } catch {
+        // Cancelled or unsupported — fall through to copying.
+      }
+    }
+
+    try {
+      await Promise.race([
+        navigator.clipboard.writeText(pageUrl),
+        new Promise((_, reject) => window.setTimeout(reject, 1500)),
+      ]);
+      setShared(true);
+      window.setTimeout(() => setShared(false), 1800);
+    } catch {
+      setShowUrl(true);
+    }
+  };
 
   // flex-1 lets the themed background fill a flex parent (the public page);
   // min-h-full covers fixed-height parents (the dashboard preview window).
@@ -76,6 +109,32 @@ export function BioPageView({
             </a>
           ))}
         </div>
+
+        {/* Sharing sits with the creator's identity, not buried in the footer. */}
+        {!preview ? (
+          <div className="mt-5">
+            <button
+              className="mx-auto flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur-md"
+              onClick={share}
+              style={linkStyle}
+              type="button"
+            >
+              {shared ? <Check size={15} /> : <Share2 size={15} />}
+              {shared ? "Link copied" : "Share"}
+            </button>
+
+            {showUrl ? (
+              <input
+                aria-label="Your page link"
+                className="mx-auto mt-2 w-full max-w-xs rounded-full border px-4 py-2 text-center text-sm backdrop-blur-md"
+                onFocus={(event) => event.target.select()}
+                readOnly
+                style={linkStyle}
+                value={pageUrl}
+              />
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-auto flex items-center justify-center gap-4 pt-10 text-xs font-semibold opacity-55">
           <a

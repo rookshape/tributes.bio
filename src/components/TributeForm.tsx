@@ -68,21 +68,19 @@ export function TributeForm({ profile, result }: TributeFormProps) {
     >
       <h2 className="text-center text-base font-semibold">Send a tribute</h2>
 
-      {result === "success" ? (
-        <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm text-emerald-800">
-          Payment received. Thank you.
-        </p>
-      ) : null}
-      {result === "canceled" ? (
-        <p className="mt-3 rounded-lg bg-zinc-100 px-3 py-2 text-center text-sm text-zinc-700">
-          Checkout canceled.
+      {result ? (
+        <p
+          className="mt-3 rounded-xl border px-3 py-2 text-center text-sm backdrop-blur-md"
+          style={glassSurface(theme)}
+        >
+          {result === "success" ? "Payment received. Thank you." : "Checkout canceled."}
         </p>
       ) : null}
 
       <div className="mt-4 grid grid-cols-3 gap-2">
         {presets.map((preset) => (
           <button
-            className="min-h-10 rounded-full border px-2 text-sm font-semibold backdrop-blur-md"
+            className="min-h-12 rounded-full border px-2 text-base font-semibold backdrop-blur-md"
             key={preset}
             onClick={() => setAmount(String(preset))}
             style={
@@ -105,11 +103,11 @@ export function TributeForm({ profile, result }: TributeFormProps) {
         Amount
       </label>
       <div className="relative mt-1">
-        <span className="absolute inset-y-0 left-3 flex items-center text-zinc-500">
+        <span className="absolute inset-y-0 left-3 flex items-center opacity-60">
           $
         </span>
         <input
-          className="field h-11 pl-7 pr-3 text-base"
+          className="field h-12 pl-7 pr-3 text-base"
           id="tribute-amount"
           inputMode="decimal"
           max="500"
@@ -125,7 +123,7 @@ export function TributeForm({ profile, result }: TributeFormProps) {
         Name <span className="font-normal opacity-60">(optional)</span>
       </label>
       <input
-        className="field mt-1 h-10 py-2 disabled:bg-zinc-100"
+        className="field mt-1 h-12 py-2 disabled:opacity-60"
         disabled={anonymous}
         id="tribute-name"
         maxLength={80}
@@ -147,32 +145,30 @@ export function TributeForm({ profile, result }: TributeFormProps) {
       <label className="mt-3 flex items-center gap-2 text-sm">
         <input
           checked={anonymous}
-          className="h-4 w-4"
+          className="h-5 w-5"
           onChange={(event) => setAnonymous(event.target.checked)}
           type="checkbox"
         />
         Send anonymously
       </label>
 
-      <dl className="mt-4 grid gap-1 border-t border-current/15 pt-3 text-sm opacity-80">
-        <div className="flex justify-between gap-4">
-          <dt>Creator receives</dt>
-          <dd>{currency(amountCents)}</dd>
+      <div className="mt-4 border-t border-current/15 pt-3">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm font-semibold">You pay</span>
+          <span className="text-lg font-bold">{currency(totalCents)}</span>
         </div>
-        <div className="flex justify-between gap-4">
-          <dt>Service fee (25%)</dt>
-          <dd>{currency(feeCents)}</dd>
-        </div>
-        <div className="flex justify-between gap-4 font-semibold opacity-100">
-          <dt>Total</dt>
-          <dd>{currency(totalCents)}</dd>
-        </div>
-      </dl>
+        <p className="mt-1 text-xs opacity-70">
+          {currency(amountCents)} to {profile.displayName} plus a {currency(feeCents)} service
+          fee.
+        </p>
+      </div>
 
-      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <p className="mt-3 text-center text-sm font-medium text-red-700">{error}</p>
+      ) : null}
 
       <button
-        className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full px-4 text-sm font-semibold shadow-sm disabled:opacity-60"
+        className="mt-4 flex min-h-[52px] w-full items-center justify-center rounded-full px-4 text-base font-semibold disabled:opacity-60"
         disabled={loading || !validAmount}
         style={{ backgroundColor: theme.accent, color: theme.accentText }}
         type="submit"

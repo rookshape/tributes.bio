@@ -16,6 +16,7 @@ import {
 import { Link } from "react-router-dom";
 import { BioPageView } from "../components/BioPageView";
 import { LiveSpinCard } from "../components/LiveSpinCard";
+import { ImageCropDialog } from "../components/ImageCropDialog";
 import { LinkListEditor } from "../components/LinkListEditor";
 import { SetupChecklist } from "../components/SetupChecklist";
 import {
@@ -104,6 +105,7 @@ export function DashboardPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [pendingDelete, setPendingDelete] = useState<CreatorLink | null>(null);
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [now, setNow] = useState(Date.now());
 
   const isCreator = appUser?.accountType === "creator";
@@ -266,13 +268,22 @@ export function DashboardPage() {
     await saveProfile(nextProfile);
   };
 
-  const uploadPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
+  const choosePhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
 
-    if (!file) {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Choose an image file.");
       return;
     }
 
+    setPendingPhoto(file);
+  };
+
+  const uploadPhoto = async (file: File) => {
+    setPendingPhoto(null);
     setError(null);
     setStatus("saving");
 
@@ -293,8 +304,6 @@ export function DashboardPage() {
           : "Could not upload that image.",
       );
       setStatus("idle");
-    } finally {
-      event.target.value = "";
     }
   };
 
@@ -472,6 +481,12 @@ export function DashboardPage() {
         </div>
       ) : null}
 
+      <ImageCropDialog
+        file={pendingPhoto}
+        onCancel={() => setPendingPhoto(null)}
+        onConfirm={(cropped) => void uploadPhoto(cropped)}
+      />
+
       <Dialog
         footer={
           <>
@@ -538,7 +553,7 @@ export function DashboardPage() {
                   <input
                     accept="image/*"
                     className="sr-only"
-                    onChange={uploadPhoto}
+                    onChange={choosePhoto}
                     type="file"
                   />
                 </label>
