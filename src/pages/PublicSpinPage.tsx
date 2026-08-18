@@ -16,19 +16,13 @@ import {
   subscribeSpinSession,
   totalWithServiceFee,
 } from "../lib/spin";
+import { formatMoney } from "../lib/money";
 import type {
   CreatorProfile,
   SpinConfig,
   SpinReceipt,
   SpinSession,
 } from "../lib/types";
-
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
 
 function receiptHeading(receipt: SpinReceipt) {
   if (receipt.status === "checkout") return "Confirming authorization";
@@ -240,8 +234,11 @@ export function PublicSpinPage() {
                     <span className="mt-2 block truncate text-sm font-medium text-content">
                       {wheel.name}
                     </span>
+                    {/* Price to enter and the ceiling, because the ceiling is
+                        what makes one wheel different from another. */}
                     <span className="block text-xs text-content-muted">
-                      {formatMoney(wheel.spinPriceCents)} a spin
+                      {formatMoney(wheel.spinPriceCents)} · up to{" "}
+                      {formatMoney(maxSpinAmountCents(wheel))}
                     </span>
                   </label>
                 );
@@ -249,10 +246,28 @@ export function PublicSpinPage() {
             </div>
           </fieldset>
         ) : null}
-        <p className="mt-6 text-sm text-content-muted">Maximum authorization</p>
-        <p className="mt-1 text-4xl font-semibold">{formatMoney(maximumTotalCents)}</p>
+        {/* The ceiling is the deal, so it is stated plainly and up front rather
+            than buried under the button. */}
+        <dl className="mt-6 divide-y divide-line border-y border-line">
+          <div className="flex items-baseline justify-between gap-4 py-3">
+            <dt className="text-sm text-content-muted">To spin</dt>
+            <dd className="text-lg font-semibold">
+              {formatMoney(totalWithServiceFee(chosen.spinPriceCents))}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 py-3">
+            <dt className="text-sm text-content-muted">Most you can pay</dt>
+            <dd className="text-3xl font-semibold">{formatMoney(maximumTotalCents)}</dd>
+          </div>
+        </dl>
         <p className="mt-3 text-sm leading-6 text-content-muted">
-          Your final charge is based on the live wheel result. Any unused hold is released.
+          Multipliers and bonus spins keep your run going, and what you owe climbs
+          with each one — never past{" "}
+          <span className="font-semibold text-content">
+            {formatMoney(maximumTotalCents)}
+          </span>
+          . We hold that much now and release whatever your run does not reach.
+          Service fee included; payments are handled by Stripe.
         </p>
 
         <form className="mt-8 grid gap-4" onSubmit={submit}>
@@ -280,7 +295,7 @@ export function PublicSpinPage() {
             disabled={submitting || !paymentsAvailable}
             type="submit"
           >
-            {submitting ? "Opening checkout" : `Authorize ${formatMoney(maximumTotalCents)}`}
+            {submitting ? "Opening checkout" : `Authorize up to ${formatMoney(maximumTotalCents)}`}
           </button>
         </form>
       </section>

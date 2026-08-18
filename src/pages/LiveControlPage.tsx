@@ -2,15 +2,13 @@ import {
   Check,
   Clipboard,
   ExternalLink,
-  LoaderCircle,
   Play,
   Radio,
-  Save,
+  ChevronDown,
 } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { type SpinAnimation } from "../components/SpinWheel";
-import { WheelThumbnail } from "../components/WheelThumbnail";
 import {
   OVERLAY_PARTS,
   OverlayGoalBar,
@@ -18,15 +16,14 @@ import {
   OverlayWheel,
 } from "../components/overlay/OverlayParts";
 import {
-  Badge,
   Button,
   ButtonLink,
   EmptyState,
   IconButton,
-  Input,
   StatusMessage,
 } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { formatMoney } from "../lib/money";
 import {
   createMockSpinEntry,
   heartbeatSpinSession,
@@ -57,20 +54,107 @@ import type {
   SpinState,
 } from "../lib/types";
 
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
+/**
+ * The Live page is the overlay. Rather than showing previews beside a separate
+ * set of controls, it renders the same three components the OBS browser sources
+ * render, from the same live data, and puts the only two things a streamer
+ * touches mid-stream directly on them: the spin button, and the goal.
+ *
+ * Everything else — overlay URLs, a test spin — is setup, so it lives behind a
+ * disclosure at the bottom instead of taking up the surface.
+ */
 
-const CHECKERBOARD = {
+/** Signals the transparent region OBS will key out. */
+const STAGE = {
   backgroundColor: "rgb(var(--surface))",
   backgroundImage:
     "linear-gradient(45deg, rgb(var(--surface-sunken)) 25%, transparent 25%), linear-gradient(-45deg, rgb(var(--surface-sunken)) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgb(var(--surface-sunken)) 75%), linear-gradient(-45deg, transparent 75%, rgb(var(--surface-sunken)) 75%)",
-  backgroundSize: "16px 16px",
-  backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
+  backgroundSize: "18px 18px",
+  backgroundPosition: "0 0, 0 9px, 9px -9px, -9px 0",
 } as const;
+
+/**
+ * The goal is the one number a streamer changes mid-stream, so the bar itself
+ * is the control: click it and type. The bar stays the unmodified overlay
+ * component so what is on screen here is exactly what is on stream.
+ */
+function LiveGoalBar({
+  config,
+  goal,
+  onSave,
+  state,
+}: {
+  config: SpinConfig;
+  goal: SpinGoal;
+  onSave: (goalCents: number) => Promise<void>;
+  state: SpinState | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  const open = () => {
+    setDraft(goal.goalCents ? String(goal.goalCents / 100) : "");
+    setEditing(true);
+  };
+
+  const commit = async () => {
+    const goalCents = Math.max(0, Math.round(Number(draft) * 100) || 0);
+    setSaving(true);
+    try {
+      await onSave(goalCents);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative w-full max-w-[600px]">
+      <button
+        aria-label="Edit the tribute goal"
+        className="block w-full rounded-3xl text-left transition-transform duration-fast ease-standard hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+        onClick={open}
+        type="button"
+      >
+        <OverlayGoalBar
+          config={config}
+          goalCents={goal.goalCents}
+          goalLabel={goal.label}
+          state={state}
+        />
+      </button>
+
+      {editing ? (
+        <div className="panel absolute left-1/2 top-full z-10 mt-2 flex w-64 -translate-x-1/2 items-center gap-2 p-2 shadow-lg">
+          <input
+            className="field h-10 flex-1"
+            inputMode="decimal"
+            min="0"
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void commit();
+              if (event.key === "Escape") setEditing(false);
+            }}
+            placeholder="Goal"
+            ref={inputRef}
+            step="1"
+            type="number"
+            value={draft}
+          />
+          <Button loading={saving} onClick={() => void commit()} variant="accent">
+            Set
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function LiveControlPage() {
   const { appUser, user } = useAuth();
@@ -86,10 +170,8 @@ export function LiveControlPage() {
     label: DEFAULT_GOAL_LABEL,
     goalCents: 0,
   });
-  const [savingGoal, setSavingGoal] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewerName, setViewerName] = useState("Test viewer");
   const [copiedPart, setCopiedPart] = useState<string | null>(null);
   const [wheels, setWheels] = useState<SpinConfig[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -129,10 +211,6 @@ export function LiveControlPage() {
     () => queue.filter((entry) => entry.status === "queued"),
     [queue],
   );
-  const completed = useMemo(
-    () => queue.filter((entry) => entry.status === "completed").slice(-5).reverse(),
-    [queue],
-  );
 
   if (!isCreator || !creatorId) {
     return (
@@ -143,7 +221,6 @@ export function LiveControlPage() {
   }
 
   const spinning = Boolean(state && state.lockedUntilMs > now);
-  const isLive = spinSessionIsLive(session, now);
   const manualLive = session?.manualLive === true;
   const animation: SpinAnimation | null =
     state?.spinId && state.selectedIndex !== null
@@ -167,8 +244,6 @@ export function LiveControlPage() {
     }
   };
 
-  const activeWheel = wheels.find((wheel) => wheel.id === activeId) ?? null;
-
   const toggleLive = () =>
     void run(async () => {
       if (manualLive) {
@@ -191,14 +266,6 @@ export function LiveControlPage() {
 
       await setSpinLiveStatus(creatorId, true);
     });
-
-  const addTestSpin = (event: FormEvent) => {
-    event.preventDefault();
-    void run(async () => {
-      await createMockSpinEntry(creatorId, viewerName);
-      setViewerName("");
-    });
-  };
 
   const copyOverlayUrl = (path: string) => {
     navigator.clipboard
@@ -233,16 +300,26 @@ export function LiveControlPage() {
     );
   }
 
+  // The stage follows the queue exactly as the overlay does: the wheel a spin
+  // ran on, then the next viewer's once it settles.
+  const shownWheelId = spinning
+    ? state?.wheelId
+    : (state?.nextWheelId ?? state?.wheelId);
+  const shownWheel = wheels.find((wheel) => wheel.id === shownWheelId) ?? config;
+  const nextUp = queued[0] ?? null;
+  const runOpen = state?.tabOpen === true && !spinning;
+
+  const spinBlockedReason = !manualLive
+    ? "Go live to open spins for your viewers."
+    : queued.length === 0
+      ? "Nobody is queued yet."
+      : null;
+
   return (
     <section className="page-shell">
       <header className="page-header border-b border-line">
         <div className="min-w-0">
           <h1 className="page-title">Live</h1>
-          <p className="page-subtitle">
-            {manualLive
-              ? "Your session is running. Spin each viewer as they come up."
-              : "Go live to open spins for your viewers."}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -282,220 +359,130 @@ export function LiveControlPage() {
         </div>
       </header>
 
-      {/* The viewer picks the wheel when they pay, so this reports what is
-          coming rather than offering a choice. */}
-      <section className="panel mt-5 flex items-center gap-4 p-5">
-        <WheelThumbnail className="w-20 shrink-0" slices={config.slices} />
-        <div className="min-w-0">
-          <p className="text-caption text-content-muted">
-            {queued.length ? "Next up" : "On the overlay"}
-          </p>
-          <p className="truncate text-title font-semibold text-content">{config.name}</p>
-          <p className="mt-0.5 text-caption text-content-muted">
-            Viewers choose their own wheel when they pay.{" "}
-            <Link className="font-medium text-accent hover:underline" to="/dashboard/spin">
-              Manage wheels
-            </Link>
-          </p>
-        </div>
-      </section>
-
       <StatusMessage className="mt-5" tone="error">{error}</StatusMessage>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.7fr)]">
-        <div className="grid min-w-0 content-start gap-6">
-          <section className="panel p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-title font-semibold text-content">Queue</h2>
-                <p className="mt-1 text-detail text-content-muted">Next up on stream</p>
-              </div>
-              <Badge tone={queued.length ? "accent" : "neutral"}>{queued.length}</Badge>
-            </div>
-
-            <div className="mt-4 min-h-28 divide-y divide-line border-y border-line">
-              {queued.length ? (
-                queued.map((entry, index) => (
-                  <div className="flex items-center justify-between gap-4 py-3" key={entry.id}>
-                    <div className="min-w-0">
-                      <p className="truncate text-body font-semibold text-content">
-                        {entry.viewerName}
-                      </p>
-                      {/* Which wheel they bought into matters once viewers
-                          pick their own. */}
-                      {entry.wheelName ? (
-                        <p className="truncate text-caption text-content-muted">
-                          {entry.wheelName}
-                        </p>
-                      ) : null}
-                      <p className="text-caption text-content-subtle">
-                        {entry.source === "bonus"
-                          ? "Bonus spin"
-                          : entry.source === "payment"
-                            ? entry.authorizedTotalCents > 0
-                              ? `Authorized ${formatMoney(entry.authorizedTotalCents)}`
-                              : `Paid ${formatMoney(entry.amountCents)}`
-                            : `Test ${formatMoney(entry.amountCents)}`}
-                      </p>
-                    </div>
-                    <span className="text-caption text-content-subtle">#{index + 1}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="py-9 text-center text-detail text-content-muted">
-                  Queue is empty
-                </p>
-              )}
-            </div>
-
-            <Button
-              block
-              className="mt-4"
-              disabled={spinning || queued.length === 0}
-              iconLeft={working ? undefined : <Play size={17} />}
-              loading={working}
-              onClick={() => void run(() => triggerNextSpin(creatorId))}
-              variant="accent"
-            >
-              {spinning ? "Spinning" : "Spin next"}
-            </Button>
-
-            <form className="mt-5 grid gap-2 border-t border-line pt-5 sm:grid-cols-[1fr_auto]" onSubmit={addTestSpin}>
-              <Input
-                label="Test viewer"
-                maxLength={40}
-                onChange={(event) => setViewerName(event.target.value)}
-                placeholder="Viewer name"
-                value={viewerName}
+      {/* The overlay itself, at working size. */}
+      <div
+        className="mt-5 rounded-panel border border-line p-5 sm:p-8"
+        style={STAGE}
+      >
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="flex min-w-0 flex-col items-center gap-6">
+            <div className="w-full max-w-[420px]">
+              <OverlayWheel
+                animation={animation}
+                config={shownWheel}
+                spinning={spinning}
+                state={state}
               />
-              <Button className="sm:mt-[26px]" loading={working} type="submit" variant="secondary">
-                Add test spin
-              </Button>
-            </form>
-
-            {completed.length ? (
-              <div className="mt-5 border-t border-line pt-5">
-                <h3 className="text-detail font-semibold text-content">Recent results</h3>
-                <div className="mt-2 divide-y divide-line">
-                  {completed.map((entry) => (
-                    <div className="flex justify-between gap-3 py-2 text-detail" key={entry.id}>
-                      <span className="truncate text-content-muted">{entry.viewerName}</span>
-                      <span className="font-semibold text-content">{entry.resultLabel}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="panel p-5">
-            <h2 className="text-title font-semibold text-content">Tribute goal</h2>
-            <p className="mt-1 text-detail text-content-muted">
-              Shared by every wheel. Counts everything your viewers send.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <Input
-                label="Goal"
-                min="0"
-                onChange={(event) =>
-                  setGoal({ ...goal, goalCents: Math.round(Number(event.target.value) * 100) })
-                }
-                placeholder="0"
-                prefix="$"
-                step="1"
-                type="number"
-                value={goal.goalCents ? goal.goalCents / 100 : ""}
-              />
-              <Button
-                className="sm:mt-[26px]"
-                iconLeft={<Save size={16} />}
-                loading={savingGoal}
-                onClick={() => {
-                  setSavingGoal(true);
-                  saveSpinGoal({ ...goal, creatorId, label: DEFAULT_GOAL_LABEL })
-                    .then(setGoal)
-                    .catch((caughtError) =>
-                      setError(
-                        caughtError instanceof Error
-                          ? caughtError.message
-                          : "Could not save the goal.",
-                      ),
-                    )
-                    .finally(() => setSavingGoal(false));
-                }}
-                variant="secondary"
-              >
-                Save
-              </Button>
             </div>
-          </section>
+            <LiveGoalBar
+              config={config}
+              goal={goal}
+              onSave={(goalCents) =>
+                saveSpinGoal({
+                  ...goal,
+                  creatorId,
+                  goalCents,
+                  label: DEFAULT_GOAL_LABEL,
+                }).then(setGoal)
+              }
+              state={state}
+            />
+          </div>
+          <div className="mx-auto w-full max-w-[320px] lg:mx-0">
+            <OverlayQueue config={config} entries={queued} />
+          </div>
         </div>
+      </div>
 
-        <aside className="grid min-w-0 content-start gap-4">
+      {/* The only action. */}
+      <div className="mt-6 grid justify-items-center gap-2">
+        <Button
+          className="min-w-56"
+          disabled={spinning || queued.length === 0 || !manualLive}
+          iconLeft={working ? undefined : <Play size={19} />}
+          loading={working}
+          onClick={() => void run(() => triggerNextSpin(creatorId))}
+          size="lg"
+          variant="accent"
+        >
+          {spinning ? "Spinning" : runOpen ? "Spin again" : "Spin"}
+        </Button>
+        <p className="text-detail text-content-muted">
+          {spinBlockedReason ??
+            (runOpen
+              ? `${state?.viewerName} is on ${formatMoney(state?.tabCents ?? 0)} and still going`
+              : nextUp
+                ? `${nextUp.viewerName}${nextUp.wheelName ? ` · ${nextUp.wheelName}` : ""}`
+                : null)}
+        </p>
+      </div>
+
+      {/* Setup, not stream controls. */}
+      <details className="group mt-8 border-t border-line pt-4">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-detail font-medium text-content-muted hover:text-content">
+          <ChevronDown
+            className="transition-transform duration-fast group-open:rotate-180"
+            size={15}
+          />
+          OBS sources
+        </summary>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
           {OVERLAY_PARTS.map((part) => {
             const path = `${overlayBase}/${part.id}`;
             return (
-              <section className="panel overflow-hidden p-4" key={part.id}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-detail font-semibold text-content">{part.label}</p>
-                    <p className="mt-0.5 text-caption text-content-subtle">{part.hint}</p>
-                  </div>
-                  <div className="flex shrink-0 gap-1.5">
-                    <Link
-                      aria-label={`Open ${part.label} overlay`}
-                      className="icon-button h-9 w-9"
-                      target="_blank"
-                      title="Open in a new tab"
-                      to={path}
-                    >
-                      <ExternalLink size={15} />
-                    </Link>
-                    <IconButton
-                      icon={copiedPart === path ? <Check size={15} /> : <Clipboard size={15} />}
-                      label={`Copy ${part.label} overlay URL`}
-                      onClick={() => copyOverlayUrl(path)}
-                      size="sm"
-                    />
-                  </div>
+              <div
+                className="flex items-center justify-between gap-2 rounded-card border border-line p-3"
+                key={part.id}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-detail font-semibold text-content">
+                    {part.label}
+                  </p>
+                  <p className="truncate text-caption text-content-subtle">
+                    {part.hint}
+                  </p>
                 </div>
-
-                <div
-                  className="mt-4 grid place-items-center rounded-card border border-line p-4"
-                  style={CHECKERBOARD}
-                >
-                  {part.id === "wheel" ? (
-                    <div className="w-full max-w-[210px]">
-                      <OverlayWheel
-                        animation={animation}
-                        config={config}
-                        spinning={spinning}
-                        state={state}
-                      />
-                    </div>
-                  ) : null}
-                  {part.id === "bar" ? (
-                    <OverlayGoalBar
-                      config={config}
-                      goalCents={goal.goalCents}
-                      goalLabel={goal.label}
-                      state={state}
-                    />
-                  ) : null}
-                  {part.id === "queue" ? (
-                    <OverlayQueue config={config} entries={queued} />
-                  ) : null}
+                <div className="flex shrink-0 gap-1">
+                  <Link
+                    aria-label={`Open the ${part.label} overlay`}
+                    className="icon-button h-8 w-8"
+                    target="_blank"
+                    title="Open in a new tab"
+                    to={path}
+                  >
+                    <ExternalLink size={14} />
+                  </Link>
+                  <IconButton
+                    icon={
+                      copiedPart === path ? <Check size={14} /> : <Clipboard size={14} />
+                    }
+                    label={`Copy the ${part.label} overlay URL`}
+                    onClick={() => copyOverlayUrl(path)}
+                    size="sm"
+                  />
                 </div>
-              </section>
+              </div>
             );
           })}
-          {!isLive ? (
-            <p className="text-caption text-content-subtle">
-              The overlay stays blank for viewers until you go live.
-            </p>
-          ) : null}
-        </aside>
-      </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Button
+            loading={working}
+            onClick={() =>
+              void run(() => createMockSpinEntry(creatorId, "Test viewer"))
+            }
+            size="sm"
+            variant="secondary"
+          >
+            Queue a test spin
+          </Button>
+          <p className="text-caption text-content-subtle">
+            Adds a fake viewer so you can check the sources land in your scene.
+          </p>
+        </div>
+      </details>
     </section>
   );
 }

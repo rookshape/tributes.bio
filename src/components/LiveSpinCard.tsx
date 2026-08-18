@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { maxSpinAmountCents, totalWithServiceFee } from "../lib/spin";
 import { derivePageTheme, glassPanelSurface } from "../lib/pageThemes";
+import { formatMoney } from "../lib/money";
 import type { CreatorProfile, SpinConfig } from "../lib/types";
 
 type LiveSpinCardProps = {
@@ -8,14 +9,6 @@ type LiveSpinCardProps = {
   preview?: boolean;
   profile: CreatorProfile;
 };
-
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
-}
 
 export function LiveSpinCard({ config, preview = false, profile }: LiveSpinCardProps) {
   const maximumTotalCents = totalWithServiceFee(maxSpinAmountCents(config));

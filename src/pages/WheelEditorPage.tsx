@@ -13,7 +13,13 @@ import {
   Tooltip,
 } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { spinSessionIsLive, subscribeSpinSession } from "../lib/spin";
+import { formatMoney } from "../lib/money";
+import {
+  MAX_MAX_CHARGE_CENTS,
+  largestSingleResultCents,
+  spinSessionIsLive,
+  subscribeSpinSession,
+} from "../lib/spin";
 import {
   activateWheel,
   getWheel,
@@ -110,6 +116,8 @@ export function WheelEditorPage() {
   // Editing the active wheel while live would change what viewers are paying
   // into mid-session, so the live copy is only refreshed when not live.
   const lockedByLiveSession = isActive && isLive;
+  // A cap under the biggest single slice would be hit on the very first spin.
+  const maxChargeFloor = largestSingleResultCents(wheel);
 
   const change = (changes: Partial<SpinConfig>) => {
     setWheel((current) => (current ? { ...current, ...changes } : current));
@@ -239,6 +247,22 @@ export function WheelEditorPage() {
             value={wheel.spinPriceCents / 100}
           />
           </div>
+          {/* The cap is the draw — "the $1k wheel" — so it sits next to the
+              price rather than buried in settings. */}
+          <div className="w-36 shrink-0">
+          <Input
+            label="Max charge"
+            max={MAX_MAX_CHARGE_CENTS / 100}
+            min={maxChargeFloor / 100}
+            onChange={(event) =>
+              change({ maxChargeCents: Math.round(Number(event.target.value) * 100) })
+            }
+            prefix="$"
+            step="1"
+            type="number"
+            value={wheel.maxChargeCents / 100}
+          />
+          </div>
           {isActive ? (
             <Badge className="mb-2.5" dot tone="positive">
               Active
@@ -265,6 +289,19 @@ export function WheelEditorPage() {
           until the session ends.
         </p>
       ) : null}
+
+      <p className="mt-5 text-detail text-content-muted">
+        Multipliers and bonus spins keep a run going, so a viewer pays{" "}
+        <span className="font-semibold text-content">
+          {formatMoney(wheel.spinPriceCents)}
+        </span>{" "}
+        to start and can reach{" "}
+        <span className="font-semibold text-content">
+          {formatMoney(wheel.maxChargeCents)}
+        </span>
+        . That ceiling is what they agree to before paying, and their run stops
+        there.
+      </p>
 
       <div className="panel mt-6 grid gap-4 p-5 sm:grid-cols-2">
         <Toggle

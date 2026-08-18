@@ -103,6 +103,13 @@ export type SpinConfig = {
   title: string;
   counterLabel: string;
   spinPriceCents: number;
+  /**
+   * Ceiling on what one viewer can be charged across a whole run, however far
+   * their multipliers and bonus spins carry them. This is the amount Stripe
+   * authorizes and the number the viewer agrees to before paying, so it is the
+   * headline of the wheel rather than fine print.
+   */
+  maxChargeCents: number;
   isEnabled: boolean;
   showOnProfile: boolean;
   mockModeEnabled: boolean;
@@ -124,6 +131,11 @@ export type SpinQueueEntry = {
   viewerName: string;
   amountCents: number;
   authorizedTotalCents: number;
+  /**
+   * What this viewer owes so far in the run they are currently on. Starts at
+   * the spin price and climbs until an amount slice ends the run.
+   */
+  tabCents: number;
   source: "mock" | "bonus" | "payment";
   /** The wheel this viewer paid to spin. Null on entries made before wheels
    *  were selectable. */
@@ -186,6 +198,13 @@ export type SpinState = {
   resultLabel: string | null;
   resultType: SpinSliceType | null;
   counterDeltaCents: number;
+  /** The spinning viewer's running tab, and the ceiling it stops at. */
+  tabCents: number;
+  /** What the tab read before this spin, so it can tick up on the result. */
+  tabBeforeCents: number;
+  tabMaxCents: number;
+  /** True while the run continues — a multiplier or bonus landed. */
+  tabOpen: boolean;
   startedAtMs: number;
   durationMs: number;
   lockedUntilMs: number;

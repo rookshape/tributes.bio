@@ -31,6 +31,49 @@ import type {
   SpinState,
 } from "./types";
 
+/**
+ * A run can chain — multipliers and bonus spins keep it going — so the amount a
+ * viewer ends up owing is not known when they pay. The wheel's max charge is
+ * what bounds it: Stripe authorizes exactly that, the viewer agrees to it up
+ * front, and the tab stops climbing there.
+ */
+export const MIN_MAX_CHARGE_CENTS = 100;
+export const MAX_MAX_CHARGE_CENTS = 500000;
+
+/** A new wheel caps out at five spins' worth unless the creator says otherwise. */
+export const DEFAULT_MAX_CHARGE_MULTIPLE = 5;
+
+/** The most a single slice can move the tab, used as the floor for the cap. */
+export function largestSingleResultCents(config: {
+  spinPriceCents: number;
+  slices: SpinSlice[];
+}) {
+  return config.slices.reduce((largest, slice) => {
+    if (slice.type === "amount") return Math.max(largest, slice.value);
+    if (slice.type === "multiplier") {
+      return Math.max(largest, config.spinPriceCents * Math.max(1, slice.value));
+    }
+    return largest;
+  }, config.spinPriceCents);
+}
+
+/**
+ * A cap below the biggest single result would be hit on the first spin, which
+ * would read as the wheel lying about its own slices.
+ */
+export function normalizeMaxChargeCents(config: {
+  spinPriceCents: number;
+  maxChargeCents?: number;
+  slices: SpinSlice[];
+}) {
+  const floor = largestSingleResultCents(config);
+  const requested = Number.isFinite(config.maxChargeCents)
+    ? Math.round(Number(config.maxChargeCents))
+    : config.spinPriceCents * DEFAULT_MAX_CHARGE_MULTIPLE;
+
+  return Math.min(MAX_MAX_CHARGE_CENTS, Math.max(floor, requested));
+}
+
 const defaultSlicesWithoutColor: Omit<SpinSlice, "color">[] = [
   { id: "five", label: "$5", type: "amount", value: 500, action: "" },
   { id: "double", label: "2x", type: "multiplier", value: 2, action: "" },
@@ -62,6 +105,7 @@ export function createDefaultSpinConfig(creatorId: string): SpinConfig {
     title: "Spin the wheel",
     counterLabel: "Tribute goal",
     spinPriceCents: 1000,
+    maxChargeCents: 1000 * DEFAULT_MAX_CHARGE_MULTIPLE,
     isEnabled: false,
     showOnProfile: true,
     mockModeEnabled: true,
@@ -117,6 +161,13 @@ export function validateSpinConfig(config: SpinConfig) {
     throw new Error("Spin price must be between $1 and $1,000.");
   }
 
+  if (
+    config.maxChargeCents < MIN_MAX_CHARGE_CENTS ||
+    config.maxChargeCents > MAX_MAX_CHARGE_CENTS
+  ) {
+    throw new Error("Max charge must be between $1 and $5,000.");
+  }
+
   if (config.slices.length < 4 || config.slices.length > 12) {
     throw new Error("Use between 4 and 12 wheel slices.");
   }
@@ -139,16 +190,30 @@ export function validateSpinConfig(config: SpinConfig) {
 
   if (
     slices.some(
-      (slice) =>
-        (slice.type === "amount" && (slice.value < 100 || slice.value > 100000)) ||
-        (slice.type === "multiplier" &&
-          (slice.value < 1 || config.spinPriceCents * slice.value > 100000)),
+      (slice) => slice.type === "amount" && (slice.value < 100 || slice.value > 100000),
     )
   ) {
-    throw new Error("Every paid result must be between $1 and $1,000.");
+    throw new Error("Every cash result must be between $1 and $1,000.");
   }
 
-  return { ...config, name, title, counterLabel, wheelHue, wheelTone, slices };
+  // Multipliers act on the running tab rather than the spin price, so what
+  // bounds them is the wheel's max charge, not a per-slice ceiling.
+  if (slices.some((slice) => slice.type === "multiplier" && (slice.value < 2 || slice.value > 10))) {
+    throw new Error("Multipliers must be between 2x and 10x.");
+  }
+
+  const maxChargeCents = normalizeMaxChargeCents({ ...config, slices });
+
+  return {
+    ...config,
+    name,
+    title,
+    counterLabel,
+    maxChargeCents,
+    wheelHue,
+    wheelTone,
+    slices,
+  };
 }
 
 function configRef(creatorId: string) {
@@ -183,13 +248,13 @@ export function spinResultAmountCents(slice: SpinSlice, baseAmountCents: number)
   return 0;
 }
 
+/**
+ * The most a viewer can owe on this wheel. A run chains, so this is the wheel's
+ * ceiling rather than its biggest slice — it is what Stripe authorizes and what
+ * the viewer agrees to before paying.
+ */
 export function maxSpinAmountCents(config: SpinConfig) {
-  return Math.max(
-    config.spinPriceCents,
-    ...config.slices.map((slice) =>
-      spinResultAmountCents(slice, config.spinPriceCents),
-    ),
-  );
+  return normalizeMaxChargeCents(config);
 }
 
 export function totalWithServiceFee(amountCents: number) {
@@ -233,6 +298,13 @@ function mapSpinConfig(
         ? data.counterLabel
         : defaults.counterLabel,
     spinPriceCents: Number(data.spinPriceCents ?? defaults.spinPriceCents),
+    // Wheels made before runs could chain carry no cap; derive one so they get
+    // the same ceiling a new wheel would.
+    maxChargeCents: normalizeMaxChargeCents({
+      spinPriceCents: Number(data.spinPriceCents ?? defaults.spinPriceCents),
+      maxChargeCents: Number(data.maxChargeCents),
+      slices,
+    }),
     isEnabled: Boolean(data.isEnabled),
     showOnProfile: data.showOnProfile !== false,
     mockModeEnabled: data.mockModeEnabled !== false,
@@ -263,6 +335,10 @@ function mapSpinState(creatorId: string, data: DocumentData | undefined): SpinSt
         ? data.resultType
         : null,
     counterDeltaCents: Number(data?.counterDeltaCents ?? 0),
+    tabCents: Number(data?.tabCents ?? 0),
+    tabBeforeCents: Number(data?.tabBeforeCents ?? 0),
+    tabMaxCents: Number(data?.tabMaxCents ?? 0),
+    tabOpen: data?.tabOpen === true,
     startedAtMs: Number(data?.startedAtMs ?? 0),
     durationMs: Number(data?.durationMs ?? 0),
     lockedUntilMs: Number(data?.lockedUntilMs ?? 0),
@@ -293,6 +369,9 @@ function mapQueueEntry(snapshot: QueryDocumentSnapshot<DocumentData>): SpinQueue
     viewerName: String(data.viewerName ?? "Viewer"),
     amountCents: Number(data.amountCents ?? 0),
     authorizedTotalCents: Number(data.authorizedTotalCents ?? 0),
+    // Entries queued before runs could chain have no tab yet; the spin price
+    // they paid is where one would have started.
+    tabCents: Number(data.tabCents ?? data.amountCents ?? 0),
     source:
       data.source === "bonus"
         ? "bonus"

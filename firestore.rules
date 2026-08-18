@@ -70,6 +70,7 @@ service cloud.firestore {
           'title',
           'counterLabel',
           'spinPriceCents',
+          'maxChargeCents',
           'isEnabled',
           'showOnProfile',
           'mockModeEnabled',
@@ -100,6 +101,12 @@ service cloud.firestore {
         && request.resource.data.spinPriceCents is int
         && request.resource.data.spinPriceCents >= 100
         && request.resource.data.spinPriceCents <= 100000
+        // The ceiling a run can reach. Older wheels predate it and merge
+        // through without one.
+        && (!('maxChargeCents' in request.resource.data)
+          || (request.resource.data.maxChargeCents is int
+            && request.resource.data.maxChargeCents >= 100
+            && request.resource.data.maxChargeCents <= 500000))
         && request.resource.data.isEnabled is bool
         && request.resource.data.showOnProfile is bool
         && request.resource.data.mockModeEnabled is bool

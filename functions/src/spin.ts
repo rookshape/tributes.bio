@@ -10,6 +10,7 @@ import {
 import {
   spinSessionIsLive,
 } from "./spin-session.js";
+import { applyTabStep, maxChargeCents } from "./spin-tab.js";
 
 type SpinSliceType = "amount" | "multiplier" | "bonus" | "action";
 
@@ -84,10 +85,11 @@ function parseConfig(data: FirebaseFirestore.DocumentData | undefined): SpinConf
       throw new HttpsError("failed-precondition", "The wheel configuration is invalid.");
     }
 
+    // Multipliers act on the running tab, so what bounds them is the wheel's
+    // max charge rather than a ceiling on any single slice.
     if (
       (slice.type === "amount" && (slice.value < 100 || slice.value > 100000)) ||
-      (slice.type === "multiplier" &&
-        (slice.value < 1 || data.spinPriceCents * slice.value > 100000))
+      (slice.type === "multiplier" && (slice.value < 1 || slice.value > 10))
     ) {
       throw new HttpsError("failed-precondition", "Spin results must be between $1 and $1,000.");
     }
@@ -105,21 +107,6 @@ function parseConfig(data: FirebaseFirestore.DocumentData | undefined): SpinConf
   };
 }
 
-function counterDelta(slice: SpinSlice, amountCents: number) {
-  if (slice.type === "amount") {
-    return Math.min(slice.value, 10000000);
-  }
-
-  if (slice.type === "multiplier") {
-    return Math.min(amountCents * Math.max(1, slice.value), 10000000);
-  }
-
-  if (slice.type === "action") {
-    return amountCents;
-  }
-
-  return 0;
-}
 
 export const setSpinLiveStatus = onCall(
   { secrets: [stripeSecret] },
@@ -280,6 +267,14 @@ export const createMockSpinEntry = onCall(async (request) => {
     transaction.create(entryRef, {
       viewerName: name,
       amountCents: config.spinPriceCents,
+      // A test run behaves like a paid one so the streamer sees the real tab.
+      tabCents: config.spinPriceCents,
+      tabMaxCents: maxChargeCents(
+        configSnapshot.data(),
+        config.spinPriceCents,
+        config.slices,
+      ),
+      runSpins: 0,
       source: "mock",
       wheelId: "current",
       wheelName: typeof config.name === "string" ? config.name : null,
@@ -317,6 +312,13 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
   let selectedResultAmountCents = 0;
   let selectedResultLabel = "";
   let selectedResultType: SpinSliceType = "action";
+  // Hoisted so the state written after a capture can still say which wheel ran
+  // and which one the overlay should settle on.
+  let selectedWheelId = "current";
+  let selectedNextWheelId = "current";
+  /** What the tab read before this spin, so the overlay holds the old number
+   *  through the animation and ticks up only when the result lands. */
+  let selectedTabBeforeCents = 0;
 
   await firestore.runTransaction(async (transaction) => {
     const [creatorSnapshot, configSnapshot, stateSnapshot, sessionSnapshot, queueSnapshot] =
@@ -391,7 +393,26 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
     const slice = config.slices[selectedIndex];
     const entry = queueEntry.data();
     const amountCents = Number(entry.amountCents ?? config.spinPriceCents);
-    const deltaCents = counterDelta(slice, amountCents);
+
+    // A run accumulates: the viewer owes the spin price the moment they pay,
+    // and multipliers and bonus slices keep the run going from there. The
+    // wheel's ceiling — the amount Stripe already authorized — bounds it.
+    const capCents = Math.max(
+      amountCents,
+      Number(entry.tabMaxCents ?? 0) ||
+        maxChargeCents(
+          entryWheelSnapshot.exists ? entryWheelSnapshot.data() : configSnapshot.data(),
+          config.spinPriceCents,
+          config.slices,
+        ),
+    );
+    const tabBeforeCents = Math.max(
+      0,
+      Math.min(capCents, Number(entry.tabCents ?? amountCents)),
+    );
+    const runSpins = Number(entry.runSpins ?? 0) + 1;
+    const step = applyTabStep(slice, tabBeforeCents, capCents, runSpins);
+    const deltaCents = step.tabCents;
     const paymentId = typeof entry.paymentId === "string" ? entry.paymentId : null;
     const requiresCapture = Boolean(
       paymentId &&
@@ -406,16 +427,25 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
     selectedResultAmountCents = deltaCents;
     selectedResultLabel = slice.label;
     selectedResultType = slice.type;
+    selectedWheelId = entryWheelId;
+    selectedTabBeforeCents = tabBeforeCents;
+    // A run that is still open keeps the overlay on the wheel it is running on.
+    selectedNextWheelId = step.continues ? entryWheelId : nextWheelId;
 
-    if (slice.type === "bonus") {
+    // The run keeps going — a multiplier or a bonus spin landed. Nothing is
+    // captured yet; the entry stays at the head of the queue so the same viewer
+    // spins again immediately rather than losing their open tab to the back of
+    // the line.
+    if (step.continues) {
       transaction.update(queueEntry.ref, {
         status: "queued",
         resultLabel: slice.label,
         selectedIndex: null,
         selectedSliceId: slice.id,
         capturePending: false,
-        createdAt: FieldValue.serverTimestamp(),
-        createdAtMs: now,
+        tabCents: step.tabCents,
+        tabMaxCents: capCents,
+        runSpins,
         updatedAt: FieldValue.serverTimestamp(),
       });
 
@@ -442,10 +472,17 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           spinId,
           queueEntryId: queueEntry.id,
           viewerName: String(entry.viewerName ?? "Viewer"),
+          wheelId: entryWheelId,
+          nextWheelId: entryWheelId,
           selectedIndex,
           resultLabel: slice.label,
           resultType: slice.type,
           counterDeltaCents: 0,
+          // The tab is on screen while the run is open, climbing with each spin.
+          tabBeforeCents,
+          tabCents: step.tabCents,
+          tabMaxCents: capCents,
+          tabOpen: true,
           startedAtMs: now,
           durationMs,
           lockedUntilMs: now + durationMs,
@@ -462,7 +499,12 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         selectedIndex,
         selectedSliceId: slice.id,
         resultLabel: slice.label,
+        // The run is over, so the whole tab is what gets captured — not just
+        // the slice that ended it.
         resultAmountCents: deltaCents,
+        tabCents: step.tabCents,
+        tabMaxCents: capCents,
+        runSpins,
         captureOperationId: spinId,
         capturePending: true,
         updatedAt: FieldValue.serverTimestamp(),
@@ -490,6 +532,10 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           spinId: null,
           queueEntryId: queueEntry.id,
           viewerName: String(entry.viewerName ?? "Viewer"),
+          // The overlay swaps to the wheel this viewer paid for as the spin
+          // starts, not after the capture returns.
+          wheelId: entryWheelId,
+          nextWheelId,
           selectedIndex: null,
           resultLabel: null,
           lockedUntilMs: now + 30000,
@@ -505,6 +551,9 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
       status: "completed",
       resultLabel: slice.label,
       selectedSliceId: slice.id,
+      tabCents: step.tabCents,
+      tabMaxCents: capCents,
+      runSpins,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -524,6 +573,11 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         resultLabel: slice.label,
         resultType: slice.type,
         counterDeltaCents: deltaCents,
+        // The run closed on this spin, so the tab is final.
+        tabBeforeCents,
+        tabCents: step.tabCents,
+        tabMaxCents: capCents,
+        tabOpen: false,
         startedAtMs: now,
         durationMs,
         lockedUntilMs: now + durationMs,
@@ -609,10 +663,17 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           spinId,
           queueEntryId: selectedEntryId,
           viewerName: String(entrySnapshot.data()?.viewerName ?? "Viewer"),
+          wheelId: selectedWheelId,
+          nextWheelId: selectedNextWheelId,
           selectedIndex,
           resultLabel: selectedResultLabel,
           resultType: selectedResultType,
           counterDeltaCents: selectedResultAmountCents,
+          // The captured tab is the run's final number.
+          tabBeforeCents: selectedTabBeforeCents,
+          tabCents: selectedResultAmountCents,
+          tabMaxCents: Number(entrySnapshot.data()?.tabMaxCents ?? 0),
+          tabOpen: false,
           startedAtMs: animationStartedAt,
           durationMs,
           lockedUntilMs: animationStartedAt + durationMs,

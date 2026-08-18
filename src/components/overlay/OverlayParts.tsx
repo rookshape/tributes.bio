@@ -5,6 +5,7 @@ import {
   wheelInk,
   type WheelAppearance,
 } from "../../lib/wheelPalette";
+import { formatMoney } from "../../lib/money";
 import type { SpinConfig, SpinQueueEntry, SpinState } from "../../lib/types";
 
 /**
@@ -26,14 +27,6 @@ function appearanceOf(config: SpinConfig): WheelAppearance {
   return { hue: config.wheelHue, tone: config.wheelTone };
 }
 
-export function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
-
 export function OverlayWheel({
   config,
   state,
@@ -46,6 +39,10 @@ export function OverlayWheel({
   spinning: boolean;
 }) {
   const appearance = appearanceOf(config);
+  // Mid-animation the state already holds the new tab, so show the value from
+  // before this spin until the wheel settles.
+  const tabCents = spinning ? (state?.tabBeforeCents ?? 0) : (state?.tabCents ?? 0);
+  const tabMaxCents = state?.tabMaxCents ?? 0;
 
   return (
     <div className="flex w-full flex-col items-center gap-3">
@@ -55,7 +52,7 @@ export function OverlayWheel({
       {/* Only shown once there is a viewer and a result — no idle caption. */}
       {state?.viewerName ? (
         <div
-          className="rounded-full border px-5 py-2 text-center backdrop-blur-md"
+          className="rounded-3xl border px-5 py-2.5 text-center backdrop-blur-md"
           style={{ ...wheelGlass(appearance), color: wheelInk(appearance) }}
         >
           <p className="text-sm font-medium opacity-70 lg:text-base">
@@ -64,6 +61,25 @@ export function OverlayWheel({
           <p className="text-xl font-bold leading-tight lg:text-3xl">
             {spinning ? "Spinning" : state.resultLabel}
           </p>
+          {/* The whole point of a run: what they owe climbing as it goes. The
+              tab holds its old value through the animation so the jump lands
+              with the result rather than spoiling it. */}
+          {tabCents > 0 ? (
+            <p className="mt-1 text-lg font-bold leading-none tabular-nums lg:text-2xl">
+              {formatMoney(tabCents)}
+              {tabMaxCents > 0 ? (
+                <span className="font-semibold opacity-50">
+                  {" "}
+                  / {formatMoney(tabMaxCents)}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+          {!spinning && state.tabOpen ? (
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-60 lg:text-sm">
+              Spins again
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

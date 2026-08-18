@@ -4,6 +4,7 @@ import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import Stripe from "stripe";
 import { spinSessionIsLive } from "./spin-session.js";
+import { maxChargeCents } from "./spin-tab.js";
 
 export const stripeSecret = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
@@ -118,26 +119,6 @@ function connectStatus(account: Stripe.Account): ConnectStatus {
   }
 
   return "needs_action";
-}
-
-function spinResultAmountCents(slice: SpinSlice, baseAmountCents: number) {
-  const value = Number(slice.value ?? 0);
-
-  if (slice.type === "amount") {
-    return Number.isInteger(value) ? Math.max(0, value) : 0;
-  }
-
-  if (slice.type === "multiplier") {
-    return Number.isInteger(value)
-      ? baseAmountCents * Math.max(1, value)
-      : baseAmountCents;
-  }
-
-  if (slice.type === "action") {
-    return baseAmountCents;
-  }
-
-  return 0;
 }
 
 function totalWithServiceFee(amountCents: number) {
@@ -558,15 +539,17 @@ export const createSpinCheckoutSession = onCall(
     }
 
     const slices = Array.isArray(config?.slices) ? (config.slices as SpinSlice[]) : [];
-    const maximumCreatorAmountCents = Math.max(
-      spinPriceCents,
-      ...slices.map((slice) => spinResultAmountCents(slice, spinPriceCents)),
-    );
 
-    if (maximumCreatorAmountCents < 100 || maximumCreatorAmountCents > 100000) {
+    // A run chains: multipliers and bonus spins keep it going, so the final
+    // amount is not known here. What we authorize is the wheel's ceiling, which
+    // is also the number the viewer agreed to on the spin page. The tab stops
+    // there, so the capture can never exceed this hold.
+    const maximumCreatorAmountCents = maxChargeCents(config, spinPriceCents, slices);
+
+    if (maximumCreatorAmountCents < 100 || maximumCreatorAmountCents > 500000) {
       throw new HttpsError(
         "failed-precondition",
-        "Spin results must be between $1 and $1,000.",
+        "The wheel's max charge is invalid.",
       );
     }
 
@@ -761,6 +744,11 @@ async function updatePaymentAndSpinQueue(
             : String(payment.senderName).slice(0, 40),
         amountCents: Number(payment.baseAmountCents ?? 0),
         authorizedTotalCents: Number(payment.authorizedTotalCents ?? 0),
+        // The run starts owing the spin price and climbs from there, bounded by
+        // the ceiling this authorization was taken against.
+        tabCents: Number(payment.baseAmountCents ?? 0),
+        tabMaxCents: Number(payment.maximumCreatorAmountCents ?? 0),
+        runSpins: 0,
         source: "payment",
         wheelId: typeof payment.wheelId === "string" ? payment.wheelId : "current",
         wheelName: typeof payment.wheelName === "string" ? payment.wheelName : null,
