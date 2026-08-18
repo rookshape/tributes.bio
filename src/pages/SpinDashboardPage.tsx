@@ -179,7 +179,7 @@ export function SpinDashboardPage() {
   if (!isCreator) {
     return (
       <section className="mx-auto max-w-2xl px-5 py-14">
-        <h1 className="text-2xl font-semibold">Spin is for creator accounts</h1>
+        <h1 className="text-2xl font-semibold">The wheel is for creator accounts</h1>
       </section>
     );
   }
@@ -361,7 +361,7 @@ export function SpinDashboardPage() {
   return (
     <main className="page-shell">
       <header className="page-header">
-        <h1 className="page-title">Spin</h1>
+        <h1 className="page-title">Wheel</h1>
         <div className="flex items-center gap-2">
           <Link
             aria-label="Open viewer page"

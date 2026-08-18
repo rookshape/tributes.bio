@@ -11,7 +11,7 @@ import { useAuth } from "../context/AuthContext";
 
 const creatorLinks = [
   { label: "Page", path: "/dashboard", icon: PanelsTopLeft, end: true },
-  { label: "Spin", path: "/dashboard/spin", icon: Disc3, end: false },
+  { label: "Wheel", path: "/dashboard/spin", icon: Disc3, end: false },
   { label: "Analytics", path: "/dashboard/analytics", icon: BarChart3, end: false },
   { label: "Payments", path: "/dashboard/payments", icon: WalletCards, end: false },
   { label: "Settings", path: "/dashboard/settings", icon: Settings, end: false },
