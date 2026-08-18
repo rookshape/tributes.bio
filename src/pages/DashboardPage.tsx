@@ -19,6 +19,7 @@ import {
 import { Link } from "react-router-dom";
 import { BioPageView } from "../components/BioPageView";
 import { LiveSpinCard } from "../components/LiveSpinCard";
+import { SetupChecklist } from "../components/SetupChecklist";
 import { useAuth } from "../context/AuthContext";
 import {
   createCreatorLink,
@@ -402,6 +403,15 @@ export function DashboardPage() {
           {error}
         </div>
       ) : null}
+
+      <div className="mt-6">
+        <SetupChecklist
+          creatorId={profile.id}
+          links={links}
+          profile={profile}
+          spinEnabled={Boolean(spinConfig?.isEnabled)}
+        />
+      </div>
 
       {/* Below lg the editor and preview stack, so both are capped and centred
           rather than stretching across a narrow viewport. */}
