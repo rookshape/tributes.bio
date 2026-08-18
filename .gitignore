@@ -19,3 +19,6 @@ ui-debug.log
 
 *.local
 *.log
+
+# Local source material for design work, not shipped
+design-assets/

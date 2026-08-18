@@ -5,7 +5,7 @@ export default [
   { ignores: ["dist"] },
   {
     ...js.configs.recommended,
-    files: ["*.js", "*.config.js"],
+    files: ["*.js", "*.cjs", "*.config.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
