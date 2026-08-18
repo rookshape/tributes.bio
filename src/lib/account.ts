@@ -26,6 +26,8 @@ const reservedUsernames = new Set([
   "settings",
   "signup",
   "support",
+  "terms",
+  "privacy",
 ]);
 
 export function normalizeUsername(value: string) {

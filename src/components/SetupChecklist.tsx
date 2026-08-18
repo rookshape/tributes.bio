@@ -12,28 +12,27 @@ type ChecklistItem = {
   title: string;
   description: string;
   done: boolean;
-  /** Where the creator goes to finish it. Omitted for self-marked steps. */
-  to?: string;
+  /** Where the creator goes to finish it. */
+  to: string;
   action: string;
-  onAction?: () => void;
 };
 
 /**
- * Dismissal and the OBS step live in localStorage rather than Firestore: they
- * are a UI nudge, not creator work, and keeping them local avoids widening the
- * user document's write rules for something this small.
+ * Dismissal lives in localStorage rather than Firestore: it is a UI nudge, not
+ * creator work, and keeping it local avoids widening the user document's write
+ * rules for something this small.
  */
 const STORAGE_KEY = "tributes.setupChecklist";
 
-type LocalState = { dismissed: boolean; obsAdded: boolean };
+type LocalState = { dismissed: boolean };
 
 function readLocal(): LocalState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<LocalState>) : {};
-    return { dismissed: Boolean(parsed.dismissed), obsAdded: Boolean(parsed.obsAdded) };
+    return { dismissed: Boolean(parsed.dismissed) };
   } catch {
-    return { dismissed: false, obsAdded: false };
+    return { dismissed: false };
   }
 }
 
@@ -123,20 +122,8 @@ export function SetupChecklist({
         to: "/dashboard/settings",
         action: "Connect",
       },
-      {
-        id: "obs",
-        title: "Add the OBS overlay",
-        description: "Copy the browser source URLs into your scene.",
-        done: local.obsAdded,
-        action: local.obsAdded ? "Undo" : "Mark done",
-        onAction: () => {
-          const next = { ...local, obsAdded: !local.obsAdded };
-          setLocal(next);
-          writeLocal(next);
-        },
-      },
     ];
-  }, [links.length, local, profile.appearance, spinEnabled, stripeReady, twitchReady]);
+  }, [links.length, profile.appearance, spinEnabled, stripeReady, twitchReady]);
 
   const complete = items.filter((item) => item.done).length;
 
@@ -189,15 +176,7 @@ export function SetupChecklist({
                   {item.title}
                 </span>
 
-                {item.onAction ? (
-                  <button
-                    className="shrink-0 text-caption font-medium text-accent hover:underline"
-                    onClick={item.onAction}
-                    type="button"
-                  >
-                    {item.action}
-                  </button>
-                ) : !item.done && item.to ? (
+                {!item.done ? (
                   <Link
                     className="flex shrink-0 items-center gap-0.5 text-caption font-medium text-accent hover:underline"
                     to={item.to}

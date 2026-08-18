@@ -45,26 +45,26 @@ function ReceiptView({ receipt }: { receipt: SpinReceipt | null }) {
 
   return (
     <div className="w-full max-w-md text-center">
-      <p className="text-sm font-semibold text-zinc-500">@{receipt.creatorUsername}</p>
+      <p className="text-sm font-semibold text-content-muted">@{receipt.creatorUsername}</p>
       <h1 className="mt-3 text-3xl font-semibold">{receiptHeading(receipt)}</h1>
       {receipt.status === "queued" || receipt.status === "authorized" ? (
-        <p className="mt-4 text-sm leading-6 text-zinc-500">Watch the stream for your spin.</p>
+        <p className="mt-4 text-sm leading-6 text-content-muted">Watch the stream for your spin.</p>
       ) : null}
       {receipt.status === "bonus" ? (
-        <p className="mt-4 text-sm leading-6 text-zinc-500">You have been added back to the queue.</p>
+        <p className="mt-4 text-sm leading-6 text-content-muted">You have been added back to the queue.</p>
       ) : null}
       {receipt.status === "completed" && receipt.totalCents !== null ? (
-        <div className="mt-7 border-y border-sky/70 py-5">
-          <p className="text-sm text-zinc-500">Final charge</p>
+        <div className="mt-7 border-y border-line py-5">
+          <p className="text-sm text-content-muted">Final charge</p>
           <p className="mt-1 text-4xl font-semibold">{formatMoney(receipt.totalCents)}</p>
           {receipt.creatorAmountCents !== null ? (
-            <p className="mt-2 text-xs text-zinc-400">
+            <p className="mt-2 text-xs text-content-subtle">
               {formatMoney(receipt.creatorAmountCents)} result plus service fee
             </p>
           ) : null}
         </div>
       ) : null}
-      <Link className="mt-7 inline-block text-sm font-semibold text-ink underline decoration-zinc-300 underline-offset-4" to={`/${receipt.creatorUsername}`}>
+      <Link className="mt-7 inline-block text-sm font-semibold text-content underline decoration-line-strong underline-offset-4" to={`/${receipt.creatorUsername}`}>
         Back to profile
       </Link>
     </div>
@@ -175,27 +175,27 @@ export function PublicSpinPage() {
 
   if (receiptId) {
     return (
-      <main className="grid min-h-screen place-items-center bg-paper px-5 text-ink">
-        <div className="glass-panel w-full max-w-md p-8"><ReceiptView receipt={receipt} /></div>
+      <main className="grid min-h-screen place-items-center bg-canvas px-5 text-content">
+        <div className="panel w-full max-w-md p-8"><ReceiptView receipt={receipt} /></div>
       </main>
     );
   }
 
   if (loading || !sessionLoaded || !creator || !config || !live) {
-    return <main className="min-h-screen bg-paper" />;
+    return <main className="min-h-screen bg-canvas" />;
   }
 
   const maximumCreatorCents = maxSpinAmountCents(config);
   const maximumTotalCents = totalWithServiceFee(maximumCreatorCents);
 
   return (
-    <main className="grid min-h-screen place-items-center bg-paper px-5 py-10 text-ink">
-      <section className="glass-panel w-full max-w-md p-6 sm:p-8">
-        <p className="text-sm font-semibold text-zinc-500">@{creator.username}</p>
+    <main className="grid min-h-screen place-items-center bg-canvas px-5 py-10 text-content">
+      <section className="panel w-full max-w-md p-6 sm:p-8">
+        <p className="text-sm font-semibold text-content-muted">@{creator.username}</p>
         <h1 className="mt-2 text-3xl font-semibold">Join the spin queue</h1>
-        <p className="mt-6 text-sm text-zinc-500">Maximum authorization</p>
+        <p className="mt-6 text-sm text-content-muted">Maximum authorization</p>
         <p className="mt-1 text-4xl font-semibold">{formatMoney(maximumTotalCents)}</p>
-        <p className="mt-3 text-sm leading-6 text-zinc-500">
+        <p className="mt-3 text-sm leading-6 text-content-muted">
           Your final charge is based on the live wheel result. Any unused hold is released.
         </p>
 
@@ -211,13 +211,13 @@ export function PublicSpinPage() {
               value={viewerName}
             />
           </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-600">
+          <label className="flex items-center gap-2 text-sm text-content-muted">
             <input checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} type="checkbox" />
             Join anonymously
           </label>
           {error ? <p className="status-error">{error}</p> : null}
           {!paymentsAvailable ? (
-            <p className="text-sm text-zinc-500">Spin payments are unavailable.</p>
+            <p className="text-sm text-content-muted">Spin payments are unavailable.</p>
           ) : null}
           <button
             className="primary-button h-12 w-full"

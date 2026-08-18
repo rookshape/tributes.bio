@@ -82,10 +82,10 @@ function PersonalDashboard() {
   return (
     <section className="page-shell max-w-3xl">
       <p className="eyebrow">Personal account</p>
-      <h1 className="mt-2 text-3xl font-semibold text-ink">
+      <h1 className="mt-2 text-3xl font-semibold text-content">
         {appUser?.displayName ?? appUser?.email ?? "Account"}
       </h1>
-      <p className="mt-4 text-zinc-500">
+      <p className="mt-4 text-content-muted">
         Payment history will appear here after tips launch.
       </p>
     </section>

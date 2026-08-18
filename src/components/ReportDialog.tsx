@@ -44,9 +44,9 @@ export function ReportDialog({ links, onClose, profile }: ReportDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/25 px-4 backdrop-blur-md" role="presentation">
-      <section aria-labelledby="report-title" aria-modal="true" className="glass-panel w-full max-w-md p-5 text-left text-ink" role="dialog">
-        <div className="flex items-center justify-between gap-4 border-b border-sky/60 pb-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-md" role="presentation">
+      <section aria-labelledby="report-title" aria-modal="true" className="panel w-full max-w-md p-5 text-left text-content" role="dialog">
+        <div className="flex items-center justify-between gap-4 border-b border-line pb-4">
           <h2 className="flex items-center gap-2 font-semibold" id="report-title"><Flag size={17} /> Report content</h2>
           <button aria-label="Close report" className="icon-button h-9 w-9" onClick={onClose} title="Close" type="button"><X size={18} /></button>
         </div>
@@ -81,7 +81,7 @@ export function ReportDialog({ links, onClose, profile }: ReportDialogProps) {
               <textarea className={`${fieldClass} min-h-24 resize-y`} maxLength={500} onChange={(event) => setDetails(event.target.value)} value={details} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Email <span className="font-normal text-zinc-500">Optional</span>
+              Email <span className="font-normal text-content-muted">Optional</span>
               <input className={fieldClass} onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
             </label>
             {error ? <p className="status-error">{error}</p> : null}

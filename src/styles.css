@@ -348,25 +348,6 @@ select:focus-visible,
     @apply overflow-x-auto rounded-card border border-line bg-surface;
   }
 
-  /* --- Migration aliases -------------------------------------------------
-     Un-ported pages still reference these. Delete each alias once its pages
-     move to the classes above. */
-
-  .glass-panel {
-    @apply panel;
-  }
-
-  .soft-panel {
-    @apply panel-flat;
-  }
-
-  .glass-bar {
-    @apply app-bar;
-  }
-
-  .liquid-divider {
-    @apply border-line;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

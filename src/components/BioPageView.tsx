@@ -1,4 +1,4 @@
-import { Check, Share2 } from "lucide-react";
+import { Check, SquareArrowOutUpRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import type { CreatorLink, CreatorProfile } from "../lib/types";
 import { derivePageTheme, glassSurface } from "../lib/pageThemes";
@@ -60,9 +60,34 @@ export function BioPageView({
   // min-h-full covers fixed-height parents (the dashboard preview window).
   return (
     <div
-      className="flex min-h-full w-full flex-1 flex-col px-5 py-10 sm:px-6"
+      className="relative flex min-h-full w-full flex-1 flex-col px-5 py-10 sm:px-6"
       style={{ background: theme.background, color: theme.text }}
     >
+      {!preview ? (
+        <div className="absolute right-4 top-4 z-10 flex flex-col items-end gap-2">
+          <button
+            aria-label="Share this page"
+            className="grid h-10 w-10 place-items-center rounded-full border backdrop-blur-md"
+            onClick={share}
+            style={linkStyle}
+            title="Share this page"
+            type="button"
+          >
+            {shared ? <Check size={16} /> : <SquareArrowOutUpRight size={16} />}
+          </button>
+          {showUrl ? (
+            <input
+              aria-label="Your page link"
+              className="w-56 rounded-full border px-3 py-1.5 text-center text-xs backdrop-blur-md"
+              onFocus={(event) => event.target.select()}
+              readOnly
+              style={linkStyle}
+              value={pageUrl}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col text-center">
         {profile.photoURL ? (
           <img
@@ -110,42 +135,26 @@ export function BioPageView({
           ))}
         </div>
 
-        {/* Sharing sits with the creator's identity, not buried in the footer. */}
-        {!preview ? (
-          <div className="mt-5">
-            <button
-              className="mx-auto flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur-md"
-              onClick={share}
-              style={linkStyle}
-              type="button"
-            >
-              {shared ? <Check size={15} /> : <Share2 size={15} />}
-              {shared ? "Link copied" : "Share"}
-            </button>
-
-            {showUrl ? (
-              <input
-                aria-label="Your page link"
-                className="mx-auto mt-2 w-full max-w-xs rounded-full border px-4 py-2 text-center text-sm backdrop-blur-md"
-                onFocus={(event) => event.target.select()}
-                readOnly
-                style={linkStyle}
-                value={pageUrl}
-              />
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="mt-auto flex items-center justify-center gap-4 pt-10 text-xs font-semibold opacity-55">
+        <div className="mt-auto flex flex-col items-center gap-3 pt-10">
           <a
+            className="rounded-full border px-4 py-1.5 text-xs font-semibold backdrop-blur-md"
             href={preview ? undefined : "/"}
+            style={linkStyle}
             onClick={preview ? (event) => event.preventDefault() : undefined}
           >
             tributes.bio
           </a>
-          {!preview && onReport ? (
-            <button onClick={onReport} type="button">Report</button>
-          ) : null}
+          <div className="flex items-center gap-4 text-xs font-medium opacity-55">
+            <a
+              href={preview ? undefined : "/terms"}
+              onClick={preview ? (event) => event.preventDefault() : undefined}
+            >
+              Terms of Service
+            </a>
+            {!preview && onReport ? (
+              <button onClick={onReport} type="button">Report</button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

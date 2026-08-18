@@ -405,15 +405,15 @@ export function SpinDashboardPage() {
       {error ? <p className="status-error mt-5">{error}</p> : null}
 
       <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
-        <section className="glass-panel min-w-0 p-4 sm:p-6">
+        <section className="panel min-w-0 p-4 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold">Wheel</h2>
-              <p className="mt-1 text-sm text-zinc-500">Select a slice to edit it.</p>
+              <p className="mt-1 text-sm text-content-muted">Select a slice to edit it.</p>
             </div>
             <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
               <span>{config.isEnabled ? "Enabled" : "Disabled"}</span>
-              <span className="relative h-7 w-12 rounded-full bg-zinc-200 transition has-[:checked]:bg-tribute">
+              <span className="relative h-7 w-12 rounded-full bg-surface-sunken transition has-[:checked]:bg-accent">
                 <input
                   checked={config.isEnabled}
                   className="peer sr-only"
@@ -434,14 +434,14 @@ export function SpinDashboardPage() {
             />
 
             {selectedSlice ? (
-              <div className="soft-panel p-4">
+              <div className="panel-flat p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <SlidersHorizontal size={16} /> Slice
                   </div>
                   <button
                     aria-label={`Delete ${selectedSlice.label}`}
-                    className="icon-button h-9 w-9 text-zinc-500 hover:text-red-600"
+                    className="icon-button h-9 w-9 text-content-muted hover:text-red-600"
                     onClick={() => removeSlice(selectedSlice.id)}
                     title="Delete slice"
                     type="button"
@@ -553,7 +553,7 @@ export function SpinDashboardPage() {
             <label className="grid gap-1.5 text-sm font-medium">
               Price
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-content-muted">$</span>
                 <input className={`${fieldClass} pl-7`} min="1" onChange={(event) => changeConfig({ spinPriceCents: Math.round(Number(event.target.value) * 100) })} step="1" type="number" value={config.spinPriceCents / 100} />
               </div>
             </label>
@@ -570,7 +570,7 @@ export function SpinDashboardPage() {
           {OVERLAY_PARTS.map((overlayPart) => {
             const path = `${overlayPath}/${overlayPart.id}`;
             return (
-              <section className="glass-panel overflow-hidden p-4 sm:p-5" key={overlayPart.id}>
+              <section className="panel overflow-hidden p-4 sm:p-5" key={overlayPart.id}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">{overlayPart.label}</p>
@@ -636,7 +636,7 @@ export function SpinDashboardPage() {
           })}
 
           {/* The goal is creator-level: every wheel counts towards the same one. */}
-          <section className="glass-panel p-4 sm:p-5">
+          <section className="panel p-4 sm:p-5">
             <h2 className="text-sm font-semibold">Tribute goal</h2>
             <p className="mt-0.5 text-xs text-content-subtle">
               Shared by every wheel. Counts everything your viewers send.
@@ -688,25 +688,25 @@ export function SpinDashboardPage() {
         </aside>
       </div>
 
-      <section className="glass-panel mt-6 grid min-w-0 gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.4fr)]">
+      <section className="panel mt-6 grid min-w-0 gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.4fr)]">
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Queue</h2>
-              <p className="mt-1 text-sm text-zinc-500">Next up on stream</p>
+              <p className="mt-1 text-sm text-content-muted">Next up on stream</p>
             </div>
-            <span className="grid h-8 min-w-8 place-items-center rounded-full bg-mist px-2 text-sm font-semibold text-tribute">{queuedEntries.length}</span>
+            <span className="grid h-8 min-w-8 place-items-center rounded-full bg-surface-raised px-2 text-sm font-semibold text-accent">{queuedEntries.length}</span>
           </div>
           <div className="mt-4 min-h-32 divide-y divide-white/80 border-y border-white/80">
             {queuedEntries.length ? queuedEntries.map((entry, index) => (
               <div className="flex items-center justify-between gap-4 py-3 text-sm" key={entry.id}>
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{entry.viewerName}</p>
-                  <p className="text-xs text-zinc-500">{entry.source === "bonus" ? "Bonus spin" : entry.source === "payment" ? entry.authorizedTotalCents > 0 ? `Authorized ${formatMoney(entry.authorizedTotalCents)}` : `Paid ${formatMoney(entry.amountCents)}` : `Test ${formatMoney(entry.amountCents)}`}</p>
+                  <p className="text-xs text-content-muted">{entry.source === "bonus" ? "Bonus spin" : entry.source === "payment" ? entry.authorizedTotalCents > 0 ? `Authorized ${formatMoney(entry.authorizedTotalCents)}` : `Paid ${formatMoney(entry.amountCents)}` : `Test ${formatMoney(entry.amountCents)}`}</p>
                 </div>
-                <span className="text-xs text-zinc-400">#{index + 1}</span>
+                <span className="text-xs text-content-subtle">#{index + 1}</span>
               </div>
-            )) : <p className="py-10 text-center text-sm text-zinc-500">Queue is empty</p>}
+            )) : <p className="py-10 text-center text-sm text-content-muted">Queue is empty</p>}
           </div>
           <button className="blue-button mt-4 w-full" disabled={working || spinning || queuedEntries.length === 0} onClick={trigger} type="button">
             {working ? <LoaderCircle className="animate-spin" size={17} /> : <Play size={17} />}
@@ -729,7 +729,7 @@ export function SpinDashboardPage() {
               <div className="mt-2 divide-y divide-white/80">
                 {completedEntries.map((entry) => (
                   <div className="flex justify-between gap-3 py-2 text-sm" key={entry.id}>
-                    <span className="truncate text-zinc-600">{entry.viewerName}</span>
+                    <span className="truncate text-content-muted">{entry.viewerName}</span>
                     <span className="font-semibold">{entry.resultLabel}</span>
                   </div>
                 ))}

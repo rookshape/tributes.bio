@@ -255,7 +255,7 @@ export function SettingsPage() {
 
   return (
     <section className="page-shell max-w-3xl">
-      <div className="page-header border-b liquid-divider">
+      <div className="page-header border-b border-line">
         <div>
         <h1 className="page-title">Settings</h1>
         <p className="page-subtitle">Account and notifications</p>
@@ -273,15 +273,15 @@ export function SettingsPage() {
         </div>
       ) : null}
 
-      <section className="glass-panel mt-6 p-5 sm:p-6">
+      <section className="panel mt-6 p-5 sm:p-6">
         <h2 className="font-semibold">Account</h2>
         <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-zinc-500">Email</dt>
+            <dt className="text-content-muted">Email</dt>
             <dd className="mt-1 break-all font-medium">{appUser?.email}</dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Account type</dt>
+            <dt className="text-content-muted">Account type</dt>
             <dd className="mt-1 font-medium capitalize">
               {appUser?.accountType}
             </dd>
@@ -310,12 +310,12 @@ export function SettingsPage() {
       </section>
 
       {appUser?.accountType === "creator" ? (
-        <section className="glass-panel mt-4 p-5 sm:p-6">
+        <section className="panel mt-4 p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <CreditCard size={18} />
             <h2 className="font-semibold">Payouts</h2>
           </div>
-          <p className="mt-2 text-sm text-zinc-500">
+          <p className="mt-2 text-sm text-content-muted">
             {connectStatus === "active"
               ? "Ready to receive tributes."
               : connectStatus === "pending"
@@ -346,7 +346,7 @@ export function SettingsPage() {
       ) : null}
 
       {appUser?.accountType === "creator" ? (
-        <section className="glass-panel mt-4 p-5 sm:p-6">
+        <section className="panel mt-4 p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <RadioTower size={18} />
             <h2 className="font-semibold">Twitch</h2>
@@ -366,13 +366,13 @@ export function SettingsPage() {
                   <p className="truncate text-sm font-semibold">
                     {twitchConnection.broadcasterDisplayName}
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-content-muted">
                     {twitchConnection.isLive ? "Live on Twitch" : "Connected"}
                   </p>
                 </div>
               </div>
 
-              <p className="mt-3 text-xs text-zinc-500">
+              <p className="mt-3 text-xs text-content-muted">
                 {twitchConnection.subscriptions["stream.online"]?.status === "enabled" &&
                 twitchConnection.subscriptions["stream.offline"]?.status === "enabled"
                   ? "Stream events ready"
@@ -382,17 +382,17 @@ export function SettingsPage() {
                   : " | Bits events pending"}
               </p>
 
-              <div className="soft-panel mt-5 grid gap-4 p-4">
+              <div className="panel-flat mt-5 grid gap-4 p-4">
                 <label className="flex items-start justify-between gap-5">
                   <span>
                     <span className="block text-sm font-medium">Sync live status</span>
-                    <span className="mt-1 block text-sm text-zinc-500">
+                    <span className="mt-1 block text-sm text-content-muted">
                       Open and close Spin with your Twitch stream
                     </span>
                   </span>
                   <input
                     checked={twitchSettings.autoLiveEnabled}
-                    className="mt-1 h-4 w-4 shrink-0 accent-tribute"
+                    className="mt-1 h-4 w-4 shrink-0 accent-accent"
                     onChange={(event) =>
                       setTwitchSettings({
                         ...twitchSettings,
@@ -402,16 +402,16 @@ export function SettingsPage() {
                     type="checkbox"
                   />
                 </label>
-                <label className="flex items-start justify-between gap-5 border-t border-sky/50 pt-4">
+                <label className="flex items-start justify-between gap-5 border-t border-line pt-4">
                   <span>
                     <span className="block text-sm font-medium">Add Bits to counter</span>
-                    <span className="mt-1 block text-sm text-zinc-500">
+                    <span className="mt-1 block text-sm text-content-muted">
                       Count one cent per Bit
                     </span>
                   </span>
                   <input
                     checked={twitchSettings.bitsCounterEnabled}
-                    className="mt-1 h-4 w-4 shrink-0 accent-tribute"
+                    className="mt-1 h-4 w-4 shrink-0 accent-accent"
                     onChange={(event) =>
                       setTwitchSettings({
                         ...twitchSettings,
@@ -421,16 +421,16 @@ export function SettingsPage() {
                     type="checkbox"
                   />
                 </label>
-                <label className="flex items-start justify-between gap-5 border-t border-sky/50 pt-4">
+                <label className="flex items-start justify-between gap-5 border-t border-line pt-4">
                   <span>
                     <span className="block text-sm font-medium">Show Bits alerts</span>
-                    <span className="mt-1 block text-sm text-zinc-500">
+                    <span className="mt-1 block text-sm text-content-muted">
                       Show the name and Bits amount on the overlay
                     </span>
                   </span>
                   <input
                     checked={twitchSettings.showBitsAlerts}
-                    className="mt-1 h-4 w-4 shrink-0 accent-tribute"
+                    className="mt-1 h-4 w-4 shrink-0 accent-accent"
                     onChange={(event) =>
                       setTwitchSettings({
                         ...twitchSettings,
@@ -463,7 +463,7 @@ export function SettingsPage() {
             </>
           ) : (
             <>
-              <p className="mt-2 text-sm text-zinc-500">
+              <p className="mt-2 text-sm text-content-muted">
                 {twitchConnection?.status === "reconnect_required"
                   ? "Reconnect Twitch to resume stream events."
                   : "Connect your channel for live status and Bits."}
@@ -488,22 +488,22 @@ export function SettingsPage() {
         </section>
       ) : null}
 
-      <section className="glass-panel mt-4 p-5 sm:p-6">
+      <section className="panel mt-4 p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Mail size={18} />
           <h2 className="font-semibold">Email notifications</h2>
         </div>
-        <div className="soft-panel mt-5 grid gap-4 p-4">
+        <div className="panel-flat mt-5 grid gap-4 p-4">
           <label className="flex items-start justify-between gap-5">
             <span>
               <span className="block text-sm font-medium">Payment activity</span>
-              <span className="mt-1 block text-sm text-zinc-500">
+              <span className="mt-1 block text-sm text-content-muted">
                 Tips, refunds, disputes, and payout updates
               </span>
             </span>
             <input
               checked={preferences.paymentActivity}
-              className="mt-1 h-4 w-4 shrink-0 accent-tribute"
+              className="mt-1 h-4 w-4 shrink-0 accent-accent"
               onChange={(event) =>
                 setPreferences({
                   ...preferences,
@@ -513,16 +513,16 @@ export function SettingsPage() {
               type="checkbox"
             />
           </label>
-          <label className="flex items-start justify-between gap-5 border-t border-sky/50 pt-4">
+          <label className="flex items-start justify-between gap-5 border-t border-line pt-4">
             <span>
               <span className="block text-sm font-medium">Product updates</span>
-              <span className="mt-1 block text-sm text-zinc-500">
+              <span className="mt-1 block text-sm text-content-muted">
                 New features and service announcements
               </span>
             </span>
             <input
               checked={preferences.productUpdates}
-              className="mt-1 h-4 w-4 shrink-0 accent-tribute"
+              className="mt-1 h-4 w-4 shrink-0 accent-accent"
               onChange={(event) =>
                 setPreferences({
                   ...preferences,
@@ -544,12 +544,12 @@ export function SettingsPage() {
       </section>
 
       {hasPassword ? (
-        <section className="glass-panel mt-4 p-5 sm:p-6">
+        <section className="panel mt-4 p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <KeyRound size={18} />
             <h2 className="font-semibold">Password</h2>
           </div>
-          <p className="mt-2 text-sm text-zinc-500">
+          <p className="mt-2 text-sm text-content-muted">
             Send a secure password-reset link to {appUser?.email}.
           </p>
           <button

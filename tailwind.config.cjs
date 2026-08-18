@@ -33,14 +33,6 @@ module.exports = {
         positive: token("positive"),
         caution: token("caution"),
         critical: token("critical"),
-
-        // Legacy names kept only so un-ported pages stay legible mid-migration.
-        // Remove each one as its pages move to the token colors above.
-        ink: token("content"),
-        paper: token("canvas"),
-        tribute: token("accent"),
-        sky: token("line"),
-        mist: token("surface-raised"),
       },
       borderRadius: {
         control: "10px",

@@ -12,6 +12,7 @@ import { OnboardingPage } from "./pages/OnboardingPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
 import { PublicProfilePage } from "./pages/PublicProfilePage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { TermsPage } from "./pages/TermsPage";
 
 const AdminPage = lazy(() =>
   import("./pages/AdminPage").then((module) => ({
@@ -63,6 +64,7 @@ function AppRoutes() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<LandingPage />} />
+          <Route element={<TermsPage />} path="terms" />
           <Route element={<AuthPage mode="login" />} path="login" />
           <Route element={<AuthPage mode="signup" />} path="signup" />
           <Route element={<OnboardingPage />} path="onboarding" />

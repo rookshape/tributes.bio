@@ -156,15 +156,15 @@ export function PublicProfilePage() {
   }, [creator]);
 
   if (loading) {
-    return <div className="min-h-screen bg-paper" />;
+    return <div className="min-h-screen bg-canvas" />;
   }
 
   if (!creator) {
     return (
-      <main className="grid min-h-screen place-items-center bg-paper px-5 text-center">
+      <main className="grid min-h-screen place-items-center bg-canvas px-5 text-center">
         <div>
           <h1 className="text-2xl font-semibold">Profile not found</h1>
-          <Link className="mt-5 inline-block font-semibold text-ink underline decoration-zinc-300 underline-offset-4" to="/">
+          <Link className="mt-5 inline-block font-semibold text-content underline decoration-line-strong underline-offset-4" to="/">
             Go home
           </Link>
         </div>
