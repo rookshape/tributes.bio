@@ -31,6 +31,8 @@ type AuthContextValue = {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   createAccountWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: () => Promise<void>;
+  /** Recovery for a signed-out user, who has no `currentUser` to read. */
+  sendPasswordResetTo: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -105,6 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         await sendPasswordResetEmail(auth, auth.currentUser.email);
+      },
+      sendPasswordResetTo: async (email: string) => {
+        await sendPasswordResetEmail(auth, email);
       },
       sendVerificationEmail: async () => {
         if (!auth.currentUser || auth.currentUser.emailVerified) return;
