@@ -262,6 +262,29 @@ export async function updateCreatorLink(
   return normalizedLink;
 }
 
+/** Copies a link directly below the original, so ordering stays predictable. */
+export async function duplicateCreatorLink(
+  creatorId: string,
+  link: CreatorLink,
+  links: CreatorLink[],
+) {
+  const copy = await createCreatorLink(
+    creatorId,
+    `${link.title} copy`.slice(0, 80),
+    link.url,
+    links.length,
+  );
+
+  const index = links.findIndex((item) => item.id === link.id);
+  const reordered = [...links];
+  reordered.splice(index + 1, 0, copy);
+
+  const positioned = reordered.map((item, position) => ({ ...item, position }));
+  await reorderCreatorLinks(creatorId, positioned);
+
+  return positioned;
+}
+
 export async function deleteCreatorLink(creatorId: string, linkId: string) {
   await deleteDoc(doc(db, "creators", creatorId, "links", linkId));
 }

@@ -1,29 +1,39 @@
 import {
-  ArrowDown,
-  ArrowUp,
   Check,
   Copy,
   ExternalLink,
   ImagePlus,
-  Link2,
   LoaderCircle,
   Plus,
-  Trash2,
 } from "lucide-react";
 import {
   type ChangeEvent,
   type FormEvent,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { Link } from "react-router-dom";
 import { BioPageView } from "../components/BioPageView";
 import { LiveSpinCard } from "../components/LiveSpinCard";
+import { LinkListEditor } from "../components/LinkListEditor";
 import { SetupChecklist } from "../components/SetupChecklist";
+import {
+  Badge,
+  Button,
+  Dialog,
+  IconButton,
+  Input,
+  Tabs,
+  Textarea,
+  Toggle,
+  Tooltip,
+} from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import {
   createCreatorLink,
   deleteCreatorLink,
+  duplicateCreatorLink,
   getCreatorWorkspace,
   reorderCreatorLinks,
   updateCreatorLink,
@@ -47,8 +57,23 @@ import type {
 type EditorTab = "profile" | "links" | "appearance";
 type SaveStatus = "idle" | "saving" | "saved";
 
-const fieldClass =
-  "field py-2.5";
+function SaveIndicator({ status }: { status: SaveStatus }) {
+  if (status === "idle") return null;
+
+  return (
+    <span className="flex items-center gap-1.5 text-caption text-content-muted">
+      {status === "saving" ? (
+        <>
+          <LoaderCircle className="animate-spin" size={13} /> Saving
+        </>
+      ) : (
+        <>
+          <Check size={13} /> Saved
+        </>
+      )}
+    </span>
+  );
+}
 
 function PersonalDashboard() {
   const { appUser } = useAuth();
@@ -78,9 +103,11 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newUrl, setNewUrl] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<CreatorLink | null>(null);
   const [now, setNow] = useState(Date.now());
 
   const isCreator = appUser?.accountType === "creator";
+  const saveProfileRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (!user || !isCreator) {
@@ -135,6 +162,57 @@ export function DashboardPage() {
     return () => window.clearInterval(timer);
   }, []);
 
+  // Autosave profile edits, debounced. The first render after load must not
+  // write, or opening the page would save it straight back.
+  const savedProfileRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!profile) return;
+
+    const snapshot = JSON.stringify({
+      displayName: profile.displayName,
+      bio: profile.bio,
+      appearance: profile.appearance,
+      isPublished: profile.isPublished,
+      photoURL: profile.photoURL,
+    });
+
+    if (savedProfileRef.current === null) {
+      savedProfileRef.current = snapshot;
+      return;
+    }
+
+    if (savedProfileRef.current === snapshot) return;
+
+    const timer = window.setTimeout(() => {
+      savedProfileRef.current = snapshot;
+      void saveProfileRef.current?.();
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [profile]);
+
+  // Guards a debounced write that has not fired yet.
+  const dirty = Boolean(
+    profile &&
+      savedProfileRef.current !== null &&
+      savedProfileRef.current !==
+        JSON.stringify({
+          displayName: profile.displayName,
+          bio: profile.bio,
+          appearance: profile.appearance,
+          isPublished: profile.isPublished,
+          photoURL: profile.photoURL,
+        }),
+  );
+
+  useEffect(() => {
+    if (!dirty) return;
+
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
   if (!isCreator) {
     return <PersonalDashboard />;
   }
@@ -156,14 +234,22 @@ export function DashboardPage() {
     );
   }
 
+  // The autosave effect runs before saveProfile is defined, so it calls through
+  // a ref rather than depending on the function identity.
+  saveProfileRef.current = () => saveProfile();
+
+  const markSaved = () => {
+    setStatus("saved");
+    window.setTimeout(() => setStatus("idle"), 1600);
+  };
+
   const saveProfile = async (nextProfile = profile) => {
     setError(null);
     setStatus("saving");
 
     try {
       await updateCreatorProfile(profile.id, nextProfile);
-      setStatus("saved");
-      window.setTimeout(() => setStatus("idle"), 1600);
+      markSaved();
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -199,8 +285,7 @@ export function DashboardPage() {
       const nextProfile = { ...profile, ...photo };
       setProfile(nextProfile);
       await updateCreatorProfile(profile.id, nextProfile);
-      setStatus("saved");
-      window.setTimeout(() => setStatus("idle"), 1600);
+      markSaved();
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -267,17 +352,8 @@ export function DashboardPage() {
     }
   };
 
-  const toggleLink = async (link: CreatorLink) => {
-    const nextLink = { ...link, isActive: !link.isActive };
-    changeLink(link.id, { isActive: nextLink.isActive });
-    await saveLink(nextLink);
-  };
-
   const removeLink = async (link: CreatorLink) => {
-    if (!window.confirm(`Delete "${link.title}"?`)) {
-      return;
-    }
-
+    setPendingDelete(null);
     setError(null);
     setStatus("saving");
 
@@ -298,32 +374,32 @@ export function DashboardPage() {
     }
   };
 
-  const moveLink = async (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-
-    if (target < 0 || target >= links.length) {
-      return;
-    }
-
-    const nextLinks = [...links];
-    [nextLinks[index], nextLinks[target]] = [
-      nextLinks[target],
-      nextLinks[index],
-    ];
-    const positionedLinks = nextLinks.map((link, position) => ({
-      ...link,
-      position,
-    }));
-    setLinks(positionedLinks);
+  const applyReorder = async (nextLinks: CreatorLink[]) => {
+    const previous = links;
+    setLinks(nextLinks);
     setStatus("saving");
 
     try {
-      await reorderCreatorLinks(profile.id, positionedLinks);
-      setStatus("saved");
-      window.setTimeout(() => setStatus("idle"), 1600);
+      await reorderCreatorLinks(profile.id, nextLinks);
+      markSaved();
     } catch {
-      setLinks(links);
+      setLinks(previous);
       setError("Could not reorder your links.");
+      setStatus("idle");
+    }
+  };
+
+  const duplicateLink = async (link: CreatorLink) => {
+    setError(null);
+    setStatus("saving");
+
+    try {
+      setLinks(await duplicateCreatorLink(profile.id, link, links));
+      markSaved();
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error ? caughtError.message : "Could not duplicate that link.",
+      );
       setStatus("idle");
     }
   };
@@ -352,31 +428,20 @@ export function DashboardPage() {
 
   return (
     <section className="page-shell">
-      <div className="page-header border-b liquid-divider">
+      <div className="page-header border-b border-line">
         <div>
           <h1 className="page-title">Your page</h1>
-          <p className="page-subtitle">
-            tributes.bio/{profile.username}
-          </p>
+          <p className="page-subtitle">tributes.bio/{profile.username}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="min-w-16 text-right text-xs text-zinc-500">
-            {status === "saving" ? "Saving..." : null}
-            {status === "saved" ? (
-              <span className="inline-flex items-center gap-1">
-                <Check size={14} /> Saved
-              </span>
-            ) : null}
-          </span>
-          <button
-            aria-label="Copy page link"
-            className="icon-button"
-            onClick={copyPageUrl}
-            title="Copy page link"
-            type="button"
-          >
-            <Copy size={17} />
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <SaveIndicator status={status} />
+          <Tooltip content="Copy your page link">
+            <IconButton
+              icon={<Copy size={17} />}
+              label="Copy page link"
+              onClick={copyPageUrl}
+            />
+          </Tooltip>
           <Link
             aria-label="Open public page"
             className="icon-button"
@@ -386,15 +451,18 @@ export function DashboardPage() {
           >
             <ExternalLink size={17} />
           </Link>
-          <label className="secondary-button min-h-10 cursor-pointer px-4">
-            <input
+          {/* States what is true now, and the switch changes it. */}
+          <div className="flex items-center gap-2.5 rounded-control border border-line bg-surface px-3 py-1.5">
+            <Badge dot tone={profile.isPublished ? "positive" : "neutral"}>
+              {profile.isPublished ? "Live" : "Hidden"}
+            </Badge>
+            <Toggle
               checked={profile.isPublished}
-              className="h-4 w-4 accent-tribute"
+              hideLabel
+              label="Published"
               onChange={togglePublished}
-              type="checkbox"
             />
-            Published
-          </label>
+          </div>
         </div>
       </div>
 
@@ -403,6 +471,30 @@ export function DashboardPage() {
           {error}
         </div>
       ) : null}
+
+      <Dialog
+        footer={
+          <>
+            <Button onClick={() => setPendingDelete(null)} variant="secondary">
+              Keep it
+            </Button>
+            <Button
+              onClick={() => pendingDelete && void removeLink(pendingDelete)}
+              variant="danger"
+            >
+              Delete link
+            </Button>
+          </>
+        }
+        onClose={() => setPendingDelete(null)}
+        open={pendingDelete !== null}
+        size="sm"
+        title={`Delete "${pendingDelete?.title ?? ""}"?`}
+      >
+        <p className="text-body text-content-muted">
+          It will be removed from your page straight away. This cannot be undone.
+        </p>
+      </Dialog>
 
       <SetupChecklist
         creatorId={profile.id}
@@ -415,26 +507,20 @@ export function DashboardPage() {
           rather than stretching across a narrow viewport. */}
       <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_390px] lg:gap-8">
         <div className="mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
-          <div className="segmented-control w-full grid-cols-3">
-            {(["profile", "links", "appearance"] as EditorTab[]).map(
-              (item) => (
-                <button
-                  className={`segmented-item capitalize ${
-                    tab === item ? "segmented-item-active" : ""
-                  }`}
-                  key={item}
-                  onClick={() => setTab(item)}
-                  type="button"
-                >
-                  {item}
-                </button>
-              ),
-            )}
-          </div>
+          <Tabs
+            items={[
+              { value: "profile", label: "Profile" },
+              { value: "links", label: "Links", badge: <Badge>{links.length}</Badge> },
+              { value: "appearance", label: "Appearance" },
+            ]}
+            label="Page editor sections"
+            onChange={setTab}
+            value={tab}
+          />
 
           {tab === "profile" ? (
             <div className="mt-7 grid gap-6">
-              <div className="glass-panel flex items-center gap-4 p-5">
+              <div className="panel flex items-center gap-4 p-5">
                 {profile.photoURL ? (
                   <img
                     alt="Profile"
@@ -442,7 +528,7 @@ export function DashboardPage() {
                     src={profile.photoURL}
                   />
                 ) : (
-                  <div className="grid h-20 w-20 place-items-center rounded-full bg-ink text-xl font-semibold text-white shadow-sm">
+                  <div className="grid h-20 w-20 place-items-center rounded-full bg-surface-sunken text-xl font-semibold text-content-muted">
                     {profile.displayName.charAt(0).toUpperCase() || "T"}
                   </div>
                 )}
@@ -458,163 +544,66 @@ export function DashboardPage() {
                 </label>
               </div>
 
-              <label className="grid gap-2 text-sm font-medium">
-                Display name
-                <input
-                  className={fieldClass}
-                  maxLength={80}
-                  onChange={(event) =>
-                    setProfile({ ...profile, displayName: event.target.value })
-                  }
-                  value={profile.displayName}
-                />
-              </label>
+              <Input
+                label="Display name"
+                maxLength={80}
+                onChange={(event) =>
+                  setProfile({ ...profile, displayName: event.target.value })
+                }
+                value={profile.displayName}
+              />
 
-              <label className="grid gap-2 text-sm font-medium">
-                Bio
-                <textarea
-                  className={`${fieldClass} min-h-28 resize-y`}
-                  maxLength={160}
-                  onChange={(event) =>
-                    setProfile({ ...profile, bio: event.target.value })
-                  }
-                  value={profile.bio}
-                />
-                <span className="text-right text-xs font-normal text-zinc-500">
-                  {profile.bio.length}/160
-                </span>
-              </label>
-
-              <button
-                className="primary-button w-fit"
-                disabled={status === "saving"}
-                onClick={() => saveProfile()}
-                type="button"
-              >
-                Save profile
-              </button>
+              <Textarea
+                label="Bio"
+                maxLength={160}
+                onChange={(event) => setProfile({ ...profile, bio: event.target.value })}
+                trailing={`${profile.bio.length}/160`}
+                value={profile.bio}
+              />
             </div>
           ) : null}
 
           {tab === "links" ? (
             <div className="mt-7">
               <form
-                className="glass-panel grid gap-3 p-5 sm:grid-cols-[1fr_1.4fr_auto]"
+                className="panel grid gap-3 p-5 sm:grid-cols-[1fr_1.4fr_auto]"
                 onSubmit={addLink}
               >
-                <label className="grid gap-2 text-sm font-medium">
-                  Title
-                  <input
-                    className={fieldClass}
-                    maxLength={80}
-                    onChange={(event) => setNewTitle(event.target.value)}
-                    placeholder="My website"
-                    required
-                    value={newTitle}
-                  />
-                </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  URL
-                  <input
-                    className={fieldClass}
-                    onChange={(event) => setNewUrl(event.target.value)}
-                    placeholder="example.com"
-                    required
-                    value={newUrl}
-                  />
-                </label>
-                <button
+                <Input
+                  label="Title"
+                  maxLength={80}
+                  onChange={(event) => setNewTitle(event.target.value)}
+                  placeholder="My website"
+                  required
+                  value={newTitle}
+                />
+                <Input
+                  label="URL"
+                  onChange={(event) => setNewUrl(event.target.value)}
+                  placeholder="example.com"
+                  required
+                  value={newUrl}
+                />
+                <Button
                   aria-label="Add link"
-                  className="icon-button mt-auto border-ink bg-ink text-white hover:bg-zinc-700 hover:text-white"
-                  disabled={status === "saving"}
-                  title="Add link"
+                  className="sm:mt-[26px]"
+                  loading={status === "saving"}
                   type="submit"
+                  variant="secondary"
                 >
                   <Plus size={18} />
-                </button>
+                </Button>
               </form>
 
-              <div className="mt-5 grid gap-3">
-                {links.length === 0 ? (
-                  <div className="soft-panel flex items-center justify-center gap-2 py-10 text-sm text-zinc-500">
-                    <Link2 size={18} /> Add your first link above.
-                  </div>
-                ) : null}
-                {links.map((link, index) => (
-                  <article
-                    className="glass-panel p-4"
-                    key={link.id}
-                  >
-                    <div className="grid gap-3 sm:grid-cols-[1fr_1.5fr_auto]">
-                      <input
-                        aria-label="Link title"
-                        className={fieldClass}
-                        maxLength={80}
-                        onChange={(event) =>
-                          changeLink(link.id, { title: event.target.value })
-                        }
-                        value={link.title}
-                      />
-                      <input
-                        aria-label="Link URL"
-                        className={fieldClass}
-                        onChange={(event) =>
-                          changeLink(link.id, { url: event.target.value })
-                        }
-                        value={link.url}
-                      />
-                      <button
-                        className="primary-button min-h-10 px-4"
-                        onClick={() => saveLink(link)}
-                        type="button"
-                      >
-                        Save
-                      </button>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between border-t border-sky/50 pt-3">
-                      <label className="flex items-center gap-2 text-sm font-medium">
-                        <input
-                          checked={link.isActive}
-                          className="h-4 w-4 accent-tribute"
-                          onChange={() => toggleLink(link)}
-                          type="checkbox"
-                        />
-                        Visible
-                      </label>
-                      <div className="flex items-center gap-1">
-                        <button
-                          aria-label="Move link up"
-                          className="icon-button h-9 w-9 border-transparent bg-transparent disabled:opacity-30"
-                          disabled={index === 0}
-                          onClick={() => moveLink(index, -1)}
-                          title="Move up"
-                          type="button"
-                        >
-                          <ArrowUp size={17} />
-                        </button>
-                        <button
-                          aria-label="Move link down"
-                          className="icon-button h-9 w-9 border-transparent bg-transparent disabled:opacity-30"
-                          disabled={index === links.length - 1}
-                          onClick={() => moveLink(index, 1)}
-                          title="Move down"
-                          type="button"
-                        >
-                          <ArrowDown size={17} />
-                        </button>
-                        <button
-                          aria-label="Delete link"
-                          className="icon-button h-9 w-9 border-transparent bg-transparent text-red-600 hover:bg-red-50"
-                          onClick={() => removeLink(link)}
-                          title="Delete link"
-                          type="button"
-                        >
-                          <Trash2 size={17} />
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
+              <div className="mt-5">
+                <LinkListEditor
+                  links={links}
+                  onChange={changeLink}
+                  onCommit={saveLink}
+                  onDelete={setPendingDelete}
+                  onDuplicate={duplicateLink}
+                  onReorder={applyReorder}
+                />
               </div>
             </div>
           ) : null}
