@@ -14,6 +14,7 @@ import {
   overlayDisplay,
   overlayInk,
   overlaySurface,
+  overlaySurfaceSolid,
   markerColors,
   markerGlow,
   rainbowFill,
@@ -166,9 +167,59 @@ function useCountUp(target: number, durationMs = COUNT_UP_MS) {
 }
 
 /**
- * A screen set into the cabinet. Dark, sunk behind a rim, with a fixed gloss
- * across the top — the cues that read as "glass" without bevels heavy enough
- * to fight the rest of the overlay.
+ * The cabinet is one silhouette, not a body with things stuck to it.
+ *
+ * Each extension is a rounded rectangle tipped in 3D rather than a clipped
+ * polygon: the perspective narrows the free edge into a trapezoid while the
+ * corner radii survive, which a clip-path cannot do. All three pieces share the
+ * same fill and overlap, so they read as one shape, and the shadow is thrown by
+ * the group so it follows the union instead of outlining every piece.
+ */
+function Cabinet({ fillColor }: { fillColor: string }) {
+  const fill = { backgroundColor: fillColor };
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0"
+      style={{
+        filter: "drop-shadow(0 6px 16px rgba(15,23,32,0.18))",
+        // Faded as a group, so overlaps do not compound into visible seams.
+        opacity: 0.95,
+      }}
+    >
+      <div
+        className="absolute left-[32px] top-0 h-[64px] w-[136px]"
+        style={{
+          ...fill,
+          borderRadius: "15px 15px 0 0",
+          transform: "perspective(22px) rotateX(4deg)",
+          transformOrigin: "bottom",
+        }}
+      />
+      <div
+        className="absolute bottom-0 h-[66px] w-[216px]"
+        style={{
+          ...fill,
+          left: "50%",
+          marginLeft: -108,
+          borderRadius: "0 0 15px 15px",
+          transform: "perspective(22px) rotateX(-4deg)",
+          transformOrigin: "top",
+        }}
+      />
+      <div
+        className="absolute inset-x-0 bottom-[52px] top-[52px] rounded-[26px]"
+        style={fill}
+      />
+    </div>
+  );
+}
+
+/**
+ * A screen set into the cabinet: dark, sunk behind a rim, with a fixed gloss
+ * across the top. The cues that read as "glass" without bevels heavy enough to
+ * fight the rest of the overlay.
  */
 function Screen({
   accent,
@@ -177,7 +228,6 @@ function Screen({
   className = "",
   charging = false,
   shineKey,
-  style,
 }: {
   accent: string;
   children: ReactNode;
@@ -187,15 +237,13 @@ function Screen({
   charging?: boolean;
   /** Changing this replays the gloss sweep. */
   shineKey?: number;
-  style?: CSSProperties;
 }) {
   return (
     <div
-      className={`relative overflow-hidden ${className}`}
+      className={`overflow-hidden ${className}`}
       style={{
         backgroundColor: display,
         boxShadow: `inset 0 2px 9px rgba(0,0,0,0.6), inset 0 0 0 1px ${accent}2e`,
-        ...style,
       }}
     >
       <span
@@ -234,57 +282,12 @@ function Screen({
 }
 
 /**
- * The two small screens are tabs off the cabinet body — narrow at the free
- * edge, flaring where they meet it, the way a browser tab used to. They sit
- * behind the body so the flare disappears under it.
- */
-const TAB_UP = "polygon(13% 0, 87% 0, 100% 100%, 0 100%)";
-const TAB_DOWN = "polygon(0 0, 100% 0, 87% 100%, 13% 100%)";
-
-function Tab({
-  accent,
-  children,
-  charging,
-  display,
-  shape,
-  surface,
-  className,
-}: {
-  accent: string;
-  children: ReactNode;
-  charging: boolean;
-  display: string;
-  shape: "up" | "down";
-  surface: CSSProperties;
-  className: string;
-}) {
-  const clipPath = shape === "up" ? TAB_UP : TAB_DOWN;
-
-  return (
-    <div
-      className={`absolute z-0 ${className}`}
-      style={{ ...surface, clipPath, borderRadius: shape === "up" ? "9px 9px 0 0" : "0 0 9px 9px" }}
-    >
-      <Screen
-        accent={accent}
-        charging={charging}
-        className="absolute inset-[6px] grid place-items-center"
-        display={display}
-        style={{ clipPath, borderRadius: shape === "up" ? "6px 6px 0 0" : "0 0 6px 6px" }}
-      >
-        {children}
-      </Screen>
-    </div>
-  );
-}
-
-/**
  * The running total — the part of a run people actually watch.
  *
- * One cabinet with the figure on it, and two tabs carrying the things a viewer
- * needs alongside it: what multiplier is armed, and how many spins are left.
- * The second of those is the reason the tab exists at all — streamers count it
- * out on their fingers today, so it has to be readable at a glance.
+ * One cabinet with the figure on it, and two smaller screens carrying what a
+ * viewer needs alongside it: the multiplier that is armed, and how many spins
+ * are left. The second is the reason that screen exists at all — streamers
+ * count it out on their fingers today, so it has to read at a glance.
  */
 export function OverlayTotal({
   appearance,
@@ -299,10 +302,10 @@ export function OverlayTotal({
   const accent = overlayAccent(appearance);
   const display = overlayDisplay(appearance);
   const digit = overlayDigit(appearance);
-  const surface = overlaySurface(appearance, 0.94);
+  const surface = overlaySurfaceSolid(appearance);
 
-  // Mid-animation the state already holds the new tab, so the reels hold the
-  // value from before this spin and climb only once the wheel settles.
+  // Mid-animation the state already holds the new tab, so the figure holds the
+  // value from before this spin and climbs only once the wheel settles.
   const tabCents = spinning ? (state?.tabBeforeCents ?? 0) : (state?.tabCents ?? 0);
   const spinsLeft = state?.spinsLeft ?? 0;
   const multiplier = spinning ? 0 : (state?.multiplier ?? 0);
@@ -327,20 +330,24 @@ export function OverlayTotal({
   const armed = multiplier > 1;
 
   return (
-    <div className="relative w-full max-w-[330px] pb-[40px] pt-[38px]">
+    <div
+      className="relative w-full max-w-[330px] pb-[66px] pt-[64px]"
+      key={`cabinet-${pulseKey}`}
+      style={{ color: ink, animation: "total-pop 480ms var(--ease-standard)" }}
+    >
+      <Cabinet fillColor={surface} />
+
       {/* Upper left: what is armed. */}
-      <Tab
+      <Screen
         accent={accent}
         charging={spinning}
-        className="left-7 top-0 h-[46px] w-[108px]"
+        className="absolute left-[52px] top-[12px] grid h-[36px] w-[96px] place-items-center rounded-full"
         display={display}
-        shape="up"
-        surface={surface}
       >
         <span
-          className="pb-1 text-lg font-black leading-none lg:text-xl"
+          className="text-lg font-black leading-none lg:text-xl"
           style={{
-            color: armed ? digit : `${digit}`,
+            color: digit,
             textShadow: armed ? `0 0 10px ${accent}99` : undefined,
             // An empty slot blinks rather than sitting dark, so the screen
             // still reads as powered when nothing is armed.
@@ -349,22 +356,13 @@ export function OverlayTotal({
         >
           {armed ? `${multiplier}\u00d7` : "1\u00d7"}
         </span>
-      </Tab>
+      </Screen>
 
-      {/* Body: the figure. */}
-      <div
-        className="relative z-10 rounded-[26px] border-2 p-3.5"
-        key={`cabinet-${pulseKey}`}
-        style={{
-          ...surface,
-          color: ink,
-          animation: "total-pop 480ms var(--ease-standard)",
-          boxShadow: "0 6px 22px rgba(15,23,32,0.16)",
-        }}
-      >
+      {/* The figure. */}
+      <div className="relative px-3.5">
         <Screen
           accent={accent}
-          className="rounded-2xl px-4 py-3.5"
+          className="relative rounded-[20px] px-4 py-3.5"
           display={display}
           shineKey={pulseKey}
         >
@@ -384,23 +382,21 @@ export function OverlayTotal({
       </div>
 
       {/* Bottom centre: how many spins are left. */}
-      <Tab
+      <Screen
         accent={accent}
         charging={spinning}
-        className="bottom-0 left-1/2 h-[48px] w-[212px] -translate-x-1/2"
+        className="absolute bottom-[12px] left-1/2 grid h-[40px] w-[184px] -translate-x-1/2 place-items-center rounded-full"
         display={display}
-        shape="down"
-        surface={surface}
       >
         <span
-          className="whitespace-nowrap pt-1 text-sm font-black uppercase tracking-[0.1em] lg:text-base"
+          className="whitespace-nowrap text-sm font-black uppercase tracking-[0.1em] lg:text-base"
           style={{ color: digit, textShadow: `0 0 10px ${accent}66` }}
         >
           {spinsLeft > 0
             ? `${spinsLeft} ${spinsLeft === 1 ? "spin" : "spins"} left`
             : "Round over"}
         </span>
-      </Tab>
+      </Screen>
     </div>
   );
 }

@@ -129,6 +129,25 @@ export function overlaySurface(appearance: OverlayAppearance, opacity = 0.82) {
 }
 
 /**
+ * The panel colour with no alpha.
+ *
+ * The cabinet is built from overlapping pieces, and translucent ones compound
+ * where they meet — every overlap draws its own seam. The pieces are painted
+ * solid and the whole group is faded instead.
+ */
+export function overlaySurfaceSolid(appearance: OverlayAppearance) {
+  const hue = normalizeOverlayHue(appearance.hue);
+  const tone = normalizeOverlayTone(appearance.tone);
+  const lightness = panelLightness(tone);
+  const chroma = Math.min(
+    maxChroma(lightness, hue),
+    appearance.vivid ? lerp(0.04, 0.13, tone / 100) : lerp(0.005, 0.05, tone / 100),
+  );
+
+  return oklchToHex(lightness, chroma, hue);
+}
+
+/**
  * Text that stays readable as the panel darkens under it.
  *
  * The switch is driven by the panel's own lightness rather than a tone number,
