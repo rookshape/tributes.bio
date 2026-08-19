@@ -10,9 +10,10 @@ import { SpinWheel, type SpinAnimation } from "../SpinWheel";
 import {
   GOAL_SHAPE_PATHS,
   overlayAccent,
-  overlayDigit,
-  overlayDisplay,
   overlayInk,
+  overlayGlow,
+  overlayScreen,
+  overlayScreenInk,
   overlaySurface,
   overlaySurfaceSolid,
   markerColors,
@@ -189,7 +190,7 @@ function Cabinet({ fillColor }: { fillColor: string }) {
       }}
     >
       <div
-        className="absolute left-[32px] top-0 h-[64px] w-[136px]"
+        className="absolute left-[32px] top-0 h-[56px] w-[136px]"
         style={{
           ...fill,
           borderRadius: "15px 15px 0 0",
@@ -198,18 +199,18 @@ function Cabinet({ fillColor }: { fillColor: string }) {
         }}
       />
       <div
-        className="absolute bottom-0 h-[66px] w-[216px]"
+        className="absolute bottom-0 h-[58px] w-[196px]"
         style={{
           ...fill,
           left: "50%",
-          marginLeft: -108,
+          marginLeft: -98,
           borderRadius: "0 0 15px 15px",
           transform: "perspective(22px) rotateX(-4deg)",
           transformOrigin: "top",
         }}
       />
       <div
-        className="absolute inset-x-0 bottom-[52px] top-[52px] rounded-[26px]"
+        className="absolute inset-x-0 bottom-[44px] top-[44px] rounded-[26px]"
         style={fill}
       />
     </div>
@@ -217,62 +218,47 @@ function Cabinet({ fillColor }: { fillColor: string }) {
 }
 
 /**
- * A screen set into the cabinet: dark, sunk behind a rim, with a fixed gloss
- * across the top. The cues that read as "glass" without bevels heavy enough to
- * fight the rest of the overlay.
+ * A screen set into the cabinet: a light tinted face sunk behind a thin rim.
+ * Light rather than dark so it lifts off the cabinet, with its figures in a
+ * deep shade of the same hue — contrast carried by lightness, not by glow.
  */
 function Screen({
-  accent,
   children,
-  display,
   className = "",
   charging = false,
-  shineKey,
+  face,
+  ink,
+  wave,
 }: {
-  accent: string;
-  children: ReactNode;
-  display: string;
+  children?: ReactNode;
   className?: string;
   /** Breathes while a spin is resolving. */
   charging?: boolean;
-  /** Changing this replays the gloss sweep. */
-  shineKey?: number;
+  face: string;
+  ink: string;
+  /** Runs a glow across the face instead of showing content. */
+  wave?: string;
 }) {
   return (
     <div
       className={`overflow-hidden ${className}`}
       style={{
-        backgroundColor: display,
-        boxShadow: `inset 0 2px 9px rgba(0,0,0,0.6), inset 0 0 0 1px ${accent}2e`,
+        backgroundColor: face,
+        backgroundImage: wave
+          ? `linear-gradient(100deg, ${face} 18%, ${wave} 50%, ${face} 82%)`
+          : undefined,
+        backgroundSize: wave ? "220% 100%" : undefined,
+        animation: wave ? "slot-wave 2.2s linear infinite" : undefined,
+        boxShadow: `inset 0 1px 3px ${ink}59, inset 0 0 0 1px ${ink}26`,
       }}
     >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-1/2"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0))",
-        }}
-      />
       {charging ? (
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
           style={{
-            boxShadow: `inset 0 0 14px ${accent}`,
+            boxShadow: `inset 0 0 12px ${ink}66`,
             animation: "screen-charge 1s ease-in-out infinite",
-          }}
-        />
-      ) : null}
-      {shineKey ? (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 w-1/3"
-          key={shineKey}
-          style={{
-            background:
-              "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.45), rgba(255,255,255,0))",
-            animation: "screen-shine 900ms var(--ease-standard)",
           }}
         />
       ) : null}
@@ -300,8 +286,8 @@ export function OverlayTotal({
 }) {
   const ink = overlayInk(appearance);
   const accent = overlayAccent(appearance);
-  const display = overlayDisplay(appearance);
-  const digit = overlayDigit(appearance);
+  const face = overlayScreen(appearance);
+  const screenInk = overlayScreenInk(appearance);
   const surface = overlaySurfaceSolid(appearance);
 
   // Mid-animation the state already holds the new tab, so the figure holds the
@@ -331,7 +317,7 @@ export function OverlayTotal({
 
   return (
     <div
-      className="relative w-full max-w-[330px] pb-[66px] pt-[64px]"
+      className="relative w-full max-w-[330px] pb-[54px] pt-[52px]"
       key={`cabinet-${pulseKey}`}
       style={{ color: ink, animation: "total-pop 480ms var(--ease-standard)" }}
     >
@@ -339,40 +325,34 @@ export function OverlayTotal({
 
       {/* Upper left: what is armed. */}
       <Screen
-        accent={accent}
-        charging={spinning}
-        className="absolute left-[52px] top-[12px] grid h-[36px] w-[96px] place-items-center rounded-full"
-        display={display}
+        charging={spinning && armed}
+        className="absolute left-[57px] top-[12px] grid h-[30px] w-[86px] place-items-center rounded-full"
+        face={face}
+        ink={screenInk}
+        // Nothing armed: the slot runs a glow across itself rather than showing
+        // a placeholder figure, so it reads as waiting rather than as a value.
+        wave={armed ? undefined : overlayGlow(appearance)}
       >
-        <span
-          className="text-lg font-black leading-none lg:text-xl"
-          style={{
-            color: digit,
-            textShadow: armed ? `0 0 10px ${accent}99` : undefined,
-            // An empty slot blinks rather than sitting dark, so the screen
-            // still reads as powered when nothing is armed.
-            animation: armed ? undefined : "slot-idle 2.4s ease-in-out infinite",
-          }}
-        >
-          {armed ? `${multiplier}\u00d7` : "1\u00d7"}
-        </span>
+        {armed ? (
+          <span
+            className="text-base font-black leading-none lg:text-lg"
+            style={{ color: screenInk }}
+          >
+            {`${multiplier}×`}
+          </span>
+        ) : null}
       </Screen>
 
       {/* The figure. */}
       <div className="relative px-3.5">
         <Screen
-          accent={accent}
-          className="relative rounded-[20px] px-4 py-3.5"
-          display={display}
-          shineKey={pulseKey}
+          className="relative rounded-[18px] px-4 py-2.5"
+          face={face}
+          ink={screenInk}
         >
           <p
-            className="flex items-center justify-center text-5xl font-black leading-none lg:text-6xl"
-            style={{
-              color: digit,
-              // One soft halo. Stacked glows turned the figure into a smear.
-              textShadow: `0 0 12px ${accent}70`,
-            }}
+            className="flex items-center justify-center text-[2.75rem] font-black leading-none lg:text-5xl"
+            style={{ color: screenInk }}
           >
             {amount.split("").map((char, index) => (
               <Reel char={char} key={`${index}-${char}`} />
@@ -383,14 +363,14 @@ export function OverlayTotal({
 
       {/* Bottom centre: how many spins are left. */}
       <Screen
-        accent={accent}
         charging={spinning}
-        className="absolute bottom-[12px] left-1/2 grid h-[40px] w-[184px] -translate-x-1/2 place-items-center rounded-full"
-        display={display}
+        className="absolute bottom-[12px] left-1/2 grid h-[32px] w-[152px] -translate-x-1/2 place-items-center rounded-full"
+        face={face}
+        ink={screenInk}
       >
         <span
-          className="whitespace-nowrap text-sm font-black uppercase tracking-[0.1em] lg:text-base"
-          style={{ color: digit, textShadow: `0 0 10px ${accent}66` }}
+          className="whitespace-nowrap text-xs font-black uppercase tracking-[0.08em] lg:text-sm"
+          style={{ color: screenInk }}
         >
           {spinsLeft > 0
             ? `${spinsLeft} ${spinsLeft === 1 ? "spin" : "spins"} left`

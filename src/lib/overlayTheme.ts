@@ -188,6 +188,46 @@ export function overlayDigit(appearance: OverlayAppearance) {
   return oklchToHex(0.97, Math.min(maxChroma(0.97, hue), 0.045), hue);
 }
 
+/**
+ * The face of a screen: light and tinted, so it lifts off a near-white cabinet
+ * rather than sinking into it, and stays light whatever tone the cabinet takes.
+ */
+export function overlayScreen(appearance: OverlayAppearance) {
+  const hue = normalizeOverlayHue(appearance.hue);
+  const lightness = 0.9;
+  return oklchToHex(
+    lightness,
+    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.13 : 0.07),
+    hue,
+  );
+}
+
+/** Figures on that face: a deep shade of the same hue, for contrast with hue. */
+export function overlayScreenInk(appearance: OverlayAppearance) {
+  const hue = normalizeOverlayHue(appearance.hue);
+  const lightness = 0.29;
+  return oklchToHex(
+    lightness,
+    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.14 : 0.08),
+    hue,
+  );
+}
+
+/**
+ * The glow that travels across an idle slot. Lighter than the accent on
+ * purpose — full-strength accent against a pale face reads as a solid blob
+ * sliding past rather than as light moving under glass.
+ */
+export function overlayGlow(appearance: OverlayAppearance) {
+  const hue = normalizeOverlayHue(appearance.hue);
+  const lightness = 0.82;
+  return oklchToHex(
+    lightness,
+    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.17 : 0.11),
+    hue,
+  );
+}
+
 /** Deep inset behind the running total's digits, so they read like a display. */
 export function overlayDisplay(appearance: OverlayAppearance) {
   const hue = normalizeOverlayHue(appearance.hue);
