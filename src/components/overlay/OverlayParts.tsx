@@ -37,6 +37,18 @@ export type OverlayPart = "wheel" | "total" | "bar" | "queue";
 /** Matches the marker-pulse keyframe in styles.css. */
 const MARKER_PULSE_MS = 900;
 
+/**
+ * Figure size by glyph count. The screen is fixed width, so a total that runs
+ * into five or six characters has to come down to stay inside it.
+ */
+function figureSize(glyphs: number) {
+  if (glyphs <= 3) return "3.5rem";
+  if (glyphs === 4) return "3.1rem";
+  if (glyphs === 5) return "2.6rem";
+  if (glyphs === 6) return "2.2rem";
+  return "1.9rem";
+}
+
 /** How long the figure takes to climb to a new total. */
 const COUNT_UP_MS = 850;
 
@@ -193,7 +205,7 @@ function Cabinet({ fillColor }: { fillColor: string }) {
       }}
     >
       <div
-        className="absolute left-[32px] top-0 h-[58px] w-[140px]"
+        className="absolute left-[16px] top-0 h-[62px] w-[104px]"
         style={{
           ...fill,
           borderRadius: "15px 15px 0 0",
@@ -202,18 +214,18 @@ function Cabinet({ fillColor }: { fillColor: string }) {
         }}
       />
       <div
-        className="absolute bottom-0 h-[60px] w-[200px]"
+        className="absolute bottom-0 h-[64px] w-[164px]"
         style={{
           ...fill,
           left: "50%",
-          marginLeft: -100,
+          marginLeft: -82,
           borderRadius: "0 0 15px 15px",
           transform: "perspective(22px) rotateX(-4deg)",
           transformOrigin: "top",
         }}
       />
       <div
-        className="absolute inset-x-0 bottom-[46px] top-[46px] rounded-[26px]"
+        className="absolute inset-x-0 bottom-[52px] top-[52px] rounded-[26px]"
         style={fill}
       />
     </div>
@@ -348,7 +360,7 @@ export function OverlayTotal({
 
   return (
     <div
-      className="relative w-full max-w-[272px] pb-[55px] pt-[55px]"
+      className="relative w-full max-w-[214px] pb-[64px] pt-[64px]"
       key={`cabinet-${pulseKey}`}
       style={{ color: ink, animation: "total-pop 480ms var(--ease-standard)" }}
     >
@@ -357,7 +369,7 @@ export function OverlayTotal({
       {/* Upper left: what is armed. */}
       <Screen
         charging={spinning && armed}
-        className="absolute left-[62px] top-[13px] grid h-[29px] w-[80px] place-items-center rounded-[9px]"
+        className="absolute left-[28px] top-[19px] grid h-[29px] w-[80px] place-items-center rounded-[9px]"
         // Same perspective and origin as the extension behind it, so its sides
         // slant parallel to the white rather than cutting across it.
         shape={{
@@ -381,15 +393,17 @@ export function OverlayTotal({
       </Screen>
 
       {/* The figure. */}
-      <div className="relative px-[9px]">
+      <div className="relative px-[12px]">
         <Screen
-          className="relative rounded-[16px] px-4 py-3.5"
+          className="relative rounded-[16px] px-2 py-3.5"
           face={face}
           ink={screenInk}
         >
           <p
-            className="flex items-center justify-center text-[2.75rem] font-black leading-none lg:text-5xl"
-            style={{ color: screenInk }}
+            className="flex items-center justify-center font-black leading-none"
+            // Sized from the glyph count: a narrower screen means a five figure
+            // total would run off the end at one fixed size.
+            style={{ color: screenInk, fontSize: figureSize(amount.length) }}
           >
             {amount.split("").map((char, index) => (
               <Reel char={char} key={`${index}-${char}`} />
@@ -401,7 +415,7 @@ export function OverlayTotal({
       {/* Bottom centre: how many spins are left. */}
       <Screen
         charging={spinning}
-        className="absolute bottom-[13px] left-1/2 grid h-[30px] w-[140px] place-items-center rounded-[9px]"
+        className="absolute bottom-[19px] left-1/2 grid h-[30px] w-[140px] place-items-center rounded-[9px]"
         shape={{
           marginLeft: -70,
           transform: "perspective(22px) rotateX(-4deg)",
