@@ -392,7 +392,7 @@ export function OverlayGoalBar({
               paintOrder="stroke"
               stroke={`url(#${markerGradientId})`}
               strokeLinejoin="round"
-              strokeWidth="2.6"
+              strokeWidth="3.4"
             />
           </svg>
         ) : null}
