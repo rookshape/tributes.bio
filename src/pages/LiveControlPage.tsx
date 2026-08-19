@@ -29,6 +29,16 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../lib/money";
 import {
+  GOAL_SHAPES,
+  GOAL_SHAPE_PATHS,
+  OVERLAY_HUE_MAX,
+  OVERLAY_HUE_STEP,
+  OVERLAY_TONE_STEP,
+  overlayHueTrack,
+  overlayToneTrack,
+  type OverlayAppearance,
+} from "../lib/overlayTheme";
+import {
   adjustSpinCounter,
   cancelSpinQueueEntry,
   createMockSpinEntry,
@@ -153,13 +163,13 @@ function InlineAmount({
  * bar is still the unmodified overlay component.
  */
 function LiveGoalBar({
-  config,
+  appearance,
   goal,
   onSaveGoal,
   onCorrectTotal,
   state,
 }: {
-  config: SpinConfig;
+  appearance: OverlayAppearance;
   goal: SpinGoal;
   onSaveGoal: (goalCents: number) => Promise<void>;
   onCorrectTotal: (totalCents: number) => Promise<void>;
@@ -167,7 +177,7 @@ function LiveGoalBar({
 }) {
   return (
     <OverlayGoalBar
-      config={config}
+      appearance={appearance}
       currentControl={
         <InlineAmount
           label="Tribute total"
@@ -269,6 +279,16 @@ export function LiveControlPage() {
 
   const queued = useMemo(
     () => queue.filter((entry) => entry.status === "queued"),
+    [queue],
+  );
+  // Most recent first, so a streamer glancing down sees the round that just
+  // finished rather than the first one of the night.
+  const completed = useMemo(
+    () =>
+      queue
+        .filter((entry) => entry.status === "completed")
+        .slice(-6)
+        .reverse(),
     [queue],
   );
 
@@ -483,7 +503,7 @@ export function LiveControlPage() {
             className="transition-transform duration-fast group-open:rotate-180"
             size={15}
           />
-          OBS sources
+          Stream Settings &amp; Sources
         </summary>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {OVERLAY_PARTS.map((part) => {
@@ -657,6 +677,165 @@ export function LiveControlPage() {
             </p>
           </div>
         </div>
+
+        {/* The wheel keeps its own colors; these three are scene furniture and
+            stay put when a viewer buys a different wheel. */}
+        <div className="mt-5 grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+          <div>
+            <p className="text-detail font-semibold text-content">Overlay colour</p>
+            <p className="mt-0.5 text-caption text-content-subtle">
+              Goal bar, running total, and queue. The wheel keeps its own.
+            </p>
+            <label className="mt-3 block" htmlFor="overlay-hue">
+              <span className="mb-2 block text-detail font-medium text-content-muted">
+                Colour
+              </span>
+              <input
+                className="theme-slider"
+                id="overlay-hue"
+                max={OVERLAY_HUE_MAX}
+                min={0}
+                onChange={(event) =>
+                  setSettings({
+                    ...settings,
+                    appearance: {
+                      ...settings.appearance,
+                      hue: Number(event.target.value),
+                    },
+                  })
+                }
+                onPointerUp={() => saveSettings(settings)}
+                step={OVERLAY_HUE_STEP}
+                style={{ backgroundImage: overlayHueTrack(settings.appearance) }}
+                type="range"
+                value={settings.appearance.hue}
+              />
+            </label>
+            <label className="mt-3 block" htmlFor="overlay-tone">
+              <span className="mb-2 block text-detail font-medium text-content-muted">
+                Light to dark
+              </span>
+              <input
+                className="theme-slider"
+                id="overlay-tone"
+                max={100}
+                min={0}
+                onChange={(event) =>
+                  setSettings({
+                    ...settings,
+                    appearance: {
+                      ...settings.appearance,
+                      tone: Number(event.target.value),
+                    },
+                  })
+                }
+                onPointerUp={() => saveSettings(settings)}
+                step={OVERLAY_TONE_STEP}
+                style={{ backgroundImage: overlayToneTrack(settings.appearance) }}
+                type="range"
+                value={settings.appearance.tone}
+              />
+            </label>
+            <div className="mt-4">
+              <Toggle
+                checked={settings.appearance.vivid}
+                description="Full-strength colour instead of the softer default."
+                label="Vivid"
+                onChange={(vivid) =>
+                  saveSettings({
+                    ...settings,
+                    appearance: { ...settings.appearance, vivid },
+                  })
+                }
+              />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-detail font-semibold text-content">Goal bar</p>
+            <p className="mt-0.5 text-caption text-content-subtle">
+              What rides the tip of the progress fill.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {GOAL_SHAPES.map((shape) => {
+                const selected = settings.appearance.goalShape === shape.id;
+                return (
+                  <button
+                    className={`grid h-11 w-11 place-items-center rounded-card border transition-colors duration-fast ${
+                      selected
+                        ? "border-accent bg-accent/5 text-accent"
+                        : "border-line text-content-muted hover:border-line-strong"
+                    }`}
+                    key={shape.id}
+                    onClick={() =>
+                      saveSettings({
+                        ...settings,
+                        appearance: { ...settings.appearance, goalShape: shape.id },
+                      })
+                    }
+                    title={shape.label}
+                    type="button"
+                  >
+                    {shape.id === "none" ? (
+                      <span className="text-caption font-medium">None</span>
+                    ) : (
+                      <svg className="h-6 w-6" viewBox="0 0 24 24">
+                        <path
+                          d={GOAL_SHAPE_PATHS[shape.id]}
+                          fill="currentColor"
+                          stroke="currentColor"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4">
+              <Toggle
+                checked={settings.appearance.goalRainbow}
+                description="Fill the bar with every colour instead of one."
+                label="Rainbow fill"
+                onChange={(goalRainbow) =>
+                  saveSettings({
+                    ...settings,
+                    appearance: { ...settings.appearance, goalRainbow },
+                  })
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Streamer-only: the overlay sources deliberately do not carry this. */}
+        {completed.length ? (
+          <div className="mt-5 border-t border-line pt-4">
+            <p className="text-detail font-semibold text-content">Recent rounds</p>
+            <div className="mt-2 divide-y divide-line">
+              {completed.map((entry) => (
+                <div
+                  className="flex items-center justify-between gap-3 py-2 text-detail"
+                  key={entry.id}
+                >
+                  <span className="min-w-0 truncate text-content-muted">
+                    {entry.viewerName}
+                    {entry.wheelName ? (
+                      <span className="text-content-subtle"> · {entry.wheelName}</span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 font-semibold text-content">
+                    {entry.resultLabel}
+                    <span className="ml-2 text-content-muted">
+                      {formatMoney(entry.amountCents + entry.tabCents)}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </details>
       {/* The overlay itself, at working size. */}
       <div
@@ -671,10 +850,14 @@ export function LiveControlPage() {
               <div className="w-full max-w-[380px]">
                 <OverlayWheel animation={animation} config={shownWheel} />
               </div>
-              <OverlayTotal config={shownWheel} spinning={spinning} state={state} />
+              <OverlayTotal
+                appearance={settings.appearance}
+                spinning={spinning}
+                state={state}
+              />
             </div>
             <LiveGoalBar
-              config={config}
+              appearance={settings.appearance}
               goal={goal}
               onCorrectTotal={async (totalCents) => {
                 // The callable takes a delta, so a corrected figure becomes the
@@ -695,7 +878,7 @@ export function LiveControlPage() {
           </div>
           <div className="mx-auto w-full max-w-[320px] lg:mx-0">
             <OverlayQueue
-              config={config}
+              appearance={settings.appearance}
               entries={queued}
               entryControl={(entry) => (
                 <Tooltip content="Remove and release their hold">

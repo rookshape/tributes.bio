@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SpinWheel, type SpinAnimation } from "../SpinWheel";
 import {
-  wheelAccent,
-  wheelGlass,
-  wheelInk,
-  type WheelAppearance,
-} from "../../lib/wheelPalette";
+  GOAL_SHAPE_PATHS,
+  overlayAccent,
+  overlayDigit,
+  overlayDisplay,
+  overlayInk,
+  overlaySurface,
+  rainbowFill,
+  type OverlayAppearance,
+} from "../../lib/overlayTheme";
 import { formatMoney } from "../../lib/money";
 import type { SpinConfig, SpinQueueEntry, SpinState } from "../../lib/types";
 
@@ -13,8 +17,9 @@ import type { SpinConfig, SpinQueueEntry, SpinState } from "../../lib/types";
  * The overlay is three independent pieces so a streamer can place each one as
  * its own OBS browser source and position them separately over their scene.
  *
- * Every panel is light frosted glass tinted towards the wheel's hue — never a
- * solid dark plate, which would cut a hard rectangle out of the stream.
+ * The wheel carries its own colors, because they change with the wheel. The
+ * other three share one overlay theme the creator sets separately, so scene
+ * furniture stays put when a viewer buys a different wheel.
  */
 export type OverlayPart = "wheel" | "total" | "bar" | "queue";
 
@@ -50,10 +55,6 @@ export const OVERLAY_PARTS: {
     size: { width: 340, height: 320 },
   },
 ];
-
-function appearanceOf(config: SpinConfig): WheelAppearance {
-  return { hue: config.wheelHue, tone: config.wheelTone };
-}
 
 /**
  * Just the wheel. Who is spinning comes from the queue, what they landed on is
@@ -100,25 +101,51 @@ function Reel({ char }: { char: string }) {
   );
 }
 
+/** Marquee bulbs along the cabinet, chasing while the wheel is turning. */
+function Bulbs({ accent, running }: { accent: string; running: boolean }) {
+  return (
+    <span aria-hidden="true" className="flex items-center justify-center gap-[7px]">
+      {Array.from({ length: 13 }, (_, index) => (
+        <span
+          className="h-[5px] w-[5px] rounded-full"
+          key={index}
+          style={{
+            backgroundColor: accent,
+            boxShadow: `0 0 6px ${accent}`,
+            // Offsetting each bulb turns a shared animation into a chase.
+            animation: running
+              ? `bulb-chase 900ms ${index * 70}ms linear infinite`
+              : undefined,
+            opacity: running ? undefined : 0.32,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 /**
- * The running total. This is the part of a run people watch — the number
- * climbing as multipliers land — so it gets its own source the streamer can put
- * anywhere, and it behaves like a slot machine: digits roll into place, the
- * panel kicks when the number moves, and anything the slice handed out flies up
- * over the top.
+ * The running total — the part of a run people actually watch.
+ *
+ * Built as a slot cabinet rather than a card: marquee bulbs across the top,
+ * the number sunk into a dark display glass so it glows against the panel, and
+ * the spins left shown as bulbs of their own. Digits roll into place, the
+ * cabinet kicks when the number moves, and whatever the slice handed out flies
+ * up over the top.
  */
 export function OverlayTotal({
-  config,
+  appearance,
   state,
   spinning,
 }: {
-  config: SpinConfig;
+  appearance: OverlayAppearance;
   state: SpinState | null;
   spinning: boolean;
 }) {
-  const appearance = appearanceOf(config);
-  const ink = wheelInk(appearance);
-  const accent = wheelAccent(appearance);
+  const ink = overlayInk(appearance);
+  const accent = overlayAccent(appearance);
+  const display = overlayDisplay(appearance);
+  const digit = overlayDigit(appearance);
 
   // Mid-animation the state already holds the new tab, so the reels hold the
   // value from before this spin and roll only once the wheel settles.
@@ -150,21 +177,27 @@ export function OverlayTotal({
     multiplier > 1
       ? `${multiplier}\u00d7`
       : spinsAwarded > 0
-        ? `+${spinsAwarded} ${spinsAwarded === 1 ? "spin" : "spins"}`
+        ? `+${spinsAwarded} ${spinsAwarded === 1 ? "SPIN" : "SPINS"}`
         : null;
 
   return (
     <div
-      className="relative w-full max-w-[360px] rounded-3xl border px-6 py-4 text-center backdrop-blur-md"
-      style={{ ...wheelGlass(appearance), color: ink }}
+      className="relative w-full max-w-[340px] rounded-[26px] border-2 px-3.5 pb-3 pt-2.5 text-center backdrop-blur-md"
+      key={`cabinet-${pulseKey}`}
+      style={{
+        ...overlaySurface(appearance, 0.9),
+        color: ink,
+        animation: "total-pop 480ms var(--ease-standard)",
+      }}
     >
       {award ? (
         <span
-          className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full px-3 py-1 text-sm font-bold lg:text-base"
+          className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full px-3.5 py-1 text-sm font-black tracking-wide lg:text-base"
           key={`award-${pulseKey}`}
           style={{
             animation: "award-flash 1.6s var(--ease-standard) forwards",
             backgroundColor: accent,
+            boxShadow: `0 0 18px ${accent}`,
             color: "#fff",
           }}
         >
@@ -172,37 +205,50 @@ export function OverlayTotal({
         </span>
       ) : null}
 
-      {/* No viewer name: the queue's "Spinning now" line already says whose run
-          this is, and repeating it costs room the number wants. */}
-      <p
-        className="flex items-center justify-center text-4xl font-black leading-none lg:text-6xl"
-        key={`total-${pulseKey}`}
-        style={{ animation: "total-pop 480ms var(--ease-standard)" }}
-      >
-        {amount.split("").map((char, index) => (
-          <Reel char={char} key={`${index}-${char}`} />
-        ))}
-      </p>
+      <Bulbs accent={accent} running={spinning} />
 
-      <div className="mt-2.5 flex items-center justify-center gap-3 text-xs font-semibold tracking-wide lg:text-sm">
+      {/* The number sits in a dark display so it glows instead of sitting flat
+          on the panel — the single biggest thing separating this from a card. */}
+      <div
+        className="mt-2 rounded-2xl px-3 py-2"
+        style={{
+          backgroundColor: display,
+          boxShadow: `inset 0 2px 10px rgba(0,0,0,0.55), inset 0 0 0 1px ${accent}33`,
+        }}
+      >
+        <p
+          className="flex items-center justify-center text-5xl font-black leading-none lg:text-6xl"
+          style={{
+            color: digit,
+            // Hot core, coloured spill: a tight halo hugging the glyph and a
+            // wide faint one for the bloom.
+            textShadow: `0 0 4px ${accent}, 0 0 14px ${accent}dd, 0 0 34px ${accent}77`,
+          }}
+        >
+          {amount.split("").map((char, index) => (
+            <Reel char={char} key={`${index}-${char}`} />
+          ))}
+        </p>
+      </div>
+
+      <div className="mt-2 flex items-center justify-center gap-2 text-[0.7rem] font-bold tracking-[0.12em] lg:text-xs">
         {spinsLeft > 0 ? (
-          <span className="flex items-center gap-1.5">
-            {/* Pips read faster than a number at stream distance. */}
+          <>
             <span className="flex gap-1">
               {Array.from({ length: Math.min(spinsLeft, 6) }, (_, index) => (
                 <span
                   className="h-2 w-2 rounded-full"
                   key={index}
-                  style={{ backgroundColor: accent }}
+                  style={{ backgroundColor: accent, boxShadow: `0 0 7px ${accent}` }}
                 />
               ))}
             </span>
             <span className="opacity-70">
-              {spinsLeft > 6 ? `${spinsLeft} left` : "left"}
+              {spinsLeft > 6 ? `${spinsLeft} Left` : "Left"}
             </span>
-          </span>
+          </>
         ) : (
-          <span className="opacity-55">Round complete</span>
+          <span className="opacity-55">Round Complete</span>
         )}
       </div>
     </div>
@@ -210,14 +256,14 @@ export function OverlayTotal({
 }
 
 export function OverlayGoalBar({
-  config,
+  appearance,
   state,
   goalLabel,
   goalCents,
   goalControl,
   currentControl,
 }: {
-  config: SpinConfig;
+  appearance: OverlayAppearance;
   state: SpinState | null;
   goalLabel: string;
   goalCents: number;
@@ -229,62 +275,82 @@ export function OverlayGoalBar({
   goalControl?: ReactNode;
   currentControl?: ReactNode;
 }) {
-  const appearance = appearanceOf(config);
-  const ink = wheelInk(appearance);
-  const accent = wheelAccent(appearance);
+  const ink = overlayInk(appearance);
+  const accent = overlayAccent(appearance);
   const current = state?.counterCents ?? 0;
   const progress = goalCents > 0 ? Math.min(1, current / goalCents) : 0;
+  const shape = appearance.goalShape;
 
   return (
     <div
-      className="w-full max-w-[600px] rounded-3xl border px-5 py-4 backdrop-blur-md"
-      style={{ ...wheelGlass(appearance), color: ink }}
+      className="w-full max-w-[600px] rounded-full border-2 px-7 py-4 backdrop-blur-md"
+      style={{ ...overlaySurface(appearance, 0.88), color: ink }}
     >
-      {/* Label and amount share a row above the bar, with the amount kept in
-          its own raised container. */}
-      <div className="flex items-center justify-between gap-4">
-        <p className="truncate text-sm font-semibold lg:text-base">{goalLabel}</p>
-        <div
-          className="shrink-0 rounded-full border px-3.5 py-1.5"
-          style={wheelGlass(appearance, 0.85)}
-        >
-          <p className="flex items-baseline text-base font-bold leading-none lg:text-xl">
-            {currentControl ?? formatMoney(current)}
-            {goalControl ? (
-              <span className="opacity-55">/{goalControl}</span>
-            ) : goalCents > 0 ? (
-              <span className="opacity-55">/{formatMoney(goalCents)}</span>
-            ) : null}
-          </p>
-        </div>
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="truncate text-sm font-bold tracking-wide lg:text-base">
+          {goalLabel}
+        </p>
+        <p className="flex shrink-0 items-baseline text-base font-black leading-none lg:text-xl">
+          {currentControl ?? formatMoney(current)}
+          {goalControl ? (
+            <span className="opacity-50">/{goalControl}</span>
+          ) : goalCents > 0 ? (
+            <span className="opacity-50">/{formatMoney(goalCents)}</span>
+          ) : null}
+        </p>
       </div>
+
+      {/* The fill is the loudest thing on the bar, so it gets real height and a
+          marker riding its tip rather than ending on a flat edge. */}
+      {/* The marker overhangs the track, so the row carries its own room. */}
       <div
-        className="mt-3 h-2.5 overflow-hidden rounded-full"
+        className="relative mt-3.5 h-4 rounded-full"
         style={{ backgroundColor: `${ink}1f` }}
       >
         <div
           className="h-full rounded-full transition-[width] duration-slow ease-standard"
-          style={{ width: `${progress * 100}%`, backgroundColor: accent }}
+          style={{
+            width: `${progress * 100}%`,
+            background: appearance.goalRainbow
+              ? rainbowFill(appearance.vivid)
+              : accent,
+            boxShadow: `0 0 12px ${accent}66`,
+          }}
         />
+        {shape !== "none" && progress > 0 ? (
+          <svg
+            aria-hidden="true"
+            className="absolute top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-slow ease-standard"
+            style={{
+              left: `${progress * 100}%`,
+              filter: `drop-shadow(0 0 6px ${accent})`,
+            }}
+            viewBox="0 0 24 24"
+          >
+            <path
+              d={GOAL_SHAPE_PATHS[shape]}
+              fill="#fff"
+              stroke={appearance.goalRainbow ? "#fff" : accent}
+              strokeLinejoin="round"
+              strokeWidth="2.5"
+            />
+          </svg>
+        ) : null}
       </div>
-      {/* The one piece of branding on the overlay, on the source that is always
-          on screen rather than on the wheel, which is an event element. */}
-      <p className="mt-2 text-right text-[0.6rem] font-semibold tracking-[0.1em] opacity-35">
-        tributes.bio
-      </p>
+
     </div>
   );
 }
 
 export function OverlayQueue({
-  config,
+  appearance,
   entries,
   state,
   maxVisible = 5,
   hideNames = false,
   entryControl,
 }: {
-  config: SpinConfig;
+  appearance: OverlayAppearance;
   entries: SpinQueueEntry[];
   state?: SpinState | null;
   maxVisible?: number;
@@ -293,9 +359,8 @@ export function OverlayQueue({
   /** Per-row action rendered on the Live page only, never on the OBS source. */
   entryControl?: (entry: SpinQueueEntry) => ReactNode;
 }) {
-  const appearance = appearanceOf(config);
-  const ink = wheelInk(appearance);
-  const accent = wheelAccent(appearance);
+  const ink = overlayInk(appearance);
+  const accent = overlayAccent(appearance);
 
   // A run in progress keeps its queue entry — it is re-queued between spins —
   // so the viewer on the wheel is lifted out of the waiting list and called out
@@ -311,14 +376,16 @@ export function OverlayQueue({
 
   return (
     <div
-      className="w-full max-w-[320px] rounded-3xl border p-4 backdrop-blur-md"
-      style={{ ...wheelGlass(appearance), color: ink }}
+      className="w-full max-w-[320px] rounded-3xl border-2 p-4 backdrop-blur-md"
+      style={{ ...overlaySurface(appearance, 0.88), color: ink }}
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold opacity-80">Queue</p>
+        <p className="text-sm font-bold uppercase tracking-[0.12em] opacity-80">
+          Queue
+        </p>
         <span
-          className="rounded-full px-2 py-0.5 text-xs font-bold"
-          style={{ backgroundColor: `${ink}1f` }}
+          className="rounded-full px-2 py-0.5 text-xs font-black"
+          style={{ backgroundColor: accent, color: "#fff" }}
         >
           {waiting.length}
         </span>
@@ -329,7 +396,7 @@ export function OverlayQueue({
           <p className="flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] opacity-70">
             <span
               className="h-1.5 w-1.5 animate-pulse rounded-full"
-              style={{ backgroundColor: accent }}
+              style={{ backgroundColor: accent, boxShadow: `0 0 6px ${accent}` }}
             />
             Spinning now
           </p>
@@ -369,6 +436,13 @@ export function OverlayQueue({
       ) : (
         <p className="mt-3 text-sm opacity-55">Nobody waiting</p>
       )}
+
+      {/* The overlay's one piece of branding. It lives here rather than on the
+          goal bar because this panel has the room, and rather than on the wheel
+          because the wheel is an event element that comes and goes. */}
+      <p className="mt-3 text-right text-[0.6rem] font-semibold tracking-[0.12em] opacity-35">
+        tributes.bio
+      </p>
     </div>
   );
 }

@@ -398,6 +398,16 @@ select:focus-visible,
   }
 }
 
+@keyframes bulb-chase {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @keyframes award-flash {
   0% {
     opacity: 0;

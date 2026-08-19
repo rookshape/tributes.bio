@@ -12,6 +12,13 @@ import {
   DEFAULT_SOUND_SETTINGS,
   type SoundSettings,
 } from "./overlaySounds";
+import {
+  DEFAULT_OVERLAY_APPEARANCE,
+  isGoalShape,
+  normalizeOverlayHue,
+  normalizeOverlayTone,
+  type OverlayAppearance,
+} from "./overlayTheme";
 
 /**
  * The tribute goal belongs to the creator, not to a wheel.
@@ -35,6 +42,8 @@ export const DEFAULT_GOAL_LABEL = "Tribute Goal";
 export type SpinOverlaySettings = {
   creatorId: string;
   sound: SoundSettings;
+  /** Colors for the goal bar, running total, and queue — never the wheel. */
+  appearance: OverlayAppearance;
   /** Names shown on the queue source before it collapses into a count. */
   queueMaxVisible: number;
   /** Hide viewer names entirely, showing only positions. */
@@ -43,6 +52,7 @@ export type SpinOverlaySettings = {
 
 export const DEFAULT_OVERLAY_SETTINGS: Omit<SpinOverlaySettings, "creatorId"> = {
   sound: DEFAULT_SOUND_SETTINGS,
+  appearance: DEFAULT_OVERLAY_APPEARANCE,
   queueMaxVisible: 5,
   queueHideNames: false,
 };
@@ -68,6 +78,15 @@ function mapOverlaySettings(
       win: bool("soundWin", DEFAULT_SOUND_SETTINGS.win),
       queue: bool("soundQueue", DEFAULT_SOUND_SETTINGS.queue),
     },
+    appearance: {
+      hue: normalizeOverlayHue(data?.overlayHue),
+      tone: normalizeOverlayTone(data?.overlayTone),
+      vivid: bool("overlayVivid", DEFAULT_OVERLAY_APPEARANCE.vivid),
+      goalShape: isGoalShape(data?.goalShape)
+        ? data.goalShape
+        : DEFAULT_OVERLAY_APPEARANCE.goalShape,
+      goalRainbow: bool("goalRainbow", DEFAULT_OVERLAY_APPEARANCE.goalRainbow),
+    },
     queueMaxVisible: Math.min(
       10,
       Math.max(1, Math.round(Number(data?.queueMaxVisible)) || DEFAULT_OVERLAY_SETTINGS.queueMaxVisible),
@@ -88,6 +107,11 @@ export async function saveOverlaySettings(settings: SpinOverlaySettings) {
       soundResult: settings.sound.result,
       soundWin: settings.sound.win,
       soundQueue: settings.sound.queue,
+      overlayHue: normalizeOverlayHue(settings.appearance.hue),
+      overlayTone: normalizeOverlayTone(settings.appearance.tone),
+      overlayVivid: settings.appearance.vivid,
+      goalShape: settings.appearance.goalShape,
+      goalRainbow: settings.appearance.goalRainbow,
       queueMaxVisible: Math.min(10, Math.max(1, Math.round(settings.queueMaxVisible))),
       queueHideNames: settings.queueHideNames,
       updatedAt: serverTimestamp(),

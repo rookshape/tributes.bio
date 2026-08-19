@@ -88,6 +88,12 @@ export function SpinOverlayPage() {
     return subscribeSpinGoal(creatorId, setGoal);
   }, [creatorId, activePart]);
 
+  // Every source except the wheel is themed from these settings.
+  useEffect(() => {
+    if (!creatorId || activePart === "wheel") return;
+    return subscribeOverlaySettings(creatorId, setSettings);
+  }, [creatorId, activePart]);
+
   // Only the wheel source makes noise. Every source shares this state, so
   // without that a streamer running all four would hear each sound four times.
   useEffect(() => {
@@ -203,14 +209,14 @@ export function SpinOverlayPage() {
       ) : null}
       {activePart === "total" ? (
         <OverlayTotal
-          config={queuedWheel ?? config}
+          appearance={settings.appearance}
           spinning={spinning}
           state={state}
         />
       ) : null}
       {activePart === "bar" ? (
         <OverlayGoalBar
-          config={config}
+          appearance={settings.appearance}
           goalCents={goal.goalCents}
           goalLabel={goal.label}
           state={state}
@@ -218,7 +224,7 @@ export function SpinOverlayPage() {
       ) : null}
       {activePart === "queue" ? (
         <OverlayQueue
-          config={config}
+          appearance={settings.appearance}
           entries={queue.filter((entry) => entry.status === "queued")}
           hideNames={settings.queueHideNames}
           maxVisible={settings.queueMaxVisible}

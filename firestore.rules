@@ -219,6 +219,8 @@ service cloud.firestore {
             'soundEnabled', 'soundVolume', 'soundSpin', 'soundTick',
             'soundResult', 'soundWin', 'soundQueue',
             'queueMaxVisible', 'queueHideNames',
+            'overlayHue', 'overlayTone', 'overlayVivid',
+            'goalShape', 'goalRainbow',
             'updatedAt'
           ])
           && request.resource.data.creatorId == creatorId
@@ -239,7 +241,18 @@ service cloud.firestore {
           && (!('queueMaxVisible' in request.resource.data)
             || (request.resource.data.queueMaxVisible is int
               && request.resource.data.queueMaxVisible >= 1
-              && request.resource.data.queueMaxVisible <= 10));
+              && request.resource.data.queueMaxVisible <= 10))
+          && (!('overlayHue' in request.resource.data)
+            || (request.resource.data.overlayHue is int
+              && request.resource.data.overlayHue >= 0
+              && request.resource.data.overlayHue <= 345))
+          && (!('overlayTone' in request.resource.data)
+            || (request.resource.data.overlayTone is int
+              && request.resource.data.overlayTone >= 0
+              && request.resource.data.overlayTone <= 100))
+          && (!('goalShape' in request.resource.data)
+            || request.resource.data.goalShape in
+              ['circle', 'star', 'heart', 'diamond', 'none']);
         allow delete: if false;
       }
 
