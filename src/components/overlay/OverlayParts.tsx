@@ -7,6 +7,7 @@ import {
   overlayDisplay,
   overlayInk,
   overlaySurface,
+  markerGlow,
   rainbowFill,
   type OverlayAppearance,
 } from "../../lib/overlayTheme";
@@ -72,7 +73,14 @@ export function OverlayWheel({
 }) {
   return (
     <div className="w-full max-w-[520px]">
-      <SpinWheel animation={animation} onTick={onTick} slices={config.slices} />
+      <SpinWheel
+        animation={animation}
+        name={config.name}
+        onTick={onTick}
+        slices={config.slices}
+        wheelHue={config.wheelHue}
+        wheelTone={config.wheelTone}
+      />
     </div>
   );
 }
@@ -281,9 +289,22 @@ export function OverlayGoalBar({
   const progress = goalCents > 0 ? Math.min(1, current / goalCents) : 0;
   const shape = appearance.goalShape;
 
+  // The marker swells when the total climbs. Re-keying replays the animation;
+  // a correction downwards is not a win, so it does not celebrate.
+  const [pulseKey, setPulseKey] = useState(0);
+  const previousCurrentRef = useRef(current);
+
+  useEffect(() => {
+    if (current > previousCurrentRef.current) setPulseKey((key) => key + 1);
+    previousCurrentRef.current = current;
+  }, [current]);
+
   return (
     <div
-      className="w-full max-w-[600px] rounded-full border-2 px-7 py-4 backdrop-blur-md"
+      // Deeper at the bottom on purpose: the marker overhangs the track by ten
+      // pixels and throws a glow past that, so equal padding would leave it
+      // grazing the pill's edge.
+      className="w-full max-w-[600px] rounded-full border-2 px-7 pb-6 pt-2.5 backdrop-blur-md"
       style={{ ...overlaySurface(appearance, 0.88), color: ink }}
     >
       <div className="flex items-baseline justify-between gap-4">
@@ -304,7 +325,7 @@ export function OverlayGoalBar({
           marker riding its tip rather than ending on a flat edge. */}
       {/* The marker overhangs the track, so the row carries its own room. */}
       <div
-        className="relative mt-3.5 h-4 rounded-full"
+        className="relative mt-2.5 h-4 rounded-full"
         style={{ backgroundColor: `${ink}1f` }}
       >
         <div
@@ -320,17 +341,24 @@ export function OverlayGoalBar({
         {shape !== "none" && progress > 0 ? (
           <svg
             aria-hidden="true"
-            className="absolute top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-slow ease-standard"
+            className="absolute top-1/2 h-9 w-9 transition-[left] duration-slow ease-standard"
+            // The translate lives in the transform rather than in a class so
+            // the pulse keyframe can carry it too.
+            key={`marker-${pulseKey}`}
             style={{
               left: `${progress * 100}%`,
-              filter: `drop-shadow(0 0 6px ${accent})`,
+              transform: "translate(-50%, -50%)",
+              filter: markerGlow(appearance),
+              animation: pulseKey
+                ? "marker-pulse 900ms var(--ease-standard)"
+                : undefined,
             }}
             viewBox="0 0 24 24"
           >
             <path
               d={GOAL_SHAPE_PATHS[shape]}
-              fill="#fff"
-              stroke={appearance.goalRainbow ? "#fff" : accent}
+              fill={appearance.goalRainbow ? "#fff" : accent}
+              stroke="#fff"
               strokeLinejoin="round"
               strokeWidth="2.5"
             />

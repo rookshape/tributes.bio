@@ -496,6 +496,69 @@ export function LiveControlPage() {
         </p>
       </div>
 
+      {/* The overlay itself, at working size. */}
+      <div
+        className="mt-5 rounded-panel border border-line p-5 sm:p-8"
+        style={STAGE}
+      >
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="flex min-w-0 flex-col items-center gap-6">
+            {/* The total sits beside the wheel, where the eye already is during
+                a spin, rather than stacked underneath it. */}
+            <div className="flex w-full flex-wrap items-center justify-center gap-6">
+              <div className="w-full max-w-[380px]">
+                <OverlayWheel animation={animation} config={shownWheel} />
+              </div>
+              <OverlayTotal
+                appearance={settings.appearance}
+                spinning={spinning}
+                state={state}
+              />
+            </div>
+            <LiveGoalBar
+              appearance={settings.appearance}
+              goal={goal}
+              onCorrectTotal={async (totalCents) => {
+                // The callable takes a delta, so a corrected figure becomes the
+                // difference from whatever the counter reads right now.
+                const delta = totalCents - (state?.counterCents ?? 0);
+                if (delta !== 0) await adjustSpinCounter(creatorId, delta);
+              }}
+              onSaveGoal={(goalCents) =>
+                saveSpinGoal({
+                  ...goal,
+                  creatorId,
+                  goalCents,
+                  label: DEFAULT_GOAL_LABEL,
+                }).then(setGoal)
+              }
+              state={state}
+            />
+          </div>
+          <div className="mx-auto w-full max-w-[320px] lg:mx-0">
+            <OverlayQueue
+              appearance={settings.appearance}
+              entries={queued}
+              entryControl={(entry) => (
+                <Tooltip content="Remove and release their hold">
+                  <IconButton
+                    className="h-7 w-7 border-none bg-transparent opacity-40 hover:opacity-100"
+                    icon={<X size={14} />}
+                    label={`Remove ${entry.viewerName} from the queue`}
+                    onClick={() =>
+                      void run(() => cancelSpinQueueEntry(creatorId, entry.id))
+                    }
+                  />
+                </Tooltip>
+              )}
+              hideNames={settings.queueHideNames}
+              maxVisible={settings.queueMaxVisible}
+              state={state}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Setup, not stream controls. */}
       <details className="group mt-4">
         <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-detail font-medium text-content-muted hover:text-content">
@@ -837,68 +900,6 @@ export function LiveControlPage() {
           </div>
         ) : null}
       </details>
-      {/* The overlay itself, at working size. */}
-      <div
-        className="mt-5 rounded-panel border border-line p-5 sm:p-8"
-        style={STAGE}
-      >
-        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="flex min-w-0 flex-col items-center gap-6">
-            {/* The total sits beside the wheel, where the eye already is during
-                a spin, rather than stacked underneath it. */}
-            <div className="flex w-full flex-wrap items-center justify-center gap-6">
-              <div className="w-full max-w-[380px]">
-                <OverlayWheel animation={animation} config={shownWheel} />
-              </div>
-              <OverlayTotal
-                appearance={settings.appearance}
-                spinning={spinning}
-                state={state}
-              />
-            </div>
-            <LiveGoalBar
-              appearance={settings.appearance}
-              goal={goal}
-              onCorrectTotal={async (totalCents) => {
-                // The callable takes a delta, so a corrected figure becomes the
-                // difference from whatever the counter reads right now.
-                const delta = totalCents - (state?.counterCents ?? 0);
-                if (delta !== 0) await adjustSpinCounter(creatorId, delta);
-              }}
-              onSaveGoal={(goalCents) =>
-                saveSpinGoal({
-                  ...goal,
-                  creatorId,
-                  goalCents,
-                  label: DEFAULT_GOAL_LABEL,
-                }).then(setGoal)
-              }
-              state={state}
-            />
-          </div>
-          <div className="mx-auto w-full max-w-[320px] lg:mx-0">
-            <OverlayQueue
-              appearance={settings.appearance}
-              entries={queued}
-              entryControl={(entry) => (
-                <Tooltip content="Remove and release their hold">
-                  <IconButton
-                    className="h-7 w-7 border-none bg-transparent opacity-40 hover:opacity-100"
-                    icon={<X size={14} />}
-                    label={`Remove ${entry.viewerName} from the queue`}
-                    onClick={() =>
-                      void run(() => cancelSpinQueueEntry(creatorId, entry.id))
-                    }
-                  />
-                </Tooltip>
-              )}
-              hideNames={settings.queueHideNames}
-              maxVisible={settings.queueMaxVisible}
-              state={state}
-            />
-          </div>
-        </div>
-      </div>
 
     </section>
   );

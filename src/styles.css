@@ -398,6 +398,20 @@ select:focus-visible,
   }
 }
 
+/* The marker on the goal bar swells when the total climbs. The translate is
+   part of the keyframe because it also centres the marker on the fill's tip. */
+@keyframes marker-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  35% {
+    transform: translate(-50%, -50%) scale(1.4);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
 @keyframes bulb-chase {
   0%,
   100% {

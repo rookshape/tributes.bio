@@ -1,7 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Wheel } from "spin-wheel/dist/spin-wheel-esm.js";
 import type { SpinSlice } from "../lib/types";
-import { LABEL_OUTLINE, labelColorForSlice, tintFromSlice } from "../lib/wheelPalette";
+import {
+  LABEL_OUTLINE,
+  labelColorForSlice,
+  tintFromSlice,
+  wheelInk,
+} from "../lib/wheelPalette";
 
 export type SpinAnimation = {
   id: string;
@@ -12,6 +17,11 @@ export type SpinAnimation = {
 
 type SpinWheelProps = {
   slices: SpinSlice[];
+  /** Set into the rim, curved down each side. */
+  name?: string;
+  /** Hue and tone the rim lettering takes its colour from. */
+  wheelHue?: number;
+  wheelTone?: number;
   animation?: SpinAnimation | null;
   onRest?: () => void;
   /** Fires as each slice boundary passes the pointer, for the tick sound. */
@@ -22,7 +32,17 @@ type SpinWheelProps = {
 const LABEL_CENTER = 50;
 const LABEL_RADIUS = 33;
 
-export function SpinWheel({ slices, animation, onRest, onTick }: SpinWheelProps) {
+export function SpinWheel({
+  slices,
+  animation,
+  name,
+  wheelHue = 210,
+  wheelTone = 20,
+  onRest,
+  onTick,
+}: SpinWheelProps) {
+  // Stable per instance: two arcs in one document would otherwise collide.
+  const rimId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<Wheel | null>(null);
   const playedSpinIdRef = useRef<string | null>(null);
@@ -151,6 +171,9 @@ export function SpinWheel({ slices, animation, onRest, onTick }: SpinWheelProps)
   }, [animation]);
 
   const tint = slices[0] ? tintFromSlice(slices[0].color) : "#ffffff";
+  // Reads against the white rim, so it takes the wheel's dark ink rather than
+  // a shade of the slice — a pale slice colour vanishes on white.
+  const rimInk = wheelInk({ hue: wheelHue, tone: wheelTone });
 
   return (
     <div className="relative aspect-square w-full" aria-label="Spin wheel">
@@ -168,6 +191,39 @@ export function SpinWheel({ slices, animation, onRest, onTick }: SpinWheelProps)
           transformOrigin: "50% 0",
         }}
       />
+      {/* The wheel's own name stamped into the rim on the left and right.
+          The pointer owns the top of the rim, so arcs centred there would run
+          underneath it; on the sides both copies stay clear of it and of each
+          other. Each arc sweeps outward-facing, so the right reads top to
+          bottom and the left bottom to top, the way a stamped rim reads. */}
+      {name ? (
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[6]"
+          viewBox="0 0 100 100"
+        >
+          <defs>
+            {/* Radius 43 puts the baseline just off the slices, so the glyphs
+                sit in the white rim rather than over the colour. */}
+            <path d="M 50,7 A 43,43 0 0 1 50,93" id={`${rimId}-right`} />
+            <path d="M 50,93 A 43,43 0 0 1 50,7" id={`${rimId}-left`} />
+          </defs>
+          {[`${rimId}-right`, `${rimId}-left`].map((href) => (
+            <text
+              fill={rimInk}
+              fontSize="3.5"
+              fontWeight="700"
+              key={href}
+              letterSpacing="0.5"
+              opacity="0.55"
+            >
+              <textPath href={`#${href}`} startOffset="50%" textAnchor="middle">
+                {name}
+              </textPath>
+            </text>
+          ))}
+        </svg>
+      ) : null}
       <div className="absolute inset-[5%]" ref={containerRef} />
       <svg
         aria-hidden="true"

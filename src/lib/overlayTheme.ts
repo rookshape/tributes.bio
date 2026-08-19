@@ -190,6 +190,30 @@ export function rainbowFill(vivid: boolean) {
   return `linear-gradient(90deg, ${stops.join(", ")})`;
 }
 
+/**
+ * Halo behind the goal bar's marker.
+ *
+ * A drop-shadow only carries one colour, so a rainbow glow is built from six
+ * offset shadows spaced around the shape — the spill lands in a different hue
+ * on each side rather than being one flat colour.
+ */
+export function markerGlow(appearance: OverlayAppearance) {
+  if (!appearance.goalRainbow) {
+    const accent = overlayAccent(appearance);
+    return `drop-shadow(0 0 5px ${accent}) drop-shadow(0 0 12px ${accent}aa)`;
+  }
+
+  return [0, 60, 120, 180, 240, 300]
+    .map((hue) => {
+      const color = oklchToHex(0.68, Math.min(maxChroma(0.68, hue), 0.22), hue);
+      const angle = (hue / 360) * Math.PI * 2;
+      const x = (Math.cos(angle) * 2.5).toFixed(1);
+      const y = (Math.sin(angle) * 2.5).toFixed(1);
+      return `drop-shadow(${x}px ${y}px 4px ${color})`;
+    })
+    .join(" ");
+}
+
 /** Gradient showing every hue available at the current tone. */
 export function overlayHueTrack(appearance: OverlayAppearance) {
   const stops: string[] = [];
