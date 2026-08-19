@@ -398,6 +398,41 @@ select:focus-visible,
   }
 }
 
+/* The lever is pulled when a spin starts: down hard, past centre on the way
+   back, then settles — a sprung handle rather than a rotating stick. */
+@keyframes handle-pull {
+  0% {
+    transform: rotate(0deg);
+  }
+  22% {
+    transform: rotate(42deg);
+  }
+  55% {
+    transform: rotate(-7deg);
+  }
+  78% {
+    transform: rotate(3deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* A gloss travelling across the main display when the number lands. */
+@keyframes screen-shine {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(320%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
 /* The marker on the goal bar swells when the total climbs. The translate is
    part of the keyframe because it also centres the marker on the fill's tip. */
 @keyframes marker-pulse {

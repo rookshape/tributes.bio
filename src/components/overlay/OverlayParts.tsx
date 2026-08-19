@@ -28,6 +28,9 @@ export type OverlayPart = "wheel" | "total" | "bar" | "queue";
 /** Matches the marker-pulse keyframe in styles.css. */
 const MARKER_PULSE_MS = 900;
 
+/** Matches the handle-pull keyframe in styles.css. */
+const LEVER_PULL_MS = 700;
+
 export const OVERLAY_PARTS: {
   id: OverlayPart;
   label: string;
@@ -45,7 +48,7 @@ export const OVERLAY_PARTS: {
     id: "total",
     label: "Running total",
     hint: "The tab climbing as they spin",
-    size: { width: 420, height: 180 },
+    size: { width: 420, height: 240 },
   },
   {
     id: "bar",
@@ -113,11 +116,17 @@ function Reel({ char }: { char: string }) {
   );
 }
 
-/** Marquee bulbs along the cabinet, chasing while the wheel is turning. */
+/**
+ * Marquee bulbs along the cabinet's crown.
+ *
+ * These are decoration, and they say one thing: whether a spin is live. The
+ * dots that carry a number live inside the top screen instead, so position
+ * tells you which kind you are looking at.
+ */
 function Bulbs({ accent, running }: { accent: string; running: boolean }) {
   return (
     <span aria-hidden="true" className="flex items-center justify-center gap-[7px]">
-      {Array.from({ length: 13 }, (_, index) => (
+      {Array.from({ length: 11 }, (_, index) => (
         <span
           className="h-[5px] w-[5px] rounded-full"
           key={index}
@@ -128,7 +137,7 @@ function Bulbs({ accent, running }: { accent: string; running: boolean }) {
             animation: running
               ? `bulb-chase 900ms ${index * 70}ms linear infinite`
               : undefined,
-            opacity: running ? undefined : 0.32,
+            opacity: running ? undefined : 0.28,
           }}
         />
       ))}
@@ -137,13 +146,117 @@ function Bulbs({ accent, running }: { accent: string; running: boolean }) {
 }
 
 /**
+ * A screen set into the cabinet. Dark, sunk behind a rim, with a fixed gloss
+ * across the top — the three cues that read as "glass" without needing bevels
+ * or gradients heavy enough to fight the rest of the overlay.
+ */
+function Screen({
+  accent,
+  children,
+  display,
+  className = "",
+  shineKey,
+}: {
+  accent: string;
+  children: ReactNode;
+  display: string;
+  className?: string;
+  /** Changing this replays the gloss sweep. */
+  shineKey?: number;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-xl ${className}`}
+      style={{
+        backgroundColor: display,
+        boxShadow: `inset 0 2px 9px rgba(0,0,0,0.6), inset 0 0 0 1px ${accent}2e`,
+      }}
+    >
+      {/* Static gloss across the upper half. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-xl"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0))",
+        }}
+      />
+      {shineKey ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 w-1/3"
+          key={shineKey}
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.5), rgba(255,255,255,0))",
+            animation: "screen-shine 900ms var(--ease-standard)",
+          }}
+        />
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The lever, sprung when a spin starts.
+ *
+ * It is mounted on an arm off the cabinet's side rather than floating beside
+ * it, because a stem with a gap under it reads as a stray dot on a stick.
+ */
+function Lever({
+  accent,
+  ink,
+  pullKey,
+}: {
+  accent: string;
+  ink: string;
+  pullKey: number;
+}) {
+  return (
+    <div aria-hidden="true" className="relative w-11 shrink-0 self-center">
+      {/* Arm out of the cabinet, and the boss the stem pivots on. */}
+      <span
+        className="absolute left-0 top-1/2 h-[7px] w-5 -translate-y-1/2 rounded-r-full"
+        style={{ backgroundColor: `${ink}45` }}
+      />
+      <span
+        className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full"
+        style={{ backgroundColor: `${ink}38` }}
+      />
+      <div
+        className="absolute bottom-1/2 left-4 h-[74px] w-[18px] origin-bottom"
+        key={pullKey}
+        style={{
+          animation: pullKey
+            ? `handle-pull ${LEVER_PULL_MS}ms var(--ease-standard)`
+            : undefined,
+        }}
+      >
+        <span
+          className="absolute bottom-0 left-1/2 h-full w-[7px] -translate-x-1/2 rounded-full"
+          style={{ backgroundColor: `${ink}52` }}
+        />
+        <span
+          className="absolute left-1/2 top-0 h-8 w-8 -translate-x-1/2 rounded-full"
+          style={{
+            background: `radial-gradient(circle at 34% 30%, #ffffffcc, ${accent})`,
+            boxShadow: `0 2px 6px rgba(0,0,0,0.3), 0 0 10px ${accent}88`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
  * The running total — the part of a run people actually watch.
  *
- * Built as a slot cabinet rather than a card: marquee bulbs across the top,
- * the number sunk into a dark display glass so it glows against the panel, and
- * the spins left shown as bulbs of their own. Digits roll into place, the
- * cabinet kicks when the number moves, and whatever the slice handed out flies
- * up over the top.
+ * Three screens set into one cabinet, each answering a different question:
+ * what is coming (the armed multiplier and spins left), what it is worth (the
+ * total), and what just happened (the slice that landed). The last one matters
+ * because it is the only place that explains why the number jumped — the wheel
+ * is a separate source and may not be in the scene at all.
  */
 export function OverlayTotal({
   appearance,
@@ -166,8 +279,8 @@ export function OverlayTotal({
   const multiplier = spinning ? 0 : (state?.multiplier ?? 0);
   const spinsAwarded = spinning ? 0 : (state?.spinsAwarded ?? 0);
 
-  // Re-key the kick and the award flash on each settled result so the CSS
-  // animations replay rather than firing once and staying put.
+  // Re-key the kick and the gloss on each settled result so the CSS animations
+  // replay rather than firing once and staying put.
   const [pulseKey, setPulseKey] = useState(0);
   const previousTabRef = useRef(tabCents);
 
@@ -178,91 +291,117 @@ export function OverlayTotal({
     }
   }, [tabCents]);
 
+  // The lever is pulled by the spin starting, not by the result landing.
+  const [pullKey, setPullKey] = useState(0);
+  const previousSpinRef = useRef(state?.spinId ?? null);
+
+  useEffect(() => {
+    if (state?.spinId && state.spinId !== previousSpinRef.current) {
+      previousSpinRef.current = state.spinId;
+      setPullKey((key) => key + 1);
+    }
+  }, [state?.spinId]);
+
   if (!state?.viewerName) {
     return null;
   }
 
   const amount = formatMoney(tabCents);
-  // A multiplier already grants its own spin, so it is called out as the
-  // multiplier rather than as "+1 spin".
-  const award =
-    multiplier > 1
-      ? `${multiplier}\u00d7`
+  // Never the cash figure: that is already the main screen, and showing it
+  // twice reads as a fault rather than as confirmation.
+  const status = spinning
+    ? "Spinning"
+    : multiplier > 1
+      ? `${multiplier}\u00d7 next hit`
       : spinsAwarded > 0
-        ? `+${spinsAwarded} ${spinsAwarded === 1 ? "SPIN" : "SPINS"}`
-        : null;
+        ? `+${spinsAwarded} ${spinsAwarded === 1 ? "spin" : "spins"}`
+        : spinsLeft > 0
+          ? `${spinsLeft} ${spinsLeft === 1 ? "spin" : "spins"} left`
+          : "Round complete";
 
   return (
-    <div
-      className="relative w-full max-w-[340px] rounded-[26px] border-2 px-3.5 pb-3 pt-2.5 text-center backdrop-blur-md"
-      key={`cabinet-${pulseKey}`}
-      style={{
-        ...overlaySurface(appearance, 0.9),
-        color: ink,
-        animation: "total-pop 480ms var(--ease-standard)",
-      }}
-    >
-      {award ? (
-        <span
-          className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full px-3.5 py-1 text-sm font-black tracking-wide lg:text-base"
-          key={`award-${pulseKey}`}
-          style={{
-            animation: "award-flash 1.6s var(--ease-standard) forwards",
-            backgroundColor: accent,
-            boxShadow: `0 0 18px ${accent}`,
-            color: "#fff",
-          }}
-        >
-          {award}
-        </span>
-      ) : null}
-
-      <Bulbs accent={accent} running={spinning} />
-
-      {/* The number sits in a dark display so it glows instead of sitting flat
-          on the panel — the single biggest thing separating this from a card. */}
+    <div className="flex w-full max-w-[340px] items-stretch">
       <div
-        className="mt-2 rounded-2xl px-3 py-2"
+        className="relative min-w-0 flex-1 rounded-[26px] border-2 px-3 pb-3 pt-2.5"
+        key={`cabinet-${pulseKey}`}
         style={{
-          backgroundColor: display,
-          boxShadow: `inset 0 2px 10px rgba(0,0,0,0.55), inset 0 0 0 1px ${accent}33`,
+          ...overlaySurface(appearance, 0.92),
+          color: ink,
+          animation: "total-pop 480ms var(--ease-standard)",
+          boxShadow: "0 6px 22px rgba(15,23,32,0.16)",
         }}
       >
-        <p
-          className="flex items-center justify-center text-5xl font-black leading-none lg:text-6xl"
-          style={{
-            color: digit,
-            // Hot core, coloured spill: a tight halo hugging the glyph and a
-            // wide faint one for the bloom.
-            textShadow: `0 0 4px ${accent}, 0 0 14px ${accent}dd, 0 0 34px ${accent}77`,
-          }}
-        >
-          {amount.split("").map((char, index) => (
-            <Reel char={char} key={`${index}-${char}`} />
-          ))}
-        </p>
-      </div>
+        <Bulbs accent={accent} running={spinning} />
 
-      <div className="mt-2 flex items-center justify-center gap-2 text-[0.7rem] font-bold tracking-[0.12em] lg:text-xs">
-        {spinsLeft > 0 ? (
-          <>
-            <span className="flex gap-1">
-              {Array.from({ length: Math.min(spinsLeft, 6) }, (_, index) => (
+        {/* Top screen: what is coming. */}
+        <Screen accent={accent} className="mt-2 px-3 py-1.5" display={display}>
+          <div className="flex items-center justify-between gap-3">
+            <span
+              className="text-sm font-black leading-none lg:text-base"
+              style={{
+                color: multiplier > 1 ? digit : `${digit}4d`,
+                textShadow: multiplier > 1 ? `0 0 8px ${accent}` : undefined,
+              }}
+            >
+              {multiplier > 1 ? `${multiplier}\u00d7` : "1\u00d7"}
+            </span>
+            <span className="flex items-center gap-1">
+              {/* A fixed floor of slots: an empty row reads as a fault, a row
+                  of unlit slots reads as none left. */}
+              {Array.from({ length: Math.max(3, Math.min(spinsLeft, 6)) }, (_, index) => (
                 <span
-                  className="h-2 w-2 rounded-full"
+                  className="h-[7px] w-[7px] rounded-full"
                   key={index}
-                  style={{ backgroundColor: accent, boxShadow: `0 0 7px ${accent}` }}
+                  style={
+                    index < spinsLeft
+                      ? { backgroundColor: accent, boxShadow: `0 0 6px ${accent}` }
+                      : { backgroundColor: `${digit}26` }
+                  }
                 />
               ))}
+              {spinsLeft > 6 ? (
+                <span className="ml-0.5 text-[0.65rem] font-bold" style={{ color: digit }}>
+                  {spinsLeft}
+                </span>
+              ) : null}
             </span>
-            <span className="opacity-70">
-              {spinsLeft > 6 ? `${spinsLeft} Left` : "Left"}
-            </span>
-          </>
-        ) : (
-          <span className="opacity-55">Round Complete</span>
-        )}
+          </div>
+        </Screen>
+
+        {/* Main screen: what it is worth. */}
+        <Screen
+          accent={accent}
+          className="mt-1.5 px-3 py-3.5"
+          display={display}
+          shineKey={pulseKey}
+        >
+          <p
+            className="flex items-center justify-center text-5xl font-black leading-none lg:text-6xl"
+            style={{
+              color: digit,
+              // Hot core, coloured spill: a tight halo hugging the glyph and a
+              // wide faint one for the bloom.
+              textShadow: `0 0 4px ${accent}, 0 0 14px ${accent}dd, 0 0 34px ${accent}77`,
+            }}
+          >
+            {amount.split("").map((char, index) => (
+              <Reel char={char} key={`${index}-${char}`} />
+            ))}
+          </p>
+        </Screen>
+
+        {/* Bottom screen: what just happened. */}
+        <Screen accent={accent} className="mt-1.5 px-3 py-1.5" display={display}>
+          <p
+            className="truncate text-center text-[0.7rem] font-bold uppercase tracking-[0.18em] lg:text-xs"
+            style={{ color: `${digit}c4` }}
+          >
+            {status}
+          </p>
+        </Screen>
       </div>
+
+      <Lever accent={accent} ink={ink} pullKey={pullKey} />
     </div>
   );
 }
