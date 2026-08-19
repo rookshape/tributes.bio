@@ -377,7 +377,9 @@ select:focus-visible,
 
   .reel-strip {
     @apply absolute left-0 top-0 flex w-full flex-col;
-    transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+    /* Short: the figure itself climbs through the reels, so a long ease would
+       smear every intermediate value into the next. */
+    transition: transform 130ms linear;
   }
 
   .reel-cell {
@@ -398,23 +400,26 @@ select:focus-visible,
   }
 }
 
-/* The lever is pulled when a spin starts: down hard, past centre on the way
-   back, then settles — a sprung handle rather than a rotating stick. */
-@keyframes handle-pull {
-  0% {
-    transform: rotate(0deg);
-  }
-  22% {
-    transform: rotate(42deg);
-  }
-  55% {
-    transform: rotate(-7deg);
-  }
-  78% {
-    transform: rotate(3deg);
-  }
+/* The small screens breathe while a spin is resolving. */
+@keyframes screen-charge {
+  0%,
   100% {
-    transform: rotate(0deg);
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* An empty multiplier slot blinks, so the screen never looks dead. */
+@keyframes slot-idle {
+  0%,
+  62%,
+  100% {
+    opacity: 0.5;
+  }
+  74% {
+    opacity: 1;
   }
 }
 

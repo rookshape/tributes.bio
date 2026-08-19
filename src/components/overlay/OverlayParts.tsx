@@ -1,4 +1,11 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { SpinWheel, type SpinAnimation } from "../SpinWheel";
 import {
   GOAL_SHAPE_PATHS,
@@ -28,8 +35,8 @@ export type OverlayPart = "wheel" | "total" | "bar" | "queue";
 /** Matches the marker-pulse keyframe in styles.css. */
 const MARKER_PULSE_MS = 900;
 
-/** Matches the handle-pull keyframe in styles.css. */
-const LEVER_PULL_MS = 700;
+/** How long the figure takes to climb to a new total. */
+const COUNT_UP_MS = 850;
 
 export const OVERLAY_PARTS: {
   id: OverlayPart;
@@ -117,70 +124,98 @@ function Reel({ char }: { char: string }) {
 }
 
 /**
- * Marquee bulbs along the cabinet's crown.
+ * Counts a figure up to its target rather than swapping to it.
  *
- * These are decoration, and they say one thing: whether a spin is live. The
- * dots that carry a number live inside the top screen instead, so position
- * tells you which kind you are looking at.
+ * The climb is the point: a total that jumps straight to the answer gives the
+ * viewer nothing to watch, where one that races up reads as the machine
+ * tallying. Only increases animate — a correction downwards just lands.
  */
-function Bulbs({ accent, running }: { accent: string; running: boolean }) {
-  return (
-    <span aria-hidden="true" className="flex items-center justify-center gap-[7px]">
-      {Array.from({ length: 11 }, (_, index) => (
-        <span
-          className="h-[5px] w-[5px] rounded-full"
-          key={index}
-          style={{
-            backgroundColor: accent,
-            boxShadow: `0 0 6px ${accent}`,
-            // Offsetting each bulb turns a shared animation into a chase.
-            animation: running
-              ? `bulb-chase 900ms ${index * 70}ms linear infinite`
-              : undefined,
-            opacity: running ? undefined : 0.28,
-          }}
-        />
-      ))}
-    </span>
-  );
+function useCountUp(target: number, durationMs = COUNT_UP_MS) {
+  const [shown, setShown] = useState(target);
+  const fromRef = useRef(target);
+  const frameRef = useRef(0);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    fromRef.current = target;
+
+    if (target <= from) {
+      setShown(target);
+      return;
+    }
+
+    const startedAt = performance.now();
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / durationMs);
+      // Ease out, so it sprints away and settles onto the figure.
+      const eased = 1 - (1 - progress) ** 3;
+      const value = from + (target - from) * eased;
+      // Step in whole dollars on the way up. Interpolating raw cents lands on
+      // fractional values, and the formatter shows cents for those — so the
+      // figure would flip between "$12.34" and "$47" as it climbed, changing
+      // width every frame.
+      setShown(progress < 1 ? Math.round(value / 100) * 100 : target);
+      if (progress < 1) frameRef.current = requestAnimationFrame(step);
+    };
+
+    frameRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [target, durationMs]);
+
+  return shown;
 }
 
 /**
  * A screen set into the cabinet. Dark, sunk behind a rim, with a fixed gloss
- * across the top — the three cues that read as "glass" without needing bevels
- * or gradients heavy enough to fight the rest of the overlay.
+ * across the top — the cues that read as "glass" without bevels heavy enough
+ * to fight the rest of the overlay.
  */
 function Screen({
   accent,
   children,
   display,
   className = "",
+  charging = false,
   shineKey,
+  style,
 }: {
   accent: string;
   children: ReactNode;
   display: string;
   className?: string;
+  /** Breathes while a spin is resolving. */
+  charging?: boolean;
   /** Changing this replays the gloss sweep. */
   shineKey?: number;
+  style?: CSSProperties;
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-xl ${className}`}
+      className={`relative overflow-hidden ${className}`}
       style={{
         backgroundColor: display,
         boxShadow: `inset 0 2px 9px rgba(0,0,0,0.6), inset 0 0 0 1px ${accent}2e`,
+        ...style,
       }}
     >
-      {/* Static gloss across the upper half. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-xl"
+        className="pointer-events-none absolute inset-x-0 top-0 h-1/2"
         style={{
           background:
             "linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0))",
         }}
       />
+      {charging ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            boxShadow: `inset 0 0 14px ${accent}`,
+            animation: "screen-charge 1s ease-in-out infinite",
+          }}
+        />
+      ) : null}
       {shineKey ? (
         <span
           aria-hidden="true"
@@ -188,7 +223,7 @@ function Screen({
           key={shineKey}
           style={{
             background:
-              "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.5), rgba(255,255,255,0))",
+              "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.45), rgba(255,255,255,0))",
             animation: "screen-shine 900ms var(--ease-standard)",
           }}
         />
@@ -199,52 +234,46 @@ function Screen({
 }
 
 /**
- * The lever, sprung when a spin starts.
- *
- * It is mounted on an arm off the cabinet's side rather than floating beside
- * it, because a stem with a gap under it reads as a stray dot on a stick.
+ * The two small screens are tabs off the cabinet body — narrow at the free
+ * edge, flaring where they meet it, the way a browser tab used to. They sit
+ * behind the body so the flare disappears under it.
  */
-function Lever({
+const TAB_UP = "polygon(13% 0, 87% 0, 100% 100%, 0 100%)";
+const TAB_DOWN = "polygon(0 0, 100% 0, 87% 100%, 13% 100%)";
+
+function Tab({
   accent,
-  ink,
-  pullKey,
+  children,
+  charging,
+  display,
+  shape,
+  surface,
+  className,
 }: {
   accent: string;
-  ink: string;
-  pullKey: number;
+  children: ReactNode;
+  charging: boolean;
+  display: string;
+  shape: "up" | "down";
+  surface: CSSProperties;
+  className: string;
 }) {
+  const clipPath = shape === "up" ? TAB_UP : TAB_DOWN;
+
   return (
-    <div aria-hidden="true" className="relative w-11 shrink-0 self-center">
-      {/* Arm out of the cabinet, and the boss the stem pivots on. */}
-      <span
-        className="absolute left-0 top-1/2 h-[7px] w-5 -translate-y-1/2 rounded-r-full"
-        style={{ backgroundColor: `${ink}45` }}
-      />
-      <span
-        className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full"
-        style={{ backgroundColor: `${ink}38` }}
-      />
-      <div
-        className="absolute bottom-1/2 left-4 h-[74px] w-[18px] origin-bottom"
-        key={pullKey}
-        style={{
-          animation: pullKey
-            ? `handle-pull ${LEVER_PULL_MS}ms var(--ease-standard)`
-            : undefined,
-        }}
+    <div
+      className={`absolute z-0 ${className}`}
+      style={{ ...surface, clipPath, borderRadius: shape === "up" ? "9px 9px 0 0" : "0 0 9px 9px" }}
+    >
+      <Screen
+        accent={accent}
+        charging={charging}
+        className="absolute inset-[6px] grid place-items-center"
+        display={display}
+        style={{ clipPath, borderRadius: shape === "up" ? "6px 6px 0 0" : "0 0 6px 6px" }}
       >
-        <span
-          className="absolute bottom-0 left-1/2 h-full w-[7px] -translate-x-1/2 rounded-full"
-          style={{ backgroundColor: `${ink}52` }}
-        />
-        <span
-          className="absolute left-1/2 top-0 h-8 w-8 -translate-x-1/2 rounded-full"
-          style={{
-            background: `radial-gradient(circle at 34% 30%, #ffffffcc, ${accent})`,
-            boxShadow: `0 2px 6px rgba(0,0,0,0.3), 0 0 10px ${accent}88`,
-          }}
-        />
-      </div>
+        {children}
+      </Screen>
     </div>
   );
 }
@@ -252,11 +281,10 @@ function Lever({
 /**
  * The running total — the part of a run people actually watch.
  *
- * Three screens set into one cabinet, each answering a different question:
- * what is coming (the armed multiplier and spins left), what it is worth (the
- * total), and what just happened (the slice that landed). The last one matters
- * because it is the only place that explains why the number jumped — the wheel
- * is a separate source and may not be in the scene at all.
+ * One cabinet with the figure on it, and two tabs carrying the things a viewer
+ * needs alongside it: what multiplier is armed, and how many spins are left.
+ * The second of those is the reason the tab exists at all — streamers count it
+ * out on their fingers today, so it has to be readable at a glance.
  */
 export function OverlayTotal({
   appearance,
@@ -271,16 +299,16 @@ export function OverlayTotal({
   const accent = overlayAccent(appearance);
   const display = overlayDisplay(appearance);
   const digit = overlayDigit(appearance);
+  const surface = overlaySurface(appearance, 0.94);
 
   // Mid-animation the state already holds the new tab, so the reels hold the
-  // value from before this spin and roll only once the wheel settles.
+  // value from before this spin and climb only once the wheel settles.
   const tabCents = spinning ? (state?.tabBeforeCents ?? 0) : (state?.tabCents ?? 0);
   const spinsLeft = state?.spinsLeft ?? 0;
   const multiplier = spinning ? 0 : (state?.multiplier ?? 0);
-  const spinsAwarded = spinning ? 0 : (state?.spinsAwarded ?? 0);
 
-  // Re-key the kick and the gloss on each settled result so the CSS animations
-  // replay rather than firing once and staying put.
+  const countedCents = useCountUp(tabCents);
+
   const [pulseKey, setPulseKey] = useState(0);
   const previousTabRef = useRef(tabCents);
 
@@ -291,87 +319,52 @@ export function OverlayTotal({
     }
   }, [tabCents]);
 
-  // The lever is pulled by the spin starting, not by the result landing.
-  const [pullKey, setPullKey] = useState(0);
-  const previousSpinRef = useRef(state?.spinId ?? null);
-
-  useEffect(() => {
-    if (state?.spinId && state.spinId !== previousSpinRef.current) {
-      previousSpinRef.current = state.spinId;
-      setPullKey((key) => key + 1);
-    }
-  }, [state?.spinId]);
-
   if (!state?.viewerName) {
     return null;
   }
 
-  const amount = formatMoney(tabCents);
-  // Never the cash figure: that is already the main screen, and showing it
-  // twice reads as a fault rather than as confirmation.
-  const status = spinning
-    ? "Spinning"
-    : multiplier > 1
-      ? `${multiplier}\u00d7 next hit`
-      : spinsAwarded > 0
-        ? `+${spinsAwarded} ${spinsAwarded === 1 ? "spin" : "spins"}`
-        : spinsLeft > 0
-          ? `${spinsLeft} ${spinsLeft === 1 ? "spin" : "spins"} left`
-          : "Round complete";
+  const amount = formatMoney(countedCents);
+  const armed = multiplier > 1;
 
   return (
-    <div className="flex w-full max-w-[340px] items-stretch">
+    <div className="relative w-full max-w-[330px] pb-[40px] pt-[38px]">
+      {/* Upper left: what is armed. */}
+      <Tab
+        accent={accent}
+        charging={spinning}
+        className="left-7 top-0 h-[46px] w-[108px]"
+        display={display}
+        shape="up"
+        surface={surface}
+      >
+        <span
+          className="pb-1 text-lg font-black leading-none lg:text-xl"
+          style={{
+            color: armed ? digit : `${digit}`,
+            textShadow: armed ? `0 0 10px ${accent}99` : undefined,
+            // An empty slot blinks rather than sitting dark, so the screen
+            // still reads as powered when nothing is armed.
+            animation: armed ? undefined : "slot-idle 2.4s ease-in-out infinite",
+          }}
+        >
+          {armed ? `${multiplier}\u00d7` : "1\u00d7"}
+        </span>
+      </Tab>
+
+      {/* Body: the figure. */}
       <div
-        className="relative min-w-0 flex-1 rounded-[26px] border-2 px-3 pb-3 pt-2.5"
+        className="relative z-10 rounded-[26px] border-2 p-3.5"
         key={`cabinet-${pulseKey}`}
         style={{
-          ...overlaySurface(appearance, 0.92),
+          ...surface,
           color: ink,
           animation: "total-pop 480ms var(--ease-standard)",
           boxShadow: "0 6px 22px rgba(15,23,32,0.16)",
         }}
       >
-        <Bulbs accent={accent} running={spinning} />
-
-        {/* Top screen: what is coming. */}
-        <Screen accent={accent} className="mt-2 px-3 py-1.5" display={display}>
-          <div className="flex items-center justify-between gap-3">
-            <span
-              className="text-sm font-black leading-none lg:text-base"
-              style={{
-                color: multiplier > 1 ? digit : `${digit}4d`,
-                textShadow: multiplier > 1 ? `0 0 8px ${accent}` : undefined,
-              }}
-            >
-              {multiplier > 1 ? `${multiplier}\u00d7` : "1\u00d7"}
-            </span>
-            <span className="flex items-center gap-1">
-              {/* A fixed floor of slots: an empty row reads as a fault, a row
-                  of unlit slots reads as none left. */}
-              {Array.from({ length: Math.max(3, Math.min(spinsLeft, 6)) }, (_, index) => (
-                <span
-                  className="h-[7px] w-[7px] rounded-full"
-                  key={index}
-                  style={
-                    index < spinsLeft
-                      ? { backgroundColor: accent, boxShadow: `0 0 6px ${accent}` }
-                      : { backgroundColor: `${digit}26` }
-                  }
-                />
-              ))}
-              {spinsLeft > 6 ? (
-                <span className="ml-0.5 text-[0.65rem] font-bold" style={{ color: digit }}>
-                  {spinsLeft}
-                </span>
-              ) : null}
-            </span>
-          </div>
-        </Screen>
-
-        {/* Main screen: what it is worth. */}
         <Screen
           accent={accent}
-          className="mt-1.5 px-3 py-3.5"
+          className="rounded-2xl px-4 py-3.5"
           display={display}
           shineKey={pulseKey}
         >
@@ -379,9 +372,8 @@ export function OverlayTotal({
             className="flex items-center justify-center text-5xl font-black leading-none lg:text-6xl"
             style={{
               color: digit,
-              // Hot core, coloured spill: a tight halo hugging the glyph and a
-              // wide faint one for the bloom.
-              textShadow: `0 0 4px ${accent}, 0 0 14px ${accent}dd, 0 0 34px ${accent}77`,
+              // One soft halo. Stacked glows turned the figure into a smear.
+              textShadow: `0 0 12px ${accent}70`,
             }}
           >
             {amount.split("").map((char, index) => (
@@ -389,19 +381,26 @@ export function OverlayTotal({
             ))}
           </p>
         </Screen>
-
-        {/* Bottom screen: what just happened. */}
-        <Screen accent={accent} className="mt-1.5 px-3 py-1.5" display={display}>
-          <p
-            className="truncate text-center text-[0.7rem] font-bold uppercase tracking-[0.18em] lg:text-xs"
-            style={{ color: `${digit}c4` }}
-          >
-            {status}
-          </p>
-        </Screen>
       </div>
 
-      <Lever accent={accent} ink={ink} pullKey={pullKey} />
+      {/* Bottom centre: how many spins are left. */}
+      <Tab
+        accent={accent}
+        charging={spinning}
+        className="bottom-0 left-1/2 h-[48px] w-[212px] -translate-x-1/2"
+        display={display}
+        shape="down"
+        surface={surface}
+      >
+        <span
+          className="whitespace-nowrap pt-1 text-sm font-black uppercase tracking-[0.1em] lg:text-base"
+          style={{ color: digit, textShadow: `0 0 10px ${accent}66` }}
+        >
+          {spinsLeft > 0
+            ? `${spinsLeft} ${spinsLeft === 1 ? "spin" : "spins"} left`
+            : "Round over"}
+        </span>
+      </Tab>
     </div>
   );
 }
