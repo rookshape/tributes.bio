@@ -177,39 +177,78 @@ export function overlayDisplay(appearance: OverlayAppearance) {
   return oklchToHex(lerp(0.22, 0.14, tone / 100), appearance.vivid ? 0.06 : 0.03, hue);
 }
 
+/**
+ * The most saturated form of a hue, and the lightness it lives at.
+ *
+ * Hues do not share a brightness. Yellow at full strength sits near the top of
+ * the lightness range and blue near the bottom, so a rainbow drawn at one fixed
+ * lightness drags yellow down into olive and flattens green to a dull sage.
+ * Searching each hue for the lightness that carries the most chroma — the cusp
+ * of the gamut — gives a rainbow where every band is as bright as that hue can
+ * actually be.
+ */
+const cuspCache = new Map<number, { lightness: number; chroma: number }>();
+
+function hueCusp(hue: number) {
+  const key = Math.round(hue);
+  const cached = cuspCache.get(key);
+  if (cached) return cached;
+
+  let best = { lightness: 0.7, chroma: 0 };
+  for (let lightness = 0.35; lightness <= 0.95; lightness += 0.02) {
+    const chroma = maxChroma(lightness, hue);
+    if (chroma > best.chroma) best = { lightness, chroma };
+  }
+
+  cuspCache.set(key, best);
+  return best;
+}
+
+/** One band of the rainbow, honouring the vivid switch. */
+function rainbowColor(hue: number, vivid: boolean) {
+  const cusp = hueCusp(hue);
+
+  if (vivid) {
+    return oklchToHex(cusp.lightness, cusp.chroma * 0.95, hue);
+  }
+
+  // Pastel keeps each hue's own lightness and pulls it towards white, rather
+  // than flattening every band onto one lightness.
+  const lightness = cusp.lightness + (1 - cusp.lightness) * 0.34;
+  return oklchToHex(lightness, Math.min(maxChroma(lightness, hue), cusp.chroma * 0.55), hue);
+}
+
 /** Every hue at once, for the goal bar's rainbow fill. */
 export function rainbowFill(vivid: boolean) {
   const stops: string[] = [];
-  const lightness = vivid ? 0.66 : 0.74;
 
-  for (let hue = 0; hue <= 360; hue += 30) {
-    const chroma = Math.min(maxChroma(lightness, hue), vivid ? 0.26 : 0.14);
-    stops.push(`${oklchToHex(lightness, chroma, hue % 360)} ${(hue / 360) * 100}%`);
+  for (let hue = 0; hue <= 360; hue += 20) {
+    stops.push(`${rainbowColor(hue % 360, vivid)} ${(hue / 360) * 100}%`);
   }
 
   return `linear-gradient(90deg, ${stops.join(", ")})`;
 }
 
 /**
- * Halo behind the goal bar's marker.
+ * Halo behind the goal bar's marker. Kept tight — it should read as the shape
+ * being lit, not as a lamp behind it.
  *
- * A drop-shadow only carries one colour, so a rainbow glow is built from six
- * offset shadows spaced around the shape — the spill lands in a different hue
- * on each side rather than being one flat colour.
+ * A drop-shadow only carries one colour, so the rainbow version is built from
+ * offset shadows spaced around the shape, and it follows the same vivid switch
+ * the fill does rather than always running at full strength.
  */
 export function markerGlow(appearance: OverlayAppearance) {
   if (!appearance.goalRainbow) {
     const accent = overlayAccent(appearance);
-    return `drop-shadow(0 0 5px ${accent}) drop-shadow(0 0 12px ${accent}aa)`;
+    return `drop-shadow(0 0 2px ${accent}) drop-shadow(0 0 5px ${accent}bb)`;
   }
 
   return [0, 60, 120, 180, 240, 300]
     .map((hue) => {
-      const color = oklchToHex(0.68, Math.min(maxChroma(0.68, hue), 0.22), hue);
       const angle = (hue / 360) * Math.PI * 2;
-      const x = (Math.cos(angle) * 2.5).toFixed(1);
-      const y = (Math.sin(angle) * 2.5).toFixed(1);
-      return `drop-shadow(${x}px ${y}px 4px ${color})`;
+      const x = (Math.cos(angle) * 1.2).toFixed(1);
+      const y = (Math.sin(angle) * 1.2).toFixed(1);
+      return `drop-shadow(${x}px ${y}px 2px ${rainbowColor(hue, appearance.vivid)})`;
     })
     .join(" ");
 }
