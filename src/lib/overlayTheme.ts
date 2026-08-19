@@ -230,27 +230,36 @@ export function rainbowFill(vivid: boolean) {
 }
 
 /**
- * Halo behind the goal bar's marker. Kept tight — it should read as the shape
- * being lit, not as a lamp behind it.
- *
- * A drop-shadow only carries one colour, so the rainbow version is built from
- * offset shadows spaced around the shape, and it follows the same vivid switch
- * the fill does rather than always running at full strength.
+ * The colour the goal bar's fill has reached at a given progress, so the marker
+ * riding the tip can take the colour it is actually sitting on.
  */
-export function markerGlow(appearance: OverlayAppearance) {
+export function rainbowColorAt(progress: number, vivid: boolean) {
+  const clamped = Math.min(1, Math.max(0, progress));
+  return rainbowColor((clamped * 360) % 360, vivid);
+}
+
+/** The two colours the marker wears: where it sits, and where it is heading. */
+export function markerColors(appearance: OverlayAppearance, progress: number) {
   if (!appearance.goalRainbow) {
     const accent = overlayAccent(appearance);
-    return `drop-shadow(0 0 2px ${accent}) drop-shadow(0 0 5px ${accent}bb)`;
+    return { from: accent, to: accent };
   }
 
-  return [0, 60, 120, 180, 240, 300]
-    .map((hue) => {
-      const angle = (hue / 360) * Math.PI * 2;
-      const x = (Math.cos(angle) * 1.2).toFixed(1);
-      const y = (Math.sin(angle) * 1.2).toFixed(1);
-      return `drop-shadow(${x}px ${y}px 2px ${rainbowColor(hue, appearance.vivid)})`;
-    })
-    .join(" ");
+  return {
+    from: rainbowColorAt(progress, appearance.vivid),
+    // A little way further along the bar, so the marker carries a hint of the
+    // colour it is moving towards rather than reading as one flat chip.
+    to: rainbowColorAt(progress + 0.09, appearance.vivid),
+  };
+}
+
+/**
+ * Halo behind the marker, only worn while the total is climbing. A permanent
+ * glow reads as a lamp sitting behind the shape; a brief one reads as the bar
+ * having just moved.
+ */
+export function markerGlow(color: string) {
+  return `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 8px ${color}aa)`;
 }
 
 /** Gradient showing every hue available at the current tone. */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { SpinWheel, type SpinAnimation } from "../SpinWheel";
 import {
   GOAL_SHAPE_PATHS,
@@ -7,6 +7,7 @@ import {
   overlayDisplay,
   overlayInk,
   overlaySurface,
+  markerColors,
   markerGlow,
   rainbowFill,
   type OverlayAppearance,
@@ -23,6 +24,9 @@ import type { SpinConfig, SpinQueueEntry, SpinState } from "../../lib/types";
  * furniture stays put when a viewer buys a different wheel.
  */
 export type OverlayPart = "wheel" | "total" | "bar" | "queue";
+
+/** Matches the marker-pulse keyframe in styles.css. */
+const MARKER_PULSE_MS = 900;
 
 export const OVERLAY_PARTS: {
   id: OverlayPart;
@@ -292,12 +296,29 @@ export function OverlayGoalBar({
   // The marker swells when the total climbs. Re-keying replays the animation;
   // a correction downwards is not a win, so it does not celebrate.
   const [pulseKey, setPulseKey] = useState(0);
+  // The glow is worn only for the length of that swell, so at rest the marker
+  // is just a shape on the bar.
+  const [pulsing, setPulsing] = useState(false);
   const previousCurrentRef = useRef(current);
+  const markerGradientId = useId();
 
   useEffect(() => {
     if (current > previousCurrentRef.current) setPulseKey((key) => key + 1);
     previousCurrentRef.current = current;
   }, [current]);
+
+  // A timer rather than onAnimationEnd: that event did not fire reliably for
+  // the remounted marker, which left the glow lit for good after the first
+  // spin — the opposite of the point.
+  useEffect(() => {
+    if (!pulseKey) return;
+
+    setPulsing(true);
+    const timer = window.setTimeout(() => setPulsing(false), MARKER_PULSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [pulseKey]);
+
+  const marker = markerColors(appearance, progress);
 
   return (
     <div
@@ -348,19 +369,30 @@ export function OverlayGoalBar({
             style={{
               left: `${progress * 100}%`,
               transform: "translate(-50%, -50%)",
-              filter: markerGlow(appearance),
+              filter: pulsing ? markerGlow(marker.from) : undefined,
               animation: pulseKey
-                ? "marker-pulse 900ms var(--ease-standard)"
+                ? `marker-pulse ${MARKER_PULSE_MS}ms var(--ease-standard)`
                 : undefined,
             }}
             viewBox="0 0 24 24"
           >
+            <defs>
+              <linearGradient id={markerGradientId} x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stopColor={marker.from} />
+                <stop offset="100%" stopColor={marker.to} />
+              </linearGradient>
+            </defs>
+            {/* White body, edge in the colour the bar has reached. Colouring
+                the body instead camouflaged it against the fill it rides.
+                Painting the stroke before the fill keeps it outside the shape —
+                a centred stroke eats half its width out of the white. */}
             <path
               d={GOAL_SHAPE_PATHS[shape]}
-              fill={appearance.goalRainbow ? "#fff" : accent}
-              stroke="#fff"
+              fill="#fff"
+              paintOrder="stroke"
+              stroke={`url(#${markerGradientId})`}
               strokeLinejoin="round"
-              strokeWidth="2.5"
+              strokeWidth="2"
             />
           </svg>
         ) : null}
