@@ -202,13 +202,17 @@ export function overlayScreen(appearance: OverlayAppearance) {
   );
 }
 
-/** Figures on that face: a deep shade of the same hue, for contrast with hue. */
+/**
+ * Figures on that face: a deep shade of the same hue. Kept off pure darkness
+ * and given real chroma so it reads as the colour rather than as black — there
+ * is contrast to spare against a face this light.
+ */
 export function overlayScreenInk(appearance: OverlayAppearance) {
   const hue = normalizeOverlayHue(appearance.hue);
-  const lightness = 0.29;
+  const lightness = 0.4;
   return oklchToHex(
     lightness,
-    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.14 : 0.08),
+    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.2 : 0.13),
     hue,
   );
 }

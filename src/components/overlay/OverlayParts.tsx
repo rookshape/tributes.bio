@@ -40,6 +40,9 @@ const MARKER_PULSE_MS = 900;
 /** How long the figure takes to climb to a new total. */
 const COUNT_UP_MS = 850;
 
+/** How long "Round over" holds before the wordmark slides in behind it. */
+const WORDMARK_DELAY_MS = 4000;
+
 export const OVERLAY_PARTS: {
   id: OverlayPart;
   label: string;
@@ -190,7 +193,7 @@ function Cabinet({ fillColor }: { fillColor: string }) {
       }}
     >
       <div
-        className="absolute left-[32px] top-0 h-[56px] w-[136px]"
+        className="absolute left-[32px] top-0 h-[58px] w-[140px]"
         style={{
           ...fill,
           borderRadius: "15px 15px 0 0",
@@ -199,18 +202,18 @@ function Cabinet({ fillColor }: { fillColor: string }) {
         }}
       />
       <div
-        className="absolute bottom-0 h-[58px] w-[196px]"
+        className="absolute bottom-0 h-[60px] w-[200px]"
         style={{
           ...fill,
           left: "50%",
-          marginLeft: -98,
+          marginLeft: -100,
           borderRadius: "0 0 15px 15px",
           transform: "perspective(22px) rotateX(-4deg)",
           transformOrigin: "top",
         }}
       />
       <div
-        className="absolute inset-x-0 bottom-[44px] top-[44px] rounded-[26px]"
+        className="absolute inset-x-0 bottom-[46px] top-[46px] rounded-[26px]"
         style={fill}
       />
     </div>
@@ -228,6 +231,7 @@ function Screen({
   charging = false,
   face,
   ink,
+  shape,
   wave,
 }: {
   children?: ReactNode;
@@ -236,6 +240,8 @@ function Screen({
   charging?: boolean;
   face: string;
   ink: string;
+  /** Taper matching the extension this screen sits in. */
+  shape?: CSSProperties;
   /** Runs a glow across the face instead of showing content. */
   wave?: string;
 }) {
@@ -243,12 +249,15 @@ function Screen({
     <div
       className={`overflow-hidden ${className}`}
       style={{
+        ...shape,
         backgroundColor: face,
         backgroundImage: wave
           ? `linear-gradient(100deg, ${face} 18%, ${wave} 50%, ${face} 82%)`
           : undefined,
-        backgroundSize: wave ? "220% 100%" : undefined,
-        animation: wave ? "slot-wave 2.2s linear infinite" : undefined,
+        // The tile must match the keyframe's travel exactly, or the loop
+        // restarts mid-sweep and the glow visibly jumps.
+        backgroundSize: wave ? "200% 100%" : undefined,
+        animation: wave ? "slot-wave 2.6s linear infinite" : undefined,
         boxShadow: `inset 0 1px 3px ${ink}59, inset 0 0 0 1px ${ink}26`,
       }}
     >
@@ -298,6 +307,21 @@ export function OverlayTotal({
 
   const countedCents = useCountUp(tabCents);
 
+  // Once a round is over the screen has nothing left to report, so it hands
+  // the space to the wordmark rather than holding a dead message all stream.
+  const roundOver = !spinning && spinsLeft <= 0;
+  const [showWordmark, setShowWordmark] = useState(false);
+
+  useEffect(() => {
+    if (!roundOver) {
+      setShowWordmark(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setShowWordmark(true), WORDMARK_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [roundOver]);
+
   const [pulseKey, setPulseKey] = useState(0);
   const previousTabRef = useRef(tabCents);
 
@@ -314,10 +338,17 @@ export function OverlayTotal({
 
   const amount = formatMoney(countedCents);
   const armed = multiplier > 1;
+  const label = spinning
+    ? "Spinning"
+    : spinsLeft > 0
+      ? `${spinsLeft} ${spinsLeft === 1 ? "spin" : "spins"} left`
+      : showWordmark
+        ? "tributes.bio"
+        : "Round over";
 
   return (
     <div
-      className="relative w-full max-w-[330px] pb-[54px] pt-[52px]"
+      className="relative w-full max-w-[272px] pb-[55px] pt-[55px]"
       key={`cabinet-${pulseKey}`}
       style={{ color: ink, animation: "total-pop 480ms var(--ease-standard)" }}
     >
@@ -326,7 +357,13 @@ export function OverlayTotal({
       {/* Upper left: what is armed. */}
       <Screen
         charging={spinning && armed}
-        className="absolute left-[57px] top-[12px] grid h-[30px] w-[86px] place-items-center rounded-full"
+        className="absolute left-[62px] top-[13px] grid h-[29px] w-[80px] place-items-center rounded-[9px]"
+        // Same perspective and origin as the extension behind it, so its sides
+        // slant parallel to the white rather than cutting across it.
+        shape={{
+          transform: "perspective(22px) rotateX(4deg)",
+          transformOrigin: "bottom",
+        }}
         face={face}
         ink={screenInk}
         // Nothing armed: the slot runs a glow across itself rather than showing
@@ -344,9 +381,9 @@ export function OverlayTotal({
       </Screen>
 
       {/* The figure. */}
-      <div className="relative px-3.5">
+      <div className="relative px-[9px]">
         <Screen
-          className="relative rounded-[18px] px-4 py-2.5"
+          className="relative rounded-[16px] px-4 py-3.5"
           face={face}
           ink={screenInk}
         >
@@ -364,17 +401,26 @@ export function OverlayTotal({
       {/* Bottom centre: how many spins are left. */}
       <Screen
         charging={spinning}
-        className="absolute bottom-[12px] left-1/2 grid h-[32px] w-[152px] -translate-x-1/2 place-items-center rounded-full"
+        className="absolute bottom-[13px] left-1/2 grid h-[30px] w-[140px] place-items-center rounded-[9px]"
+        shape={{
+          marginLeft: -70,
+          transform: "perspective(22px) rotateX(-4deg)",
+          transformOrigin: "top",
+        }}
         face={face}
         ink={screenInk}
       >
         <span
           className="whitespace-nowrap text-xs font-black uppercase tracking-[0.08em] lg:text-sm"
-          style={{ color: screenInk }}
+          // Keyed on the wording so a change remounts the span and replays the
+          // slide, rather than swapping the text in place.
+          key={label}
+          style={{
+            color: screenInk,
+            animation: "label-slide 420ms var(--ease-standard)",
+          }}
         >
-          {spinsLeft > 0
-            ? `${spinsLeft} ${spinsLeft === 1 ? "spin" : "spins"} left`
-            : "Round over"}
+          {label}
         </span>
       </Screen>
     </div>

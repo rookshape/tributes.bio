@@ -412,13 +412,29 @@ select:focus-visible,
 }
 
 /* An empty multiplier slot runs a glow across itself, so the screen reads as
-   powered and waiting rather than as switched off. */
+   powered and waiting rather than as switched off. The travel is exactly one
+   tile of the background, so the loop closes on itself with no jump. */
 @keyframes slot-wave {
   0% {
-    background-position: 160% 0;
+    background-position: 200% 0;
   }
   100% {
-    background-position: -160% 0;
+    background-position: 0% 0;
+  }
+}
+
+/* The bottom screen slides its label aside when the wording changes. */
+@keyframes label-slide {
+  0% {
+    transform: translateX(55%);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 
