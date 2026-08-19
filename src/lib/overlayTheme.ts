@@ -203,6 +203,18 @@ export function overlayScreen(appearance: OverlayAppearance) {
 }
 
 /**
+ * The main display's face: white with only a whisper of hue in it.
+ *
+ * The figure is the one thing on the overlay that has to be read instantly, so
+ * it gets a different surface from the two small screens rather than a larger
+ * copy of them — white behind it, tinted faces beside it.
+ */
+export function overlayDisplayFace(appearance: OverlayAppearance) {
+  const hue = normalizeOverlayHue(appearance.hue);
+  return oklchToHex(0.985, Math.min(maxChroma(0.985, hue), 0.012), hue);
+}
+
+/**
  * Figures on that face: a deep shade of the same hue. Kept off pure darkness
  * and given real chroma so it reads as the colour rather than as black — there
  * is contrast to spare against a face this light.

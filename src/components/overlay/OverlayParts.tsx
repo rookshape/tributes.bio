@@ -12,6 +12,7 @@ import {
   overlayAccent,
   overlayInk,
   overlayGlow,
+  overlayDisplayFace,
   overlayScreen,
   overlayScreenInk,
   overlaySurface,
@@ -205,16 +206,18 @@ function Cabinet({ fillColor }: { fillColor: string }) {
       }}
     >
       <div
-        className="absolute left-[16px] top-0 h-[62px] w-[104px]"
+        className="absolute top-0 h-[56px] w-[104px]"
         style={{
           ...fill,
+          left: "50%",
+          marginLeft: -52,
           borderRadius: "15px 15px 0 0",
           transform: "perspective(22px) rotateX(4deg)",
           transformOrigin: "bottom",
         }}
       />
       <div
-        className="absolute bottom-0 h-[64px] w-[164px]"
+        className="absolute bottom-0 h-[58px] w-[164px]"
         style={{
           ...fill,
           left: "50%",
@@ -241,6 +244,7 @@ function Screen({
   children,
   className = "",
   charging = false,
+  deep = false,
   face,
   ink,
   shape,
@@ -252,6 +256,8 @@ function Screen({
   charging?: boolean;
   face: string;
   ink: string;
+  /** Sunk further, for the one screen that has to read as glass. */
+  deep?: boolean;
   /** Taper matching the extension this screen sits in. */
   shape?: CSSProperties;
   /** Runs a glow across the face instead of showing content. */
@@ -270,7 +276,9 @@ function Screen({
         // restarts mid-sweep and the glow visibly jumps.
         backgroundSize: wave ? "200% 100%" : undefined,
         animation: wave ? "slot-wave 2.6s linear infinite" : undefined,
-        boxShadow: `inset 0 1px 3px ${ink}59, inset 0 0 0 1px ${ink}26`,
+        boxShadow: deep
+          ? `inset 0 4px 10px ${ink}3d, inset 0 -1px 0 #ffffffcc, inset 0 0 0 1px ${ink}2b`
+          : `inset 0 1px 3px ${ink}59, inset 0 0 0 1px ${ink}26`,
       }}
     >
       {charging ? (
@@ -308,6 +316,7 @@ export function OverlayTotal({
   const ink = overlayInk(appearance);
   const accent = overlayAccent(appearance);
   const face = overlayScreen(appearance);
+  const displayFace = overlayDisplayFace(appearance);
   const screenInk = overlayScreenInk(appearance);
   const surface = overlaySurfaceSolid(appearance);
 
@@ -369,10 +378,11 @@ export function OverlayTotal({
       {/* Upper left: what is armed. */}
       <Screen
         charging={spinning && armed}
-        className="absolute left-[28px] top-[19px] grid h-[29px] w-[80px] place-items-center rounded-[9px]"
+        className="absolute left-1/2 top-[19px] grid h-[24px] w-[80px] place-items-center rounded-[8px]"
         // Same perspective and origin as the extension behind it, so its sides
         // slant parallel to the white rather than cutting across it.
         shape={{
+          marginLeft: -40,
           transform: "perspective(22px) rotateX(4deg)",
           transformOrigin: "bottom",
         }}
@@ -396,7 +406,8 @@ export function OverlayTotal({
       <div className="relative px-[12px]">
         <Screen
           className="relative rounded-[16px] px-2 py-3.5"
-          face={face}
+          deep
+          face={displayFace}
           ink={screenInk}
         >
           <p
@@ -415,7 +426,7 @@ export function OverlayTotal({
       {/* Bottom centre: how many spins are left. */}
       <Screen
         charging={spinning}
-        className="absolute bottom-[19px] left-1/2 grid h-[30px] w-[140px] place-items-center rounded-[9px]"
+        className="absolute bottom-[19px] left-1/2 grid h-[25px] w-[140px] place-items-center rounded-[8px]"
         shape={{
           marginLeft: -70,
           transform: "perspective(22px) rotateX(-4deg)",
