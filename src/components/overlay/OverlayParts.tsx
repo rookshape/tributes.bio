@@ -131,11 +131,19 @@ const PLATE = {
   /** How far it runs up behind the wheel. Must clear the arc's climb, which at
       this width is about 8 — the rest is margin. */
   tuck: 9.5,
-  sideBorder: 2,
-  bottomBorder: 2.6,
+  /**
+   * Border around the lit screen.
+   *
+   * Wider than the arithmetic wanted. Converting these to shares of the wheel
+   * kept the ratios the pixel version had, but those had been set against a
+   * plate that was itself too small — so the screen came out filling almost the
+   * whole plate, with the white showing only as a hairline.
+   */
+  sideBorder: 3.2,
+  bottomBorder: 3.4,
   /** Gap between the wheel's edge and the top of the lit screen. */
-  screenGap: 0.6,
-  fontSize: 4.2,
+  screenGap: 1.2,
+  fontSize: 4,
   /** Scaled with the plate, or a taller plate would taper into a wedge. */
   tip: { perspective: "5.76cqw", degrees: 6 },
 };
