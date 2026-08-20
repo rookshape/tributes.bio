@@ -101,74 +101,33 @@ export const OVERLAY_PARTS: {
 const WHEEL_TITLE_MS = 9000;
 const WHEEL_WORDMARK_MS = 3500;
 /**
- * The plate under the wheel.
+ * The name plate under the wheel.
  *
- * Struck from the wheel's own centre rather than laid out in boxes: its top
- * edge *is* an arc of the rim, its sides run back in toward the hub, and its
- * screen is the same shape inset. The first version was a CSS tab, which can
- * only ever be a rectangle held up against a circle — the bare plate it left
- * ran deep at the ends and thin in the middle, and no amount of narrowing it
- * fixed that, because the mismatch is the shape rather than the size.
- *
- * Everything is in the wheel's own 100-unit space, so it scales with the wheel
- * the way the rim lettering used to.
+ * The same tab every other part wears — same taper, same border, same screen —
+ * running up behind the wheel far enough that its flat top is hidden and the
+ * two read as one shape. That last part only works because both are painted the
+ * same opaque white: an earlier version gave the plate the themed panel colour
+ * against a translucent white frame, which is two fills meeting at a line, and
+ * no amount of reshaping it fixed that.
  */
 const PLATE = {
-  center: 50,
-  /** Where the wheel's glass frame ends. */
-  rim: 48,
-  /** A hair inside the rim, so no hairline of background shows at the join. */
-  inner: 47.4,
-  depth: 9,
-  /** Half-widths in degrees either side of bottom-centre. Narrower below, so
-      the band tapers the way the counter's tabs do. */
-  topHalfAngle: 26,
-  bottomHalfAngle: 21,
-  border: 2.1,
-  /** Corners come from stroking the fill rather than from mitring it. */
-  round: 1.4,
+  width: 176,
+  /**
+   * How far it runs up behind the wheel.
+   *
+   * A straight edge meeting a circle only closes if it reaches past the point
+   * where the arc has climbed level with the plate's corners. That climb grows
+   * as the wheel gets smaller, so this clears the smallest the wheel is drawn
+   * at — the editor's preview — rather than the size it happens to be here.
+   */
+  tuck: 30,
+  /**
+   * Deeper than the default: the taper a perspective produces grows with the
+   * element's height, and this tab is buried-part-plus-visible-part tall. At
+   * the standard 13 it closed into a wedge.
+   */
+  tip: { perspective: 22, degrees: 6 },
 };
-
-/** Extra height the plate needs below the wheel's square box, as a % of width. */
-const PLATE_ROOM = 8;
-
-function platePoint(radius: number, degreesFromBottom: number) {
-  const radians = ((90 + degreesFromBottom) * Math.PI) / 180;
-
-  return {
-    x: PLATE.center + radius * Math.cos(radians),
-    y: PLATE.center + radius * Math.sin(radians),
-  };
-}
-
-/** A curved trapezoid: an arc along the rim, a wider one below it, sides between. */
-function platePath(
-  inner: number,
-  outer: number,
-  topHalf: number,
-  bottomHalf: number,
-) {
-  const a = platePoint(inner, topHalf);
-  const b = platePoint(inner, -topHalf);
-  const c = platePoint(outer, -bottomHalf);
-  const d = platePoint(outer, bottomHalf);
-
-  return [
-    `M ${a.x} ${a.y}`,
-    `A ${inner} ${inner} 0 0 0 ${b.x} ${b.y}`,
-    `L ${c.x} ${c.y}`,
-    `A ${outer} ${outer} 0 0 1 ${d.x} ${d.y}`,
-    "Z",
-  ].join(" ");
-}
-
-/** An arc for the lettering to sit on, read left to right. */
-function plateTextArc(radius: number, halfAngle: number) {
-  const from = platePoint(radius, halfAngle);
-  const to = platePoint(radius, -halfAngle);
-
-  return `M ${from.x} ${from.y} A ${radius} ${radius} 0 0 0 ${to.x} ${to.y}`;
-}
 
 export function OverlayWheel({
   appearance = DEFAULT_OVERLAY_APPEARANCE,
@@ -184,14 +143,10 @@ export function OverlayWheel({
   const basic = appearance.panel === "basic";
   const chipFace = overlayChipFace(appearance);
   const chipInk = overlayChipInk(appearance);
-  const surface = overlaySurfaceSolid(appearance);
-  const edgeColor = overlaySurface(appearance).borderColor;
-
   // Title most of the time, wordmark in passing. Chained timeouts rather than
   // one interval because the two are held for different lengths — the wheel is
   // the thing being watched, so the branding takes the shorter turn.
   const [showWordmark, setShowWordmark] = useState(false);
-  const plateArcId = useId().replace(/:/g, "");
 
   useEffect(() => {
     if (basic) return;
@@ -205,110 +160,72 @@ export function OverlayWheel({
 
   const plate = showWordmark ? "tributes.bio" : config.name;
 
-  const outer = PLATE.inner + PLATE.depth;
-  // Measured from the rim rather than from the plate's own top edge, which is
-  // tucked behind the wheel: a border inset from something you cannot see is
-  // not the border anyone reads.
-  const screenInner = PLATE.rim + PLATE.border;
-  const screenOuter = outer - PLATE.border;
-  // Held to a constant width around the band: an angular inset that ignored
-  // radius would leave the sides thicker at the top than at the bottom.
-  const screenTopHalf =
-    PLATE.topHalfAngle - (PLATE.border / screenInner) * (180 / Math.PI);
-  const screenBottomHalf =
-    PLATE.bottomHalfAngle - (PLATE.border / screenOuter) * (180 / Math.PI);
-  // Glyphs stand off their baseline, so it sits below the band's middle for the
-  // lettering to land centred on it.
-  const textRadius = (screenInner + screenOuter) / 2 + 1.05;
-
   return (
-    <div
-      className="relative w-full max-w-[520px]"
-      style={basic ? undefined : { paddingBottom: `${PLATE_ROOM}%` }}
-    >
-      <SpinWheel
-        animation={animation}
-        // Set into the rim only in the plain style. The cabinet style hangs it
-        // off a plate below instead, where it has room to change.
-        name={basic ? config.name : undefined}
-        onTick={onTick}
-        slices={config.slices}
-        wheelGlow={config.wheelGlow}
-        wheelHue={config.wheelHue}
-        wheelTone={config.wheelTone}
-      />
+    <div className="relative w-full max-w-[520px]">
+      {/* Over the plate, so the disc paints out the plate's flat top and the
+          silhouette closes into one shape. */}
+      <div className="relative z-10">
+        <SpinWheel
+          animation={animation}
+          // Set into the rim only in the plain style. The cabinet style hangs
+          // it off the plate below instead, where it has room to change.
+          name={basic ? config.name : undefined}
+          onTick={onTick}
+          slices={config.slices}
+          wheelGlow={config.wheelGlow}
+          wheelHue={config.wheelHue}
+          wheelTone={config.wheelTone}
+        />
+      </div>
 
       {basic ? null : (
-        <svg
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 h-full w-full"
-          viewBox={`0 0 100 ${100 + PLATE_ROOM}`}
+        <div
+          className="relative z-0 mx-auto"
+          style={{
+            width: PLATE.width,
+            height: BUMP + TUCK + PLATE.tuck,
+            marginTop: -PLATE.tuck,
+            filter: "drop-shadow(0 6px 14px rgba(15,23,32,0.14))",
+          }}
         >
-          <defs>
-            <path
-              d={plateTextArc(textRadius, screenTopHalf)}
-              id={`${plateArcId}-arc`}
-            />
-          </defs>
-          <g
-            style={{
-              filter: "drop-shadow(0 3px 8px rgba(15,23,32,0.22))",
-              opacity: OVERLAY_PANEL_ALPHA,
-            }}
+          <Tab
+            edge="bottom"
+            // The wheel's frame, not the themed panel: the plate is part of
+            // that frame rather than something resting against it.
+            edgeColor="rgba(255,255,255,0.9)"
+            fill="#ffffff"
+            style={{ left: 0, height: "100%" }}
+            tip={PLATE.tip}
+            width={PLATE.width}
           >
-            {/* Filled and stroked in the same colour: the stroke is what rounds
-                the corners, which a path cannot do on its own. */}
-            <path
-              d={platePath(
-                PLATE.inner,
-                outer,
-                PLATE.topHalfAngle,
-                PLATE.bottomHalfAngle,
-              )}
-              fill={surface}
-              stroke={surface}
-              strokeLinejoin="round"
-              strokeWidth={PLATE.round}
-            />
-            <path
-              d={platePath(screenInner, screenOuter, screenTopHalf, screenBottomHalf)}
-              fill={chipFace}
-              stroke={chipFace}
-              strokeLinejoin="round"
-              strokeWidth={PLATE.round * 0.6}
-            />
-            {/* Stands in for the screens' inset shadow, which SVG has no
-                equivalent of — enough to read as set into the plate. */}
-            <path
-              d={platePath(screenInner, screenOuter, screenTopHalf, screenBottomHalf)}
-              fill="none"
-              stroke="rgba(0,0,0,0.16)"
-              strokeLinejoin="round"
-              strokeWidth="0.35"
-            />
-            <text
-              fill={chipInk}
-              fontSize="2.9"
-              fontWeight="900"
-              // Keyed on the wording so a change remounts the node and replays
-              // the slide rather than swapping the text in place.
-              key={plate}
-              letterSpacing="0.14"
-              style={{
-                animation: "label-slide 420ms var(--ease-standard)",
-                textTransform: "uppercase",
+            <Screen
+              className="absolute grid place-items-center px-3"
+              face={chipFace}
+              // The buried part is added to the top inset and nothing else
+              // changes, so what is on show is the same screen the counter and
+              // the queue carry, down to the border either side of it.
+              shape={{
+                inset: BORDER,
+                top: PLATE.tuck + TUCK,
+                bottom: FREE_EDGE_INSET,
+                borderRadius: 7,
               }}
             >
-              <textPath
-                href={`#${plateArcId}-arc`}
-                startOffset="50%"
-                textAnchor="middle"
+              <span
+                className="w-full truncate text-center text-[1.05rem] font-black uppercase leading-none tracking-[0.04em]"
+                // Keyed on the wording so a change remounts the span and
+                // replays the slide rather than swapping the text in place.
+                key={plate}
+                style={{
+                  color: chipInk,
+                  animation: "label-slide 420ms var(--ease-standard)",
+                }}
               >
                 {plate}
-              </textPath>
-            </text>
-          </g>
-        </svg>
+              </span>
+            </Screen>
+          </Tab>
+        </div>
       )}
     </div>
   );

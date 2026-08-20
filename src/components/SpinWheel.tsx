@@ -195,11 +195,13 @@ export function SpinWheel({
   return (
     <div className="relative aspect-square w-full" aria-label="Spin wheel">
       {/* Glass disc framing the wheel, kept narrow so the pointer clears it. */}
-      {/* White, not thirty-percent white. At the old alpha the ring took its
-          colour from whatever was behind it, so over a dark scene the wheel's
-          "white" frame rendered as grey. Frosted rather than flat, so it still
-          reads as glass. */}
-      <div className="absolute inset-[2%] rounded-full border border-white/80 bg-white/80 shadow-[0_6px_18px_rgba(15,23,32,0.10)] backdrop-blur-md" />
+      {/* White, and opaque. At the old alpha the ring took its colour from
+          whatever was behind it, so over a dark scene the wheel's "white" frame
+          rendered grey. Opaque also lets the name plate run up behind it and
+          disappear: two translucent whites laid over each other compound into a
+          lighter patch, which draws exactly the seam the plate is meant not to
+          have. */}
+      <div className="absolute inset-[2%] rounded-full bg-white shadow-[0_6px_18px_rgba(15,23,32,0.12)]" />
       {/* Sized in percentages rather than pixels so the tip reaches the same
           way into the slice at any wheel size. The wheel starts 5% in, so 11%
           leaves the tip sitting just over the colour. */}
