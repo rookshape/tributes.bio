@@ -496,9 +496,9 @@ export function OverlayTotal({
               fontSize: figureSize(amount.length),
               // Maxed out: the figure cannot climb any further, so it flickers
               // rather than just sitting there as another number.
-              animation: maxedOut
-                ? "figure-flicker 2.6s linear infinite"
-                : undefined,
+              // Once, not on a loop: it marks the moment a run tops out, and a
+              // figure that flickers all round is just hard to read.
+              animation: maxedOut ? "figure-flicker 1s linear" : undefined,
             }}
           >
             {amount.split("").map((char, index) => (

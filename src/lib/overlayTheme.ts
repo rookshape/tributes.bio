@@ -259,11 +259,11 @@ export function overlayScreenInk(appearance: OverlayAppearance) {
  */
 export function overlayGlow(appearance: OverlayAppearance) {
   const hue = normalizeOverlayHue(appearance.hue);
-  // Near-white rather than a lighter tint of the face. The face carries real
-  // chroma now, so a glow only a shade lighter than it barely showed; light
-  // travelling under glass is what this is meant to look like.
-  const lightness = 0.98;
-  return oklchToHex(lightness, Math.min(maxChroma(lightness, hue), 0.03), hue);
+  // A lit version of the face rather than a white one: enough lightness above
+  // it to read as light moving under glass, but holding most of the chroma so
+  // it stays the same colour rather than washing out to a white streak.
+  const lightness = 0.93;
+  return oklchToHex(lightness, maxChroma(lightness, hue) * 0.8, hue);
 }
 
 /** Deep inset behind the running total's digits, so they read like a display. */
