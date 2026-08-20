@@ -25,7 +25,22 @@ export type OverlayAppearance = {
   goalShape: GoalShape;
   /** Rainbow fill instead of a single color. */
   goalRainbow: boolean;
+  /**
+   * Which chrome the parts wear.
+   *
+   * "cabinet" is the slot-machine treatment — trapezoid tabs with screens set
+   * into them. "basic" is the plain panel each part started as, kept because a
+   * busy scene sometimes wants furniture that recedes rather than performs.
+   */
+  panel: OverlayPanelStyle;
 };
+
+export type OverlayPanelStyle = "cabinet" | "basic";
+
+export const OVERLAY_PANEL_STYLES: { id: OverlayPanelStyle; label: string; hint: string }[] = [
+  { id: "cabinet", label: "Cabinet", hint: "Slot-machine tabs and screens." },
+  { id: "basic", label: "Basic", hint: "Plain panels that stay out of the way." },
+];
 
 export type GoalShape = "circle" | "star" | "heart" | "diamond" | "none";
 
@@ -40,6 +55,7 @@ export const DEFAULT_OVERLAY_APPEARANCE: OverlayAppearance = {
   vivid: false,
   goalShape: "circle",
   goalRainbow: false,
+  panel: "cabinet",
 };
 
 export const GOAL_SHAPES: { id: GoalShape; label: string }[] = [
@@ -76,6 +92,10 @@ export function normalizeOverlayTone(value: unknown) {
 
 export function isGoalShape(value: unknown): value is GoalShape {
   return GOAL_SHAPES.some((shape) => shape.id === value);
+}
+
+export function isOverlayPanelStyle(value: unknown): value is OverlayPanelStyle {
+  return OVERLAY_PANEL_STYLES.some((style) => style.id === value);
 }
 
 /** Panel lightness at which the ink flips from dark to light. */

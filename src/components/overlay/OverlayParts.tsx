@@ -97,6 +97,14 @@ export const OVERLAY_PARTS: {
  * under the pointer, and what they owe is on the running total — so a caption
  * here would only repeat the rest of the scene.
  */
+/** How long the wheel's plate holds its title before flipping to the wordmark. */
+const WHEEL_TITLE_MS = 9000;
+const WHEEL_WORDMARK_MS = 3500;
+/** The plate hanging off the bottom of the wheel. */
+const WHEEL_TAB = 226;
+/** How far it runs up behind the wheel, hiding its flat top against the arc. */
+const WHEEL_TUCK = 10;
+
 export function OverlayWheel({
   appearance = DEFAULT_OVERLAY_APPEARANCE,
   config,
@@ -108,23 +116,85 @@ export function OverlayWheel({
   animation: SpinAnimation | null;
   onTick?: () => void;
 }) {
-  const panel = overlaySurface(appearance);
+  const basic = appearance.panel === "basic";
+  const chipFace = overlayChipFace(appearance);
+  const chipInk = overlayChipInk(appearance);
+  const surface = overlaySurfaceSolid(appearance);
+  const edgeColor = overlaySurface(appearance).borderColor;
+
+  // Title most of the time, wordmark in passing. Chained timeouts rather than
+  // one interval because the two are held for different lengths — the wheel is
+  // the thing being watched, so the branding takes the shorter turn.
+  const [showWordmark, setShowWordmark] = useState(false);
+
+  useEffect(() => {
+    if (basic) return;
+
+    const timer = window.setTimeout(
+      () => setShowWordmark((shown) => !shown),
+      showWordmark ? WHEEL_WORDMARK_MS : WHEEL_TITLE_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [basic, showWordmark]);
+
+  const plate = showWordmark ? "tributes.bio" : config.name;
 
   return (
     <div className="w-full max-w-[520px]">
       <SpinWheel
         animation={animation}
-        frame={{
-          backgroundColor: panel.backgroundColor,
-          borderColor: panel.borderColor,
-        }}
-        name={config.name}
+        // Set into the rim only in the plain style. The cabinet style hangs it
+        // off a plate below instead, where it has room to change.
+        name={basic ? config.name : undefined}
         onTick={onTick}
         slices={config.slices}
         wheelGlow={config.wheelGlow}
         wheelHue={config.wheelHue}
         wheelTone={config.wheelTone}
       />
+
+      {basic ? null : (
+        <div
+          className="relative mx-auto"
+          style={{
+            width: WHEEL_TAB,
+            height: BUMP + TUCK - WHEEL_TUCK,
+            // Pulled up under the wheel so the plate's flat top meets the arc
+            // rather than hanging off the single point where a circle's lowest
+            // edge would touch it.
+            marginTop: -WHEEL_TUCK,
+          }}
+        >
+          <Chrome>
+            <Tab
+              edge="bottom"
+              edgeColor={edgeColor}
+              fill={surface}
+              style={{ left: 0, top: -WHEEL_TUCK }}
+              width={WHEEL_TAB}
+            >
+              <Screen
+                className="absolute grid place-items-center px-3"
+                face={chipFace}
+                shape={tabScreenShape("bottom")}
+              >
+                <span
+                  className="w-full truncate text-center text-[1.05rem] font-black uppercase leading-none tracking-[0.04em]"
+                  // Keyed on the wording so a change remounts the span and
+                  // replays the slide rather than swapping the text in place.
+                  key={plate}
+                  style={{
+                    color: chipInk,
+                    animation: "label-slide 420ms var(--ease-standard)",
+                  }}
+                >
+                  {plate}
+                </span>
+              </Screen>
+            </Tab>
+          </Chrome>
+        </div>
+      )}
     </div>
   );
 }
@@ -226,6 +296,8 @@ const EXTENSION_WIDTH = 148;
  */
 const GOAL_LABEL_TAB = 214;
 const GOAL_FIGURE_TAB = 168;
+/** The queue's single tab, carrying its header. */
+const QUEUE_TAB = 176;
 
 /**
  * One extension of a cabinet.
@@ -517,6 +589,39 @@ export function OverlayTotal({
           ? "tributes.bio"
           : "Round over";
 
+  if (appearance.panel === "basic") {
+    return (
+      <div
+        className="w-full max-w-[240px] rounded-3xl border p-4 text-center backdrop-blur-md"
+        key={`total-${pulseKey}`}
+        style={{
+          ...overlaySurface(appearance),
+          color: ink,
+          animation: "total-pop 480ms var(--ease-standard)",
+        }}
+      >
+        <p className="text-[0.65rem] font-bold uppercase tracking-[0.12em] opacity-70">
+          Round total
+        </p>
+        <p
+          className="mt-1 font-black leading-none"
+          style={{
+            fontSize: figureSize(amount.length),
+            animation: maxedOut ? "figure-flicker 1s linear" : undefined,
+          }}
+        >
+          {amount}
+        </p>
+        <p className="mt-2 text-sm font-semibold opacity-75">{label}</p>
+        {armed ? (
+          <p className="mt-1 text-sm font-black" style={{ color: accent }}>
+            {multiplier}× armed
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div
       className="relative w-full max-w-[214px]"
@@ -664,6 +769,100 @@ export function OverlayGoalBar({
 
   const marker = markerColors(appearance, progress);
 
+  // Built once and placed by whichever style is in use: the fill, its gradient,
+  // and the marker riding its tip are the one part of this component that does
+  // not change between them.
+  const track = (
+    <div
+      className="relative h-3.5 rounded-full"
+      style={{ backgroundColor: `${ink}1f` }}
+    >
+      <div
+        className="h-full rounded-full transition-[width] duration-slow ease-standard"
+        style={{
+          width: `${progress * 100}%`,
+          background: appearance.goalRainbow
+            ? rainbowFill(appearance.vivid)
+            : accent,
+          // The gradient belongs to the track, not to the fill. Left alone it
+          // scales to whatever is filled, squeezing the whole rainbow into a
+          // half-full bar — so the colour under the marker was never the colour
+          // the marker had computed for that position.
+          backgroundSize:
+            appearance.goalRainbow && progress > 0
+              ? `${100 / progress}% 100%`
+              : undefined,
+          backgroundRepeat: "no-repeat",
+          boxShadow: `0 0 12px ${accent}66`,
+        }}
+      />
+      {shape !== "none" && progress > 0 ? (
+        <svg
+          aria-hidden="true"
+          className="absolute top-1/2 h-8 w-8 transition-[left] duration-slow ease-standard"
+          // The translate lives in the transform rather than in a class so the
+          // pulse keyframe can carry it too.
+          key={`marker-${pulseKey}`}
+          style={{
+            left: `${progress * 100}%`,
+            transform: "translate(-50%, -50%)",
+            filter: pulsing ? markerGlow(marker.from) : undefined,
+            animation: pulseKey
+              ? `marker-pulse ${MARKER_PULSE_MS}ms var(--ease-standard)`
+              : undefined,
+          }}
+          viewBox="0 0 24 24"
+        >
+          <defs>
+            <linearGradient id={markerGradientId} x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stopColor={marker.from} />
+              <stop offset="100%" stopColor={marker.to} />
+            </linearGradient>
+          </defs>
+          {/* White body, edge in the colour the bar has reached. Colouring the
+              body instead camouflaged it against the fill it rides. Painting
+              the stroke before the fill keeps it outside the shape — a centred
+              stroke eats half its width out of the white. */}
+          <path
+            d={GOAL_SHAPE_PATHS[shape]}
+            fill="#fff"
+            paintOrder="stroke"
+            stroke={`url(#${markerGradientId})`}
+            strokeLinejoin="round"
+            strokeWidth="4.1"
+          />
+        </svg>
+      ) : null}
+    </div>
+  );
+
+  if (appearance.panel === "basic") {
+    return (
+      <div
+        // Deeper at the bottom on purpose: the marker overhangs the track by
+        // nine pixels and throws a glow past that, so equal padding would leave
+        // it grazing the pill's edge.
+        className="w-full max-w-[600px] rounded-full border px-5 pb-2.5 pt-2 backdrop-blur-md"
+        style={{ ...overlaySurface(appearance), color: ink }}
+      >
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="truncate text-sm font-bold tracking-wide lg:text-base">
+            {goalLabel}
+          </p>
+          <p className="flex shrink-0 items-baseline text-base font-black leading-none lg:text-xl">
+            {currentControl ?? formatMoney(current)}
+            {goalControl ? (
+              <span className="opacity-50">/{goalControl}</span>
+            ) : goalCents > 0 ? (
+              <span className="opacity-50">/{formatMoney(goalCents)}</span>
+            ) : null}
+          </p>
+        </div>
+        <div className="mt-2">{track}</div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="relative w-full max-w-[600px]"
@@ -686,7 +885,7 @@ export function OverlayGoalBar({
             shape={tabScreenShape("top")}
           >
             <span
-              className="w-full truncate text-center text-[0.95rem] font-black uppercase leading-none tracking-[0.02em]"
+              className="w-full truncate text-center text-[1.2rem] font-black uppercase leading-none tracking-[0.01em]"
               style={{ color: chipInk }}
             >
               {goalLabel}
@@ -706,7 +905,7 @@ export function OverlayGoalBar({
             shape={tabScreenShape("top")}
           >
             <span
-              className="flex items-baseline whitespace-nowrap text-[0.95rem] font-black leading-none"
+              className="flex items-baseline whitespace-nowrap text-[1.2rem] font-black leading-none"
               style={{ color: chipInk }}
             >
               {currentControl ?? formatMoney(current)}
@@ -729,78 +928,7 @@ export function OverlayGoalBar({
         />
       </Chrome>
 
-      {/* The bar itself, unchanged: the fill is the loudest thing here, so it
-          gets real height and a marker riding its tip rather than ending on a
-          flat edge. The marker overhangs the track, so the row carries its own
-          room. */}
-      <div className="relative px-5 pb-2 pt-2.5">
-        <div
-          className="relative h-3.5 rounded-full"
-          style={{ backgroundColor: `${ink}1f` }}
-        >
-          <div
-            className="h-full rounded-full transition-[width] duration-slow ease-standard"
-            style={{
-              width: `${progress * 100}%`,
-              background: appearance.goalRainbow
-                ? rainbowFill(appearance.vivid)
-                : accent,
-              // The gradient belongs to the track, not to the fill. Left alone
-              // it scales to whatever is filled, squeezing the whole rainbow
-              // into a half-full bar — so the colour under the marker was never
-              // the colour the marker had computed for that position.
-              backgroundSize:
-                appearance.goalRainbow && progress > 0
-                  ? `${100 / progress}% 100%`
-                  : undefined,
-              backgroundRepeat: "no-repeat",
-              boxShadow: `0 0 12px ${accent}66`,
-            }}
-          />
-          {shape !== "none" && progress > 0 ? (
-            <svg
-              aria-hidden="true"
-              className="absolute top-1/2 h-8 w-8 transition-[left] duration-slow ease-standard"
-              // The translate lives in the transform rather than in a class so
-              // the pulse keyframe can carry it too.
-              key={`marker-${pulseKey}`}
-              style={{
-                left: `${progress * 100}%`,
-                transform: "translate(-50%, -50%)",
-                filter: pulsing ? markerGlow(marker.from) : undefined,
-                animation: pulseKey
-                  ? `marker-pulse ${MARKER_PULSE_MS}ms var(--ease-standard)`
-                  : undefined,
-              }}
-              viewBox="0 0 24 24"
-            >
-              <defs>
-                <linearGradient id={markerGradientId} x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor={marker.from} />
-                  <stop offset="100%" stopColor={marker.to} />
-                </linearGradient>
-              </defs>
-              {/* White body, edge in the colour the bar has reached. Colouring
-                  the body instead camouflaged it against the fill it rides.
-                  Painting the stroke before the fill keeps it outside the
-                  shape — a centred stroke eats half its width out of the
-                  white. */}
-              <path
-                d={GOAL_SHAPE_PATHS[shape]}
-                fill="#fff"
-                paintOrder="stroke"
-                stroke={`url(#${markerGradientId})`}
-                strokeLinejoin="round"
-                strokeWidth="3.4"
-              />
-            </svg>
-          ) : null}
-        </div>
-
-        <p className="mt-1.5 text-right text-[0.6rem] font-semibold leading-none tracking-[0.12em] opacity-35">
-          tributes.bio
-        </p>
-      </div>
+      <div className="relative px-5 pb-2.5 pt-2.5">{track}</div>
     </div>
   );
 }
@@ -837,25 +965,18 @@ export function OverlayQueue({
   const visible = waiting.slice(0, maxVisible);
   const overflow = waiting.length - visible.length;
 
-  return (
-    <div
-      className="w-full max-w-[320px] rounded-3xl border p-4 backdrop-blur-md"
-      style={{ ...overlaySurface(appearance), color: ink }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-bold uppercase tracking-[0.12em] opacity-80">
-          Queue
-        </p>
-        <span
-          className="rounded-full px-2 py-0.5 text-xs font-black"
-          style={{ backgroundColor: accent, color: "#fff" }}
-        >
-          {waiting.length}
-        </span>
-      </div>
+  const basic = appearance.panel === "basic";
+  const chipFace = overlayChipFace(appearance);
+  const chipInk = overlayChipInk(appearance);
+  const surface = overlaySurfaceSolid(appearance);
+  const edgeColor = overlaySurface(appearance).borderColor;
 
+  // The list, and the caller-out above it for whoever is mid-run. Shared by
+  // both styles: only the chrome around it differs.
+  const list = (
+    <>
       {spinningNow ? (
-        <div className="mt-3 border-b pb-2.5" style={{ borderColor: `${ink}1f` }}>
+        <div className="border-b pb-2.5" style={{ borderColor: `${ink}1f` }}>
           <p className="flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] opacity-70">
             <span
               className="h-1.5 w-1.5 animate-pulse rounded-full"
@@ -870,7 +991,7 @@ export function OverlayQueue({
       ) : null}
 
       {visible.length ? (
-        <ol className="mt-3 grid gap-1.5">
+        <ol className="grid gap-1.5">
           {visible.map((entry, index) => (
             <li className="flex items-start gap-2.5 text-sm" key={entry.id}>
               <span className="w-4 shrink-0 text-center text-xs leading-5 opacity-50">
@@ -897,15 +1018,87 @@ export function OverlayQueue({
           ) : null}
         </ol>
       ) : (
-        <p className="mt-3 text-sm opacity-55">Nobody waiting</p>
+        <p className="text-sm opacity-55">Nobody waiting</p>
       )}
+    </>
+  );
 
-      {/* The overlay's one piece of branding. It lives here rather than on the
-          goal bar because this panel has the room, and rather than on the wheel
-          because the wheel is an event element that comes and goes. */}
-      <p className="mt-3 text-right text-[0.6rem] font-semibold tracking-[0.12em] opacity-35">
-        tributes.bio
-      </p>
+  if (basic) {
+    return (
+      <div
+        className="w-full max-w-[320px] rounded-3xl border p-4 backdrop-blur-md"
+        style={{ ...overlaySurface(appearance), color: ink }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-bold uppercase tracking-[0.12em] opacity-80">
+            Queue
+          </p>
+          <span
+            className="rounded-full px-2 py-0.5 text-xs font-black"
+            style={{ backgroundColor: accent, color: "#fff" }}
+          >
+            {waiting.length}
+          </span>
+        </div>
+
+        <div className="mt-3 grid gap-3">{list}</div>
+
+        {/* The overlay's one piece of branding in this style. It lives here
+            rather than on the goal bar because this panel has the room. */}
+        <p className="mt-3 text-right text-[0.6rem] font-semibold tracking-[0.12em] opacity-35">
+          tributes.bio
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative w-full max-w-[320px]"
+      style={{ color: ink, paddingTop: BUMP }}
+    >
+      <Chrome>
+        {/* The header earns the tab: it is a fixed label and a count, which is
+            exactly what a screen this size holds, and it frees the panel below
+            to be nothing but the list. */}
+        <Tab
+          edge="top"
+          edgeColor={edgeColor}
+          fill={surface}
+          style={centeredTab(QUEUE_TAB)}
+          width={QUEUE_TAB}
+        >
+          <Screen
+            className="absolute flex items-center justify-center gap-2 px-3"
+            face={chipFace}
+            shape={tabScreenShape("top")}
+          >
+            <span
+              className="text-[1.05rem] font-black uppercase leading-none tracking-[0.06em]"
+              style={{ color: chipInk }}
+            >
+              Queue
+            </span>
+            <span
+              className="rounded-full px-1.5 text-[0.85rem] font-black leading-tight"
+              style={{ backgroundColor: accent, color: "#fff" }}
+            >
+              {waiting.length}
+            </span>
+          </Screen>
+        </Tab>
+        <div
+          className="absolute inset-x-0 rounded-3xl"
+          style={{
+            backgroundColor: surface,
+            top: BUMP,
+            bottom: 0,
+            boxShadow: `inset 0 0 0 1px ${edgeColor}`,
+          }}
+        />
+      </Chrome>
+
+      <div className="relative grid gap-3 px-4 pb-4 pt-3">{list}</div>
     </div>
   );
 }

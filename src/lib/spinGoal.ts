@@ -15,6 +15,7 @@ import {
 import {
   DEFAULT_OVERLAY_APPEARANCE,
   isGoalShape,
+  isOverlayPanelStyle,
   normalizeOverlayHue,
   normalizeOverlayTone,
   type OverlayAppearance,
@@ -86,6 +87,9 @@ function mapOverlaySettings(
         ? data.goalShape
         : DEFAULT_OVERLAY_APPEARANCE.goalShape,
       goalRainbow: bool("goalRainbow", DEFAULT_OVERLAY_APPEARANCE.goalRainbow),
+      panel: isOverlayPanelStyle(data?.overlayPanel)
+        ? data.overlayPanel
+        : DEFAULT_OVERLAY_APPEARANCE.panel,
     },
     queueMaxVisible: Math.min(
       10,
@@ -112,6 +116,7 @@ export async function saveOverlaySettings(settings: SpinOverlaySettings) {
       overlayVivid: settings.appearance.vivid,
       goalShape: settings.appearance.goalShape,
       goalRainbow: settings.appearance.goalRainbow,
+      overlayPanel: settings.appearance.panel,
       queueMaxVisible: Math.min(10, Math.max(1, Math.round(settings.queueMaxVisible))),
       queueHideNames: settings.queueHideNames,
       updatedAt: serverTimestamp(),

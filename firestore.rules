@@ -224,7 +224,7 @@ service cloud.firestore {
             'soundResult', 'soundWin', 'soundQueue',
             'queueMaxVisible', 'queueHideNames',
             'overlayHue', 'overlayTone', 'overlayVivid',
-            'goalShape', 'goalRainbow',
+            'goalShape', 'goalRainbow', 'overlayPanel',
             'updatedAt'
           ])
           && request.resource.data.creatorId == creatorId
@@ -256,7 +256,9 @@ service cloud.firestore {
               && request.resource.data.overlayTone <= 100))
           && (!('goalShape' in request.resource.data)
             || request.resource.data.goalShape in
-              ['circle', 'star', 'heart', 'diamond', 'none']);
+              ['circle', 'star', 'heart', 'diamond', 'none'])
+          && (!('overlayPanel' in request.resource.data)
+            || request.resource.data.overlayPanel in ['cabinet', 'basic']);
         allow delete: if false;
       }
 

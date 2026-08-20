@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type CSSProperties } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Wheel } from "spin-wheel/dist/spin-wheel-esm.js";
 import type { SpinSlice } from "../lib/types";
 import {
@@ -26,12 +26,6 @@ type SpinWheelProps = {
   wheelTone?: number;
   /** Soft animated halo on the lighter alternating slices. */
   wheelGlow?: boolean;
-  /**
-   * Panel treatment for the glass frame. The overlay passes its own so the
-   * wheel's white ring matches the counter, the bar, and the queue instead of
-   * being the one piece of furniture wearing a different translucency.
-   */
-  frame?: CSSProperties;
   animation?: SpinAnimation | null;
   onRest?: () => void;
   /** Fires as each slice boundary passes the pointer, for the tick sound. */
@@ -54,7 +48,6 @@ export function SpinWheel({
   wheelHue = 210,
   wheelTone = 20,
   wheelGlow = true,
-  frame,
   onRest,
   onTick,
 }: SpinWheelProps) {
@@ -202,25 +195,36 @@ export function SpinWheel({
   return (
     <div className="relative aspect-square w-full" aria-label="Spin wheel">
       {/* Glass disc framing the wheel, kept narrow so the pointer clears it. */}
-      <div
-        className="absolute inset-[2%] rounded-full border border-white/70 bg-white/30 shadow-[0_6px_18px_rgba(15,23,32,0.08)] backdrop-blur-md"
-        style={frame}
-      />
+      {/* White, not thirty-percent white. At the old alpha the ring took its
+          colour from whatever was behind it, so over a dark scene the wheel's
+          "white" frame rendered as grey. Frosted rather than flat, so it still
+          reads as glass. */}
+      <div className="absolute inset-[2%] rounded-full border border-white/80 bg-white/80 shadow-[0_6px_18px_rgba(15,23,32,0.10)] backdrop-blur-md" />
       {/* Sized in percentages rather than pixels so the tip reaches the same
           way into the slice at any wheel size. The wheel starts 5% in, so 11%
           leaves the tip sitting just over the colour. */}
+      {/* The shadow is on the wrapper and the clip on the child, because
+          clip-path is applied *after* filter: with both on one element the
+          drop-shadow was generated from the full rectangle and then clipped
+          away along with everything else outside the triangle, which is why it
+          never appeared. Hard rather than soft — it sits on a white rim over
+          pale slices, where a blurred shadow at that contrast just greys the
+          edge instead of drawing one. */}
       <div
-        // Hard rather than soft: it sits on a white rim over pale slices, and
-        // a blurred shadow at that contrast just greys the edge instead of
-        // drawing one.
-        className="absolute left-1/2 top-0 z-20 h-[11%] w-[6%] -translate-x-1/2 bg-white drop-shadow-[0_2px_0_rgba(15,23,32,0.55)]"
+        className="absolute left-1/2 top-0 z-20 h-[11%] w-[6%] -translate-x-1/2"
         ref={pointerRef}
         style={{
-          clipPath: "polygon(50% 100%, 0 0, 100% 0)",
+          filter:
+            "drop-shadow(0 2px 0 rgba(15,23,32,0.42)) drop-shadow(0 3px 5px rgba(15,23,32,0.35))",
           // Pivots where it is pinned to the rim, like a real flapper.
           transformOrigin: "50% 0",
         }}
-      />
+      >
+        <div
+          className="h-full w-full bg-white"
+          style={{ clipPath: "polygon(50% 100%, 0 0, 100% 0)" }}
+        />
+      </div>
       {/* The wheel's name on one side of the rim and the wordmark on the
           other. The pointer owns the top, so arcs centred there would run
           underneath it; on the sides both stay clear of it and of each other,

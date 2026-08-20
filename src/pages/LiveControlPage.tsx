@@ -30,6 +30,7 @@ import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../lib/money";
 import {
   GOAL_SHAPES,
+  OVERLAY_PANEL_STYLES,
   GOAL_SHAPE_PATHS,
   OVERLAY_HUE_MAX,
   OVERLAY_HUE_STEP,
@@ -821,6 +822,46 @@ export function LiveControlPage() {
                   })
                 }
               />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-detail font-semibold text-content">Style</p>
+            <p className="mt-0.5 text-caption text-content-subtle">
+              How the goal bar, running total, queue, and wheel are framed.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {OVERLAY_PANEL_STYLES.map((style) => {
+                const selected = settings.appearance.panel === style.id;
+                return (
+                  <button
+                    className={`rounded-card border px-3 py-2.5 text-left transition-colors duration-fast ${
+                      selected
+                        ? "border-accent bg-accent/5"
+                        : "border-line hover:border-line-strong"
+                    }`}
+                    key={style.id}
+                    onClick={() =>
+                      saveSettings({
+                        ...settings,
+                        appearance: { ...settings.appearance, panel: style.id },
+                      })
+                    }
+                    type="button"
+                  >
+                    <span
+                      className={`block text-detail font-semibold ${
+                        selected ? "text-accent" : "text-content"
+                      }`}
+                    >
+                      {style.label}
+                    </span>
+                    <span className="mt-0.5 block text-caption text-content-subtle">
+                      {style.hint}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
