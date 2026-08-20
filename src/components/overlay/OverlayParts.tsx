@@ -497,7 +497,10 @@ function Chrome({ children }: { children: ReactNode }) {
       style={{
         filter: "drop-shadow(0 6px 16px rgba(15,23,32,0.18))",
         opacity: OVERLAY_PANEL_ALPHA,
-        backdropFilter: "blur(10px)",
+        // No backdrop-filter. It frosts the element's whole bounding box rather
+        // than the silhouette drawn inside it, so on anything but a flat colour
+        // it showed up as a translucent rectangle sitting behind the part —
+        // over a stream, a blurred box around a shape that is not a box.
       }}
     >
       {children}

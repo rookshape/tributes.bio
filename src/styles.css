@@ -497,3 +497,18 @@ select:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/**
+ * A scroll area with no visible scrollbar.
+ *
+ * For the shot-staging phone frame, where the bar is furniture rather than
+ * product and lands inside the thing being photographed.
+ */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

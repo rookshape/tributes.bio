@@ -51,7 +51,15 @@ const SHOWCASE_QUEUE = [
   { id: "preview-3", viewerName: "harrowmoth", amountCents: 1200, wheelName: null, status: "queued" },
 ] as never;
 
-const PHONE = { width: 390, height: 844 };
+/**
+ * A current large phone, rather than the smallest one.
+ *
+ * The page has to fit inside the frame for the shot to be worth taking — a
+ * scrolled screenshot shows a cropped product — and at 390 x 844 the footer ran
+ * about a hundred pixels past the bottom. A shade taller than a real 430 x 932
+ * so the last line is not flush against the edge.
+ */
+const PHONE = { width: 430, height: 968 };
 
 export function PreviewPage() {
   const { appUser, loading, user } = useAuth();
@@ -102,6 +110,7 @@ export function PreviewPage() {
             <Tabs
               items={[
                 { value: "bio", label: "Bio page" },
+                { value: "bio-open", label: "Bio, tribute open" },
                 { value: "stream", label: "Stream overlay" },
               ]}
               label="Shot"
@@ -128,7 +137,7 @@ export function PreviewPage() {
         </button>
       )}
 
-      {scene === "bio" ? (
+      {scene === "bio" || scene === "bio-open" ? (
         <div className="grid place-items-center px-4 py-10">
           {/* A real phone frame rather than a tall column: the bio page is
               looked at on a phone, and a shot of it in any other proportion
@@ -137,7 +146,7 @@ export function PreviewPage() {
             className="overflow-hidden rounded-[38px] bg-white shadow-[0_24px_60px_rgba(15,23,32,0.22)] ring-1 ring-line"
             style={{ height: PHONE.height, width: PHONE.width }}
           >
-            <div className="h-full w-full overflow-y-auto">
+            <div className="scrollbar-none h-full w-full overflow-y-auto">
               {profile ? (
                 <BioPageView
                   links={links}
@@ -147,7 +156,19 @@ export function PreviewPage() {
                   // visitor would see. This one is for a photograph, and the
                   // tribute form is the thing being photographed — it should
                   // not depend on whether Stripe onboarding finished today.
-                  topContent={<TributeForm preview profile={profile} />}
+                  topContent={
+                    <TributeForm
+                      // At rest it is one empty field, which is how a visitor
+                      // meets it and what leaves room for the links below. The
+                      // second scene seeds an amount so the rest of the form is
+                      // on screen to be photographed.
+                      initialAmount={scene === "bio-open" ? "10" : ""}
+                      key={scene}
+                      openDetails={scene === "bio-open"}
+                      preview
+                      profile={profile}
+                    />
+                  }
                 />
               ) : null}
             </div>
