@@ -247,7 +247,7 @@ export function overlayScreenInk(appearance: OverlayAppearance) {
   const lightness = 0.66;
   return oklchToHex(
     lightness,
-    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.28 : 0.2),
+    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.21 : 0.15),
     hue,
   );
 }
