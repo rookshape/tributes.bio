@@ -23,7 +23,7 @@ export function LandingPage() {
       <section className="relative isolate overflow-hidden pb-16 pt-24 text-center sm:pb-20 sm:pt-28">
         <div className="relative left-1/2 w-max -translate-x-1/2 pb-3">
           <h1
-            className="whitespace-nowrap text-[32.7vw] leading-[1.05]"
+            className="whitespace-nowrap text-[35.5vw] leading-[1.05]"
             style={{
               background: "linear-gradient(180deg, #82aefc 12%, #82aefc 48%, #ffffff 96%)",
               backgroundClip: "text",
@@ -39,20 +39,26 @@ export function LandingPage() {
         </div>
         <div className="relative mx-auto mt-10 w-full max-w-3xl px-4 sm:mt-14 sm:px-6">
           <p className="mx-auto max-w-xl text-lead text-content-muted sm:text-xl">
-            Get paid in your bio, and on your stream.
+            Get paid in your bio and on your stream.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             {user ? (
               <ButtonLink
+                className="rounded-full px-8 shadow-[0_10px_30px_rgba(15,23,32,0.12)]"
                 size="lg"
                 to={appUser?.onboardingComplete ? "/dashboard" : "/onboarding"}
-                variant="accent"
+                variant="primary"
               >
                 {appUser?.onboardingComplete ? "Open dashboard" : "Continue setup"}
               </ButtonLink>
             ) : (
               <>
-                <ButtonLink size="lg" to="/signup" variant="accent">
+                <ButtonLink
+                  className="rounded-full px-8 shadow-[0_10px_30px_rgba(15,23,32,0.12)]"
+                  size="lg"
+                  to="/signup"
+                  variant="primary"
+                >
                   Create your page
                 </ButtonLink>
                 <Link
@@ -72,8 +78,8 @@ export function LandingPage() {
           <div className="min-w-0 lg:order-1">
             <h2 className="text-headline font-semibold text-content">In your bio</h2>
             <p className="mt-3 max-w-md text-lead text-content-muted">
-              One page for your links and your tributes. Share a single address,
-              and let people support you from the same place they find you.
+              One page for your links and your tributes. Share one address,
+              and let people support you where they already find you.
             </p>
           </div>
           <div className="min-w-0 lg:order-2">
@@ -90,8 +96,8 @@ export function LandingPage() {
             <h2 className="text-headline font-semibold text-content">On your stream</h2>
             <p className="mt-3 text-lead text-content-muted">
               Turn sending into a live game. A viewer pays to spin your wheel,
-              you spin it on stream, and they send whatever it lands on — with
-              the most they could pay agreed before they start.
+              you spin it on stream, and they send whatever it lands on. The most
+              they can pay is agreed before they start.
             </p>
           </div>
           <div className="mt-10">
@@ -125,10 +131,10 @@ export function LandingPage() {
         <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-20 text-center sm:px-6 sm:pt-24">
           <h2 className="text-hero font-semibold text-content">Totally Free</h2>
           <p className="mx-auto mt-4 max-w-xl text-lead text-content-muted">
-            Free to set up, and free to keep. You receive the full amount someone
-            sends you — the sender covers a service fee, {feePercentLabel(TIP_FEE_RATE)} on
-            a tribute and {feePercentLabel(SPIN_FEE_RATE)} on a spin, shown to
-            them before they pay.
+            Free to set up and free to keep. You get the full amount someone
+            sends you. The sender covers the service fee: {feePercentLabel(TIP_FEE_RATE)} on
+            a tribute, {feePercentLabel(SPIN_FEE_RATE)} on a spin, shown before
+            they pay.
           </p>
           <div className="mt-9 flex justify-center">
             {/* The primary variant is already a white face with an accent
@@ -152,22 +158,22 @@ export function LandingPage() {
                 the trading name; lurk LLC is who the contract and the payouts
                 are actually with, and a card statement or a processor review
                 should be able to connect the two without asking. */}
-            <p className="text-detail text-content-muted">
+            <p className="text-detail text-white/85">
               Tributes is a product of lurk LLC. © {new Date().getFullYear()} lurk
               LLC. All rights reserved.
             </p>
             <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-detail">
-              <Link className="text-content-muted hover:text-content" to="/terms">
+              <Link className="text-white/85 hover:text-white" to="/terms">
                 Terms
               </Link>
-              <Link className="text-content-muted hover:text-content" to="/privacy">
+              <Link className="text-white/85 hover:text-white" to="/privacy">
                 Privacy
               </Link>
-              <Link className="text-content-muted hover:text-content" to="/refunds">
+              <Link className="text-white/85 hover:text-white" to="/refunds">
                 Refunds
               </Link>
               <a
-                className="text-content-muted hover:text-content"
+                className="text-white/85 hover:text-white"
                 href="mailto:support@tributes.bio"
               >
                 Support
