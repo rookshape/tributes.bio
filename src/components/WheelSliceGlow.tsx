@@ -17,8 +17,6 @@ type WheelSliceGlowProps = {
   radius: number;
   /** Optional ref on the rotating group — SpinWheel drives this each frame. */
   rotateRef?: RefObject<SVGGElement | null>;
-  /** Unique per instance: two wheels in one document would share gradient ids. */
-  filterId: string;
   className?: string;
 };
 
@@ -46,16 +44,17 @@ function wedgePath(center: number, startAngle: number, endAngle: number, radius:
 /**
  * A slow lift on the lighter alternating slices — the whole wedge breathes.
  *
- * Two earlier versions got this wrong in the same way. Both blurred the wedge,
- * which softens *edges* and leaves the interior untouched, and both used a glow
- * colour no lighter than the slice beneath. The result was a slice that never
- * changed and a pair of bright seams where the blur crept onto the darker
- * neighbours either side — light in exactly the places it should not have been.
+ * Three earlier versions all failed the same way: they put the light somewhere
+ * other than across the slice. Two blurred the wedge, which softens *edges* and
+ * leaves the interior alone, in a colour no lighter than the slice beneath — so
+ * the slice never changed and the only thing that lit up was the seam where the
+ * blur crept onto its darker neighbours. The third dropped the blur but graded
+ * the wash from hub to rim, which just moved the artefact: a bright arc banding
+ * the outer end of every lit slice.
  *
- * So: no blur. Each lit wedge is painted edge to edge, clipped to nothing but
- * its own shape, and only its opacity animates. The wash is a radial gradient
- * because a flat fill reads as a paint chip; carrying more of it at the rim
- * than at the hub is how a lamp behind the wheel would actually fall.
+ * The lesson each time was the same, so this version has nowhere left to put a
+ * gradient or a blur. One flat fill, the exact shape of the wedge, and the only
+ * thing that changes is its opacity.
  */
 export function WheelSliceGlow({
   slices,
@@ -65,7 +64,6 @@ export function WheelSliceGlow({
   center,
   radius,
   rotateRef,
-  filterId,
   className = "",
 }: WheelSliceGlowProps) {
   if (!wheelGlow || slices.length < 2) return null;
@@ -73,7 +71,6 @@ export function WheelSliceGlow({
   const appearance = { hue: wheelHue, tone: wheelTone };
   const glow = wheelSliceGlow(appearance);
   const sliceAngle = 360 / slices.length;
-  const gradientId = `${filterId}-wash`;
 
   return (
     <svg
@@ -81,19 +78,6 @@ export function WheelSliceGlow({
       className={`pointer-events-none h-full w-full ${className}`}
       viewBox={`0 0 ${center * 2} ${center * 2}`}
     >
-      <defs>
-        <radialGradient
-          cx={center}
-          cy={center}
-          gradientUnits="userSpaceOnUse"
-          id={gradientId}
-          r={radius}
-        >
-          <stop offset="0%" stopColor={glow} stopOpacity="0.35" />
-          <stop offset="55%" stopColor={glow} stopOpacity="0.8" />
-          <stop offset="100%" stopColor={glow} stopOpacity="1" />
-        </radialGradient>
-      </defs>
       <g ref={rotateRef} style={{ transformOrigin: "center" }}>
         {slices.map((slice, index) => {
           if (!isLightSlice(appearance, index, slices.length)) return null;
@@ -104,7 +88,7 @@ export function WheelSliceGlow({
             <path
               className="animate-wheel-glow"
               d={wedgePath(center, startAngle, startAngle + sliceAngle, radius)}
-              fill={`url(#${gradientId})`}
+              fill={glow}
               key={slice.id}
             />
           );

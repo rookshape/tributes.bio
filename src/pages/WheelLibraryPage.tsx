@@ -59,7 +59,10 @@ function WheelCard({
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <span className="truncate text-body font-semibold text-content">{wheel.name}</span>
-        {active ? <Badge dot tone="positive">Active</Badge> : null}
+        {/* Which wheel viewers get, not which one the page happens to be
+            pointing at — "Active" named an internal pointer that meant nothing
+            to a streamer looking at their library. */}
+        {wheel.isDefault ? <Badge dot tone="positive">Default</Badge> : null}
         {wheel.archived ? <Badge>Archived</Badge> : null}
       </div>
 

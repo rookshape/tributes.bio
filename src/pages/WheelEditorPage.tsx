@@ -2,6 +2,7 @@ import { ArrowLeft, Check, LoaderCircle, Save, SlidersHorizontal, Trash2 } from 
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { EditableSpinWheel } from "../components/EditableSpinWheel";
+import { OverlayWheel } from "../components/overlay/OverlayParts";
 import {
   Badge,
   Button,
@@ -28,7 +29,7 @@ import {
   activateWheel,
   getActiveWheelId,
   getWheel,
-  listWheels,
+  clearOtherDefaultWheels,
   saveWheel,
   subscribeActiveWheelId,
 } from "../lib/wheels";
@@ -194,12 +195,7 @@ export function WheelEditorPage() {
       const normalized = await saveWheel({ ...wheel, title: wheel.name });
 
       if (normalized.isDefault) {
-        const others = await listWheels(creatorId);
-        await Promise.all(
-          others
-            .filter((other) => other.id !== normalized.id && other.isDefault)
-            .map((other) => saveWheel({ ...other, isDefault: false })),
-        );
+        await clearOtherDefaultWheels(creatorId, normalized.id);
       }
       setWheel(normalized);
 
@@ -500,6 +496,34 @@ export function WheelEditorPage() {
           </aside>
         ) : null}
       </div>
+
+      {/* The editor's own wheel carries an add-slice control and a selection
+          highlight, so it is not what goes out. This is the overlay component
+          itself, given nothing but the wheel being edited. */}
+      <section className="panel mt-8 p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-body font-semibold text-content">On stream</h2>
+          <p className="text-caption text-content-subtle">
+            Exactly what the OBS source renders. The checkered area is
+            transparent over your scene.
+          </p>
+        </div>
+
+        <div
+          className="mt-4 flex justify-center rounded-lg border border-line p-6"
+          style={{
+            // The conventional stand-in for transparency, so the streamer reads
+            // the empty space as see-through rather than as a white card.
+            backgroundImage:
+              "repeating-conic-gradient(rgba(15,23,32,0.07) 0% 25%, transparent 0% 50%)",
+            backgroundSize: "20px 20px",
+          }}
+        >
+          <div className="w-full max-w-[360px]">
+            <OverlayWheel animation={null} config={wheel} />
+          </div>
+        </div>
+      </section>
 
     </section>
   );

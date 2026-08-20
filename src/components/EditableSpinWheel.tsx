@@ -1,5 +1,7 @@
 import { Plus } from "lucide-react";
-import { useId, type KeyboardEvent } from "react";
+import type { KeyboardEvent } from "react";
+import { MAX_WHEEL_SLICES } from "../lib/spin";
+import { labelFontSize, radialLabel } from "../lib/wheelLabels";
 import type { SpinSlice } from "../lib/types";
 import { LABEL_OUTLINE, labelColorForSlice, tintFromSlice } from "../lib/wheelPalette";
 import { WheelSliceGlow } from "./WheelSliceGlow";
@@ -51,7 +53,7 @@ export function EditableSpinWheel({
 }: EditableSpinWheelProps) {
   const sliceAngle = 360 / slices.length;
   const hubTint = slices[0] ? tintFromSlice(slices[0].color) : "#ffffff";
-  const glowFilterId = useId().replace(/:/g, "");
+  const labelSize = labelFontSize(RADIUS, slices.length);
 
   const selectWithKeyboard = (event: KeyboardEvent<SVGPathElement>, id: string) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -91,20 +93,14 @@ export function EditableSpinWheel({
           </filter>
         </defs>
 
-        <WheelSliceGlow
-          center={CENTER}
-          filterId={glowFilterId}
-          radius={RADIUS}
-          slices={slices}
-          wheelGlow={wheelGlow}
-          wheelHue={wheelHue}
-          wheelTone={wheelTone}
-        />
-
         {slices.map((slice, index) => {
           const startAngle = index * sliceAngle;
           const endAngle = startAngle + sliceAngle;
-          const labelPosition = point(startAngle + sliceAngle / 2, RADIUS * 0.64);
+          const labelPosition = radialLabel(
+            CENTER,
+            RADIUS,
+            startAngle + sliceAngle / 2 - 90,
+          );
           const selected = slice.id === selectedSliceId;
           const path = wedgePath(startAngle, endAngle);
 
@@ -133,14 +129,16 @@ export function EditableSpinWheel({
                 />
               ) : null}
               <text
-                className="pointer-events-none select-none text-[18px] font-bold"
+                className="pointer-events-none select-none font-bold"
                 dominantBaseline="middle"
                 fill={labelColorForSlice(slice.color)}
                 paintOrder="stroke"
                 stroke={LABEL_OUTLINE}
                 strokeLinejoin="round"
+                fontSize={labelSize}
                 strokeWidth="2"
-                textAnchor="middle"
+                textAnchor={labelPosition.anchor}
+                transform={labelPosition.transform}
                 x={labelPosition.x}
                 y={labelPosition.y}
               >
@@ -149,6 +147,17 @@ export function EditableSpinWheel({
             </g>
           );
         })}
+
+        {/* Over the slices, not under them: painted first it was covered by
+            every wedge in turn and nothing of it ever reached the screen. */}
+        <WheelSliceGlow
+          center={CENTER}
+          radius={RADIUS}
+          slices={slices}
+          wheelGlow={wheelGlow}
+          wheelHue={wheelHue}
+          wheelTone={wheelTone}
+        />
 
         <circle cx={CENTER} cy={CENTER} fill="#ffffff" r={HUB_RADIUS} />
         {/* Inner disc, tinted towards the wheel's own hue. */}
@@ -164,7 +173,7 @@ export function EditableSpinWheel({
       <button
         aria-label="Add two wheel slices"
         className="absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-content-muted transition-colors duration-fast hover:text-content disabled:opacity-40"
-        disabled={slices.length + 2 > 12}
+        disabled={slices.length + 2 > MAX_WHEEL_SLICES}
         onClick={onAdd}
         title="Add two slices"
         type="button"

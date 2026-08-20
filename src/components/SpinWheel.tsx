@@ -7,6 +7,7 @@ import {
   tintFromSlice,
   wheelRimInk,
 } from "../lib/wheelPalette";
+import { labelFontSize, radialLabel } from "../lib/wheelLabels";
 import { WheelSliceGlow } from "./WheelSliceGlow";
 
 export type SpinAnimation = {
@@ -31,16 +32,14 @@ type SpinWheelProps = {
   onTick?: () => void;
 };
 
-/** Label placement inside the 100-unit overlay viewBox. */
+/** The 100-unit overlay viewBox, and where the wheel's face ends inside it. */
 const LABEL_CENTER = 50;
 /**
- * Labels are hung off the rim and run inward, so this is where each one *ends*
- * rather than where it is centred. A label centred at mid-radius grows in both
- * directions and a long one ("$5 + spin") pushes its outer half over the rim;
- * anchored at the rim it can only ever grow towards the hub, where there is
- * room.
+ * Measured off the canvas rather than reasoned about: the spin-wheel library
+ * lands its face here in a 50-unit half-box, a little inside the 0.94 it is
+ * configured with.
  */
-const LABEL_RADIUS = 41;
+const FACE_RADIUS = 46.5;
 
 export function SpinWheel({
   slices,
@@ -62,7 +61,6 @@ export function SpinWheel({
   const labelRefs = useRef<(SVGTextElement | null)[]>([]);
   const pointerRef = useRef<HTMLDivElement>(null);
   const glowRotateRef = useRef<SVGGElement>(null);
-  const glowFilterId = useId().replace(/:/g, "");
 
   onRestRef.current = onRest;
   onTickRef.current = onTick;
@@ -156,27 +154,16 @@ export function SpinWheel({
       labelRefs.current.forEach((label, index) => {
         if (!label) return;
 
-        const angle = rotation + (index + 0.5) * sliceAngle - 90;
-        const radians = (angle * Math.PI) / 180;
-        const x = LABEL_CENTER + LABEL_RADIUS * Math.cos(radians);
-        const y = LABEL_CENTER + LABEL_RADIUS * Math.sin(radians);
-
-        // Down the slice rather than across it. Upright labels only ever fitted
-        // because six slices left an eighth of the face each; at twelve they
-        // collide, and the arc a label has to fit across shrinks as slices are
-        // added while the spoke it can run down does not.
-        const wrapped = ((angle % 360) + 360) % 360;
-        // Past the vertical the text would be running right to left, so it gets
-        // turned around and anchored from the other end to stay in place.
-        const flipped = wrapped > 90 && wrapped < 270;
-
-        label.setAttribute("x", String(x));
-        label.setAttribute("y", String(y));
-        label.setAttribute(
-          "transform",
-          `rotate(${flipped ? angle + 180 : angle} ${x} ${y})`,
+        const placement = radialLabel(
+          LABEL_CENTER,
+          FACE_RADIUS,
+          rotation + (index + 0.5) * sliceAngle - 90,
         );
-        label.setAttribute("text-anchor", flipped ? "start" : "end");
+
+        label.setAttribute("x", String(placement.x));
+        label.setAttribute("y", String(placement.y));
+        label.setAttribute("transform", placement.transform);
+        label.setAttribute("text-anchor", placement.anchor);
       });
 
       frame = window.requestAnimationFrame(followRotation);
@@ -200,9 +187,7 @@ export function SpinWheel({
   }, [animation]);
 
   const tint = slices[0] ? tintFromSlice(slices[0].color) : "#ffffff";
-  // What limits the type is the width of the slice where the label sits, and
-  // that narrows as slices are added.
-  const labelSize = slices.length > 12 ? 5 : slices.length > 8 ? 5.6 : 6.5;
+  const labelSize = labelFontSize(FACE_RADIUS, slices.length);
   // Pale on purpose. Set into the bezel rather than printed on it, so it stays
   // a shade of the wheel's own hue and never competes with the slice labels.
   const rimInk = wheelRimInk({ hue: wheelHue, tone: wheelTone });
@@ -215,7 +200,10 @@ export function SpinWheel({
           way into the slice at any wheel size. The wheel starts 5% in, so 11%
           leaves the tip sitting just over the colour. */}
       <div
-        className="absolute left-1/2 top-0 z-20 h-[11%] w-[6%] -translate-x-1/2 bg-white drop-shadow-[0_2px_4px_rgba(15,23,32,0.35)]"
+        // Hard rather than soft: it sits on a white rim over pale slices, and
+        // a blurred shadow at that contrast just greys the edge instead of
+        // drawing one.
+        className="absolute left-1/2 top-0 z-20 h-[11%] w-[6%] -translate-x-1/2 bg-white drop-shadow-[0_2px_0_rgba(15,23,32,0.55)]"
         ref={pointerRef}
         style={{
           clipPath: "polygon(50% 100%, 0 0, 100% 0)",
@@ -245,8 +233,8 @@ export function SpinWheel({
             <path d="M 50,93.9 A 43.9,43.9 0 0 1 50,6.1" id={`${rimId}-left`} />
           </defs>
           {[
-            { href: `${rimId}-right`, text: name },
-            { href: `${rimId}-left`, text: "tributes.bio" },
+            { href: `${rimId}-left`, text: name },
+            { href: `${rimId}-right`, text: "tributes.bio" },
           ].map((arc) => (
             <text
               fill={rimInk}
@@ -254,7 +242,7 @@ export function SpinWheel({
               fontWeight="700"
               key={arc.href}
               letterSpacing="0.5"
-              opacity="0.85"
+              opacity="0.9"
             >
               <textPath href={`#${arc.href}`} startOffset="50%" textAnchor="middle">
                 {arc.text}
@@ -267,10 +255,11 @@ export function SpinWheel({
       <div className="absolute inset-[5%] z-[4]">
         <WheelSliceGlow
           center={50}
-          filterId={glowFilterId}
-          // The wheel library draws its face at 0.94 of the box, so anything
-          // past this is over the rim rather than over a slice.
-          radius={47 * 0.94}
+          // An earlier version scaled this down by 0.94 to stop the glow
+          // spilling onto the rim, but the spill was the blur reaching past the
+          // edge, not the radius — so all that did was leave an unlit ring
+          // around the outside of every lit slice.
+          radius={FACE_RADIUS}
           rotateRef={glowRotateRef}
           slices={slices}
           wheelGlow={wheelGlow}

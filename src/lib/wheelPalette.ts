@@ -139,8 +139,11 @@ export function wheelSliceGlow(appearance: WheelAppearance) {
 export function wheelRimInk(appearance: WheelAppearance) {
   const hue = normalizeWheelHue(appearance.hue);
   const tone = normalizeWheelTone(appearance.tone);
-  const lightness = clamp(lightSliceLightness(tone) - 0.05, 0.55, 0.9);
-  const chroma = lerp(0.055, 0.045, tone / 100);
+  // Barely tinted, and mostly independent of tone: the rim stays white however
+  // dark the slices get, so lettering that tracked the slices would drift out
+  // of step with what it is actually sitting on.
+  const lightness = lerp(0.82, 0.76, tone / 100);
+  const chroma = 0.014;
 
   return oklchToHex(
     lightness,

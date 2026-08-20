@@ -238,7 +238,10 @@ export const createMockSpinEntry = onCall(async (request) => {
     const [creatorSnapshot, configSnapshot, queuedSnapshot] = await Promise.all([
       transaction.get(creatorRef),
       transaction.get(configRef),
-      transaction.get(queueRef.orderBy("createdAt", "asc").limit(30)),
+      // Same reason as the read in triggerSpin: counting queued entries out of
+      // a slice of the whole collection stops counting them once finished ones
+      // fill that slice, and the cap quietly stops applying.
+      transaction.get(queueRef.where("status", "==", "queued").limit(26)),
     ]);
     const creator = creatorSnapshot.data();
     const config = parseConfig(configSnapshot.data());
@@ -256,9 +259,7 @@ export const createMockSpinEntry = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "Mock spins are disabled.");
     }
 
-    const queuedCount = queuedSnapshot.docs.filter(
-      (snapshot) => snapshot.data().status === "queued",
-    ).length;
+    const queuedCount = queuedSnapshot.size;
 
     if (queuedCount >= 25) {
       throw new HttpsError("resource-exhausted", "The test queue is full.");
@@ -338,7 +339,20 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         transaction.get(configRef),
         transaction.get(stateRef),
         transaction.get(sessionRef),
-        transaction.get(queueRef.orderBy("createdAt", "asc").limit(50)),
+        // Filtered server-side, not after the fact. Reading the oldest fifty
+        // entries and *then* keeping the queued ones works right up until fifty
+        // finished entries have piled up in front — after that a fresh entry
+        // falls outside the window and the spin reports an empty queue while
+        // the streamer is looking at it in the UI, which subscribes to the
+        // whole collection and so always saw it.
+        transaction.get(
+          queueRef
+            .where("status", "==", "queued")
+            .orderBy("createdAt", "asc")
+            // Two: the entry being spun, and the one after it, which is what
+            // the overlay pre-loads the next wheel from.
+            .limit(2),
+        ),
       ]);
     const creator = creatorSnapshot.data();
 
@@ -359,10 +373,7 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
       throw new HttpsError("failed-precondition", "The wheel is already spinning.");
     }
 
-    const queuedEntries = queueSnapshot.docs.filter(
-      (snapshot) => snapshot.data().status === "queued",
-    );
-    const queueEntry = queuedEntries[0];
+    const queueEntry = queueSnapshot.docs[0];
 
     if (!queueEntry) {
       throw new HttpsError("failed-precondition", "The queue is empty.");
@@ -388,7 +399,7 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
 
     // What the overlay shows next: the following viewer's wheel if there is
     // one, otherwise it stays on the wheel just spun.
-    const nextEntry = queuedEntries[1];
+    const nextEntry = queueSnapshot.docs[1];
     const nextWheelId =
       nextEntry && typeof nextEntry.data().wheelId === "string"
         ? (nextEntry.data().wheelId as string)

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { labelFontSize, radialLabel } from "../lib/wheelLabels";
 import { labelColorForSlice, tintFromSlice } from "../lib/wheelPalette";
 import type { SpinSlice } from "../lib/types";
 import { WheelSliceGlow } from "./WheelSliceGlow";
@@ -36,7 +36,7 @@ export function WheelThumbnail({
 }) {
   const sliceAngle = 360 / Math.max(1, slices.length);
   const hubTint = slices[0] ? tintFromSlice(slices[0].color) : "#ffffff";
-  const glowFilterId = useId().replace(/:/g, "");
+  const labelSize = labelFontSize(RADIUS, slices.length);
 
   return (
     <div className={`relative aspect-square ${className ?? ""}`}>
@@ -46,21 +46,13 @@ export function WheelThumbnail({
         className="relative h-full w-full"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
       >
-        <WheelSliceGlow
-          center={CENTER}
-          filterId={glowFilterId}
-          radius={RADIUS}
-          slices={slices}
-          wheelGlow={wheelGlow}
-          wheelHue={wheelHue}
-          wheelTone={wheelTone}
-        />
         {slices.map((slice, index) => {
           const start = index * sliceAngle;
           const end = start + sliceAngle;
           const from = point(start, RADIUS);
           const to = point(end, RADIUS);
-          const label = point(start + sliceAngle / 2, RADIUS * 0.64);
+
+          const label = radialLabel(CENTER, RADIUS, start + sliceAngle / 2 - 90);
 
           return (
             <g key={slice.id}>
@@ -73,9 +65,10 @@ export function WheelThumbnail({
               <text
                 dominantBaseline="middle"
                 fill={labelColorForSlice(slice.color)}
-                fontSize="11"
+                fontSize={labelSize}
                 fontWeight="700"
-                textAnchor="middle"
+                textAnchor={label.anchor}
+                transform={label.transform}
                 x={label.x}
                 y={label.y}
               >
@@ -84,9 +77,21 @@ export function WheelThumbnail({
             </g>
           );
         })}
+        <WheelSliceGlow
+          center={CENTER}
+          radius={RADIUS}
+          slices={slices}
+          wheelGlow={wheelGlow}
+          wheelHue={wheelHue}
+          wheelTone={wheelTone}
+        />
         <circle cx={CENTER} cy={CENTER} fill="#ffffff" r={HUB} />
         <circle cx={CENTER} cy={CENTER} fill={hubTint} r={HUB * 0.84} />
-        <path d={`M ${CENTER} 24 l -6 -12 h 12 Z`} fill="#ffffff" />
+        <path
+          d={`M ${CENTER} 24 l -6 -12 h 12 Z`}
+          fill="#ffffff"
+          style={{ filter: "drop-shadow(0 2px 0 rgba(15,23,32,0.55))" }}
+        />
       </svg>
     </div>
   );

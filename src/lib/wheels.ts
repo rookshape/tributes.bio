@@ -7,6 +7,7 @@ import {
   onSnapshot,
   serverTimestamp,
   setDoc,
+  updateDoc,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -93,6 +94,30 @@ export function subscribeActiveWheelId(
     const value = snapshot.data()?.activeWheelId;
     onChange(typeof value === "string" ? value : null);
   });
+}
+
+/**
+ * Exactly one wheel is the default, so promoting one demotes the rest.
+ *
+ * This writes the single field rather than saving each other wheel whole. Going
+ * through saveWheel re-validated wheels the streamer was not editing and
+ * rewrote every one of their fields as a side effect, so one unrelated wheel
+ * that no longer passed validation was enough to abandon the demotion halfway
+ * and leave two wheels claiming to be the default.
+ */
+export async function clearOtherDefaultWheels(creatorId: string, keepId: string) {
+  const others = await listWheels(creatorId);
+
+  await Promise.all(
+    others
+      .filter((other) => other.id !== keepId && other.isDefault)
+      .map((other) =>
+        updateDoc(wheelRef(creatorId, other.id), {
+          isDefault: false,
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+  );
 }
 
 export async function saveWheel(wheel: SpinConfig) {
