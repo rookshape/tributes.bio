@@ -122,7 +122,7 @@ export function TributeForm({
         </span>
         <input
           aria-label="Tip amount"
-          className="field h-14 rounded-full pl-9 pr-4 text-lg"
+          className="field no-spinner h-14 rounded-full bg-white pl-9 pr-4 text-lg focus:bg-white"
           id="tribute-amount"
           inputMode="decimal"
           max="500"

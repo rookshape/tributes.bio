@@ -266,8 +266,10 @@ export function SpinWheel({
         className="absolute left-1/2 top-0 z-20 h-[11%] w-[6%] -translate-x-1/2"
         ref={pointerRef}
         style={{
-          filter:
-            "drop-shadow(0 2px 0 rgba(15,23,32,0.42)) drop-shadow(0 3px 5px rgba(15,23,32,0.35))",
+          // Soft only. The hard offset shadow was meant to define the tip
+          // against the rim, but on a shape with two long angled edges it
+          // tracks them the whole way down and reads as a drawn-on outline.
+          filter: "drop-shadow(0 3px 6px rgba(15,23,32,0.32))",
           // Pivots where it is pinned to the rim, like a real flapper.
           transformOrigin: "50% 0",
         }}

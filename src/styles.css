@@ -512,3 +512,20 @@ select:focus-visible,
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/**
+ * A number input without its stepper.
+ *
+ * The arrows are useful where a value is nudged — a slice's spin count, say —
+ * and clutter where it is typed outright, which is what an amount is.
+ */
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

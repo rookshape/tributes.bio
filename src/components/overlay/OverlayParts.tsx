@@ -111,7 +111,7 @@ const WHEEL_WORDMARK_MS = 3500;
  * no amount of reshaping it fixed that.
  */
 const PLATE = {
-  width: 190,
+  width: 212,
   /** How far it hangs below the wheel's frame. */
   drop: 50,
   /**
@@ -124,17 +124,18 @@ const PLATE = {
    * the numbers rather than the rendered widths put an eight-pixel border below
    * a twelve-pixel one and called them the same.
    */
-  sideBorder: 9,
+  sideBorder: 8,
   bottomBorder: 13,
   /**
    * How far it runs up behind the wheel.
    *
    * A straight edge meeting a circle only closes if it reaches past the point
-   * where the arc has climbed level with the plate's corners. That climb grows
+   * where the arc has climbed level with the plate's corners, and that climb
+   * grows with the plate's width — so widening it eats into the margin here. That climb grows
    * as the wheel gets smaller, so this clears the smallest the wheel is drawn
    * at — the editor's preview — rather than the size it happens to be here.
    */
-  tuck: 36,
+  tuck: 44,
   /**
    * Deeper than the default: the taper a perspective produces grows with the
    * element's height, and this tab is buried-part-plus-visible-part tall. At
@@ -234,9 +235,6 @@ export function OverlayWheel({
         >
           <Tab
             edge="bottom"
-            // No ring: an edge drawn inside the plate would be a line the
-            // circle it grows out of does not have.
-            edgeColor="transparent"
             fill="#ffffff"
             style={{ left: 0, height: "100%" }}
             tip={PLATE.tip}
@@ -251,8 +249,10 @@ export function OverlayWheel({
               shape={{
                 left: PLATE.sideBorder,
                 right: PLATE.sideBorder,
-                top: PLATE.tuck + TUCK,
-                bottom: PLATE.bottomBorder,
+                // Tighter top and bottom than the border elsewhere, because
+                // what should grow here is the lit part rather than the plate.
+                top: PLATE.tuck + 2,
+                bottom: 10,
                 // Rounder at the top than at the bottom. The white above the
                 // screen is bounded by the wheel's arc, which climbs away from
                 // a straight edge towards the plate's ends — curving the screen
@@ -261,7 +261,7 @@ export function OverlayWheel({
               }}
             >
               <span
-                className="w-full truncate text-center text-[1rem] font-black uppercase leading-none tracking-[0.02em]"
+                className="w-full truncate text-center text-[1.1rem] font-black uppercase leading-none tracking-[0.01em]"
                 // Keyed on the wording so a change remounts the span and
                 // replays the slide rather than swapping the text in place.
                 key={plate}
@@ -402,7 +402,6 @@ const QUEUE_TAB = 176;
 function Tab({
   children,
   edge,
-  edgeColor,
   fill,
   style,
   tip = TIP,
@@ -410,7 +409,6 @@ function Tab({
 }: {
   children?: ReactNode;
   edge: "top" | "bottom";
-  edgeColor: string;
   fill: string;
   /** Where along the body it sits. */
   style?: CSSProperties;
@@ -436,9 +434,6 @@ function Tab({
           up ? tip.degrees : -tip.degrees
         }deg)`,
         transformOrigin: up ? "bottom" : "top",
-        // Drawn inside, so it cannot show up as a seam where the tab tucks
-        // under the body and the body paints over it.
-        boxShadow: `inset 0 0 0 1px ${edgeColor}`,
         ...style,
       }}
     >
@@ -513,12 +508,10 @@ function Chrome({ children }: { children: ReactNode }) {
  */
 function Cabinet({
   bottomScreen,
-  edgeColor,
   fillColor,
   topScreen,
 }: {
   bottomScreen: ReactNode;
-  edgeColor: string;
   fillColor: string;
   topScreen: ReactNode;
 }) {
@@ -527,7 +520,6 @@ function Cabinet({
       <Chrome>
         <Tab
           edge="top"
-          edgeColor={edgeColor}
           fill={fillColor}
           style={centeredTab()}
           width={EXTENSION_WIDTH}
@@ -536,7 +528,6 @@ function Cabinet({
         </Tab>
         <Tab
           edge="bottom"
-          edgeColor={edgeColor}
           fill={fillColor}
           style={centeredTab()}
           width={EXTENSION_WIDTH}
@@ -549,7 +540,6 @@ function Cabinet({
             backgroundColor: fillColor,
             top: BUMP,
             bottom: BUMP,
-            boxShadow: `inset 0 0 0 1px ${edgeColor}`,
           }}
         />
       </Chrome>
@@ -632,7 +622,6 @@ export function OverlayTotal({
   const displayFace = overlayDisplayFace(appearance);
   const screenInk = overlayScreenInk(appearance);
   const surface = overlaySurfaceSolid(appearance);
-  const edgeColor = overlaySurface(appearance).borderColor;
 
   // Mid-animation the state already holds the new tab, so the figure holds the
   // value from before this spin and climbs only once the wheel settles.
@@ -748,7 +737,6 @@ export function OverlayTotal({
       }}
     >
       <Cabinet
-        edgeColor={edgeColor}
         bottomScreen={
           <Screen
             // Inset by the same border on every side, so it is this extension's
@@ -852,7 +840,6 @@ export function OverlayGoalBar({
   const chipFace = overlayChipFace(appearance);
   const chipInk = overlayChipInk(appearance);
   const surface = overlaySurfaceSolid(appearance);
-  const edgeColor = overlaySurface(appearance).borderColor;
   const current = state?.counterCents ?? 0;
   const progress = goalCents > 0 ? Math.min(1, current / goalCents) : 0;
   const shape = appearance.goalShape;
@@ -989,7 +976,6 @@ export function OverlayGoalBar({
       <Chrome>
         <Tab
           edge="top"
-          edgeColor={edgeColor}
           fill={surface}
           style={{ left: 22, maxWidth: "calc(50% - 26px)" }}
           width={GOAL_LABEL_TAB}
@@ -1009,7 +995,6 @@ export function OverlayGoalBar({
         </Tab>
         <Tab
           edge="top"
-          edgeColor={edgeColor}
           fill={surface}
           style={{ right: 22, maxWidth: "calc(50% - 26px)" }}
           width={GOAL_FIGURE_TAB}
@@ -1038,7 +1023,6 @@ export function OverlayGoalBar({
             backgroundColor: surface,
             top: BUMP,
             bottom: 0,
-            boxShadow: `inset 0 0 0 1px ${edgeColor}`,
           }}
         />
       </Chrome>
@@ -1084,7 +1068,6 @@ export function OverlayQueue({
   const chipFace = overlayChipFace(appearance);
   const chipInk = overlayChipInk(appearance);
   const surface = overlaySurfaceSolid(appearance);
-  const edgeColor = overlaySurface(appearance).borderColor;
 
   // The list, and the caller-out above it for whoever is mid-run. Shared by
   // both styles: only the chrome around it differs.
@@ -1181,7 +1164,6 @@ export function OverlayQueue({
             to be nothing but the list. */}
         <Tab
           edge="top"
-          edgeColor={edgeColor}
           fill={surface}
           // Never wider than the panel it sits on, whatever the column it
           // lands in decides that panel should be.
@@ -1213,7 +1195,6 @@ export function OverlayQueue({
             backgroundColor: surface,
             top: BUMP,
             bottom: 0,
-            boxShadow: `inset 0 0 0 1px ${edgeColor}`,
           }}
         />
       </Chrome>
