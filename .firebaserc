@@ -2,5 +2,17 @@
   "projects": {
     "dev": "tributes-bio-dev",
     "prod": "tributes-bio-prod"
+  },
+  "targets": {
+    "tributes-bio-dev": {
+      "hosting": {
+        "app": ["tributes-bio-dev"]
+      }
+    },
+    "tributes-bio-prod": {
+      "hosting": {
+        "app": ["tributes-bio-prod-abb85"]
+      }
+    }
   }
 }
