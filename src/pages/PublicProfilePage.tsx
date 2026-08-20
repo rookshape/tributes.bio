@@ -172,6 +172,9 @@ export function PublicProfilePage() {
     );
   }
 
+  // Two conditions, and they mean different things: whether the creator can
+  // take tributes, and whether they want to.
+  const tributesShown = paymentsAvailable && creator.tipsEnabled;
   const spinAvailable = Boolean(
     paymentsAvailable &&
       spinConfig?.isEnabled &&
@@ -188,9 +191,9 @@ export function PublicProfilePage() {
         onReport={() => setReportOpen(true)}
         profile={creator}
         topContent={
-          paymentsAvailable || spinAvailable ? (
+          tributesShown || spinAvailable ? (
             <>
-              {paymentsAvailable ? (
+              {tributesShown ? (
                 <TributeForm
                   profile={creator}
                   result={

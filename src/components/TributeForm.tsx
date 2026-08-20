@@ -8,6 +8,8 @@ import type { CreatorProfile } from "../lib/types";
 type TributeFormProps = {
   profile: CreatorProfile;
   result?: "success" | "canceled" | null;
+  /** Shown in the dashboard, where it must look right but do nothing. */
+  preview?: boolean;
 };
 
 const presets = [5, 10, 25];
@@ -19,7 +21,7 @@ function currency(cents: number) {
   }).format(cents / 100);
 }
 
-export function TributeForm({ profile, result }: TributeFormProps) {
+export function TributeForm({ preview = false, profile, result }: TributeFormProps) {
   const [amount, setAmount] = useState("10");
   const [senderName, setSenderName] = useState("");
   const [message, setMessage] = useState("");
@@ -37,6 +39,8 @@ export function TributeForm({ profile, result }: TributeFormProps) {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (preview) return;
 
     if (!validAmount) {
       setError("Enter an amount from $1 to $500.");
@@ -170,7 +174,7 @@ export function TributeForm({ profile, result }: TributeFormProps) {
 
       <button
         className="mt-4 flex min-h-[52px] w-full items-center justify-center rounded-full px-4 text-base font-semibold disabled:opacity-60"
-        disabled={loading || !validAmount}
+        disabled={preview || loading || !validAmount}
         style={{ backgroundColor: theme.accent, color: theme.accentText }}
         type="submit"
       >

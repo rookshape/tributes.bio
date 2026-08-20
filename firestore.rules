@@ -12,6 +12,7 @@ service cloud.firestore {
         'photoURL',
         'appearance',
         'isPublished',
+        'tipsEnabled',
         'moderationStatus',
         'createdAt',
         'updatedAt'

@@ -18,6 +18,8 @@ import { BioPageView } from "../components/BioPageView";
 import { LiveSpinCard } from "../components/LiveSpinCard";
 import { ImageCropDialog } from "../components/ImageCropDialog";
 import { LinkListEditor } from "../components/LinkListEditor";
+import { TributeForm } from "../components/TributeForm";
+import { getCreatorPaymentAvailability } from "../lib/payments";
 import { SetupChecklist } from "../components/SetupChecklist";
 import {
   Badge,
@@ -96,6 +98,7 @@ export function DashboardPage() {
   const { appUser, user } = useAuth();
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [links, setLinks] = useState<CreatorLink[]>([]);
+  const [paymentsAvailable, setPaymentsAvailable] = useState(false);
   const [spinConfig, setSpinConfig] = useState<SpinConfig | null>(null);
   const [spinSession, setSpinSession] = useState<SpinSession | null>(null);
   const [tab, setTab] = useState<EditorTab>("profile");
@@ -123,12 +126,16 @@ export function DashboardPage() {
     Promise.all([
       getCreatorWorkspace(user.uid),
       getSpinConfig(user.uid).catch(() => null),
+      // The same check the public page runs, so the preview can only ever show
+      // what a visitor would actually be shown.
+      getCreatorPaymentAvailability(user.uid).catch(() => false),
     ])
-      .then(([workspace, loadedSpinConfig]) => {
+      .then(([workspace, loadedSpinConfig, canTakePayments]) => {
         if (active) {
           setProfile(workspace.profile);
           setLinks(workspace.links);
           setSpinConfig(loadedSpinConfig);
+          setPaymentsAvailable(canTakePayments);
         }
       })
       .catch((caughtError) => {
@@ -175,6 +182,7 @@ export function DashboardPage() {
       bio: profile.bio,
       appearance: profile.appearance,
       isPublished: profile.isPublished,
+      tipsEnabled: profile.tipsEnabled,
       photoURL: profile.photoURL,
     });
 
@@ -203,6 +211,7 @@ export function DashboardPage() {
           bio: profile.bio,
           appearance: profile.appearance,
           isPublished: profile.isPublished,
+          tipsEnabled: profile.tipsEnabled,
           photoURL: profile.photoURL,
         }),
   );
@@ -575,6 +584,29 @@ export function DashboardPage() {
                 trailing={`${profile.bio.length}/160`}
                 value={profile.bio}
               />
+
+              {/* The tribute form used to appear on a published page with no
+                  setting behind it and no sign of it in this preview, so a
+                  creator had no way to control it and no way to tell why it was
+                  or was not there. Both halves are answered here: the switch,
+                  and the reason it is doing nothing yet. */}
+              <div className="panel grid gap-3 p-5">
+                <Toggle
+                  checked={profile.tipsEnabled}
+                  description="Show a form on your page for one-time tributes."
+                  label="Accept tributes"
+                  onChange={(tipsEnabled) => setProfile({ ...profile, tipsEnabled })}
+                />
+                {profile.tipsEnabled && !paymentsAvailable ? (
+                  <p className="text-caption text-content-subtle">
+                    Hidden until Stripe is connected and payouts are enabled.{" "}
+                    <Link className="font-medium text-accent hover:underline" to="/dashboard/payments">
+                      Finish setting up payments
+                    </Link>
+                    .
+                  </p>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -688,9 +720,14 @@ export function DashboardPage() {
                 preview
                 profile={profile}
                 topContent={
-                  spinConfig?.isEnabled && spinSessionIsLive(spinSession, now) ? (
-                    <LiveSpinCard config={spinConfig} preview profile={profile} />
-                  ) : null
+                  <>
+                    {profile.tipsEnabled && paymentsAvailable ? (
+                      <TributeForm preview profile={profile} />
+                    ) : null}
+                    {spinConfig?.isEnabled && spinSessionIsLive(spinSession, now) ? (
+                      <LiveSpinCard config={spinConfig} preview profile={profile} />
+                    ) : null}
+                  </>
                 }
               />
             </div>

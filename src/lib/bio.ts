@@ -46,6 +46,7 @@ type ProfileChanges = Pick<
   | "photoURL"
   | "appearance"
   | "isPublished"
+  | "tipsEnabled"
 >;
 
 function mapProfile(id: string, data: Record<string, unknown>): CreatorProfile {
@@ -59,6 +60,8 @@ function mapProfile(id: string, data: Record<string, unknown>): CreatorProfile {
     photoURL: typeof data.photoURL === "string" ? data.photoURL : null,
     appearance: readAppearance(data.appearance),
     isPublished: Boolean(data.isPublished),
+    // Absent on creators who predate the setting, and they had tributes.
+    tipsEnabled: data.tipsEnabled !== false,
     moderationStatus:
       data.moderationStatus === "review" || data.moderationStatus === "suspended"
         ? data.moderationStatus
@@ -198,6 +201,7 @@ export async function updateCreatorProfile(
     photoURL: changes.photoURL,
     appearance,
     isPublished: changes.isPublished,
+    tipsEnabled: changes.tipsEnabled,
     updatedAt: serverTimestamp(),
   });
 }

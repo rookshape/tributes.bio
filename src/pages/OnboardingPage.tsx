@@ -82,6 +82,7 @@ export function OnboardingPage() {
     username: normalizeUsername(username) || "yourname",
     displayName: displayName.trim() || normalizeUsername(username) || "Your name",
     bio: "",
+    tipsEnabled: true,
     photoPath: null,
     photoURL: user?.photoURL ?? null,
     appearance: DEFAULT_APPEARANCE,
@@ -138,6 +139,7 @@ export function OnboardingPage() {
           photoURL: user.photoURL,
           appearance: DEFAULT_APPEARANCE,
           isPublished: true,
+          tipsEnabled: true,
         });
       }
 

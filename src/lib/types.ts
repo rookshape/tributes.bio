@@ -33,6 +33,14 @@ export type CreatorProfile = {
   photoURL: string | null;
   appearance: ProfileAppearance;
   isPublished: boolean;
+  /**
+   * Whether the page offers one-time tributes.
+   *
+   * Separate from whether it *can*: a creator whose Stripe account is not ready
+   * has no tribute form either way, but that is a state to explain rather than a
+   * choice they made. Defaults on, so connecting Stripe is all it takes.
+   */
+  tipsEnabled: boolean;
   moderationStatus: "active" | "review" | "suspended";
 };
 

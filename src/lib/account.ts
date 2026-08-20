@@ -229,6 +229,7 @@ export async function reserveCreatorUsername(user: User, usernameValue: string) 
         photoURL: user.photoURL,
         appearance: defaultAppearance,
         isPublished: true,
+        tipsEnabled: true,
         moderationStatus: "active",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -286,6 +287,7 @@ export async function getCreatorByUsername(
     photoURL: data.photoURL ?? null,
     appearance: normalizeAppearance(data.appearance),
     isPublished: Boolean(data.isPublished),
+    tipsEnabled: data.tipsEnabled !== false,
     moderationStatus: data.moderationStatus ?? "active",
   };
 }
