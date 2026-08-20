@@ -100,7 +100,20 @@ function panelLightness(tone: number) {
  * Panel surface. At tone 0 this is plain white with the faintest hue in it —
  * the default is meant to disappear against any stream.
  */
-export function overlaySurface(appearance: OverlayAppearance, opacity = 0.82) {
+/**
+ * One panel treatment for every overlay part.
+ *
+ * The wheel's frame, the counter's cabinet, the goal bar and the queue used to
+ * each pick their own translucency — the wheel sat at 0.3 while the counter was
+ * effectively solid — so on a scene carrying two of them they read as parts of
+ * different products. Near-white and lightly frosted, everywhere.
+ */
+export const OVERLAY_PANEL_ALPHA = 0.9;
+
+export function overlaySurface(
+  appearance: OverlayAppearance,
+  opacity = OVERLAY_PANEL_ALPHA,
+) {
   const hue = normalizeOverlayHue(appearance.hue);
   const tone = normalizeOverlayTone(appearance.tone);
   const lightness = panelLightness(tone);

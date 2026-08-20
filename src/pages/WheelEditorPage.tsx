@@ -203,8 +203,18 @@ export function WheelEditorPage() {
       // active id is read fresh rather than taken from subscription state: if
       // that snapshot has not landed yet, the edit would save to the library
       // and quietly never reach the stream.
+      //
+      // Editing the wheel that is already active pushes through even mid-stream:
+      // it is the same wheel to everyone watching, only corrected, and holding
+      // the update back left the streamer looking at a copy of their wheel from
+      // before the edit with no way to tell why. Promoting a *different* wheel
+      // is a swap rather than a correction, so that still waits for the session
+      // to end — and the default wheel is what the overlay falls back to, which
+      // makes it the one the copy has to mirror.
       const currentActiveId = await getActiveWheelId(creatorId);
-      if (currentActiveId === normalized.id && !isLive) {
+      const sameWheel = currentActiveId === normalized.id;
+
+      if (sameWheel || (normalized.isDefault && !isLive)) {
         await activateWheel(normalized);
       }
 

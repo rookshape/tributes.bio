@@ -203,6 +203,7 @@ export function SpinOverlayPage() {
       {activePart === "wheel" ? (
         <OverlayWheel
           animation={animation}
+          appearance={settings.appearance}
           config={queuedWheel ?? config}
           onTick={() => playOverlaySound("tick", settingsRef.current.sound)}
         />

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, type CSSProperties } from "react";
 import { Wheel } from "spin-wheel/dist/spin-wheel-esm.js";
 import type { SpinSlice } from "../lib/types";
 import {
@@ -26,6 +26,12 @@ type SpinWheelProps = {
   wheelTone?: number;
   /** Soft animated halo on the lighter alternating slices. */
   wheelGlow?: boolean;
+  /**
+   * Panel treatment for the glass frame. The overlay passes its own so the
+   * wheel's white ring matches the counter, the bar, and the queue instead of
+   * being the one piece of furniture wearing a different translucency.
+   */
+  frame?: CSSProperties;
   animation?: SpinAnimation | null;
   onRest?: () => void;
   /** Fires as each slice boundary passes the pointer, for the tick sound. */
@@ -48,6 +54,7 @@ export function SpinWheel({
   wheelHue = 210,
   wheelTone = 20,
   wheelGlow = true,
+  frame,
   onRest,
   onTick,
 }: SpinWheelProps) {
@@ -195,7 +202,10 @@ export function SpinWheel({
   return (
     <div className="relative aspect-square w-full" aria-label="Spin wheel">
       {/* Glass disc framing the wheel, kept narrow so the pointer clears it. */}
-      <div className="absolute inset-[2%] rounded-full border border-white/70 bg-white/30 shadow-[0_6px_18px_rgba(15,23,32,0.08)] backdrop-blur-md" />
+      <div
+        className="absolute inset-[2%] rounded-full border border-white/70 bg-white/30 shadow-[0_6px_18px_rgba(15,23,32,0.08)] backdrop-blur-md"
+        style={frame}
+      />
       {/* Sized in percentages rather than pixels so the tip reaches the same
           way into the slice at any wheel size. The wheel starts 5% in, so 11%
           leaves the tip sitting just over the colour. */}

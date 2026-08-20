@@ -18,6 +18,8 @@ import {
   overlayScreenInk,
   overlaySurface,
   overlaySurfaceSolid,
+  OVERLAY_PANEL_ALPHA,
+  DEFAULT_OVERLAY_APPEARANCE,
   markerColors,
   markerGlow,
   rainbowFill,
@@ -96,18 +98,26 @@ export const OVERLAY_PARTS: {
  * here would only repeat the rest of the scene.
  */
 export function OverlayWheel({
+  appearance = DEFAULT_OVERLAY_APPEARANCE,
   config,
   animation,
   onTick,
 }: {
+  appearance?: OverlayAppearance;
   config: SpinConfig;
   animation: SpinAnimation | null;
   onTick?: () => void;
 }) {
+  const panel = overlaySurface(appearance);
+
   return (
     <div className="w-full max-w-[520px]">
       <SpinWheel
         animation={animation}
+        frame={{
+          backgroundColor: panel.backgroundColor,
+          borderColor: panel.borderColor,
+        }}
         name={config.name}
         onTick={onTick}
         slices={config.slices}
@@ -209,77 +219,160 @@ const TIP = { perspective: 13, degrees: 6 };
 const FREE_EDGE_INSET = 12;
 /** Both extensions carry the same screen, so they are the same size. */
 const EXTENSION_WIDTH = 148;
+/**
+ * The goal bar's two tabs. Wider than the counter's because they hold words
+ * rather than a figure, and unequal because the label runs longer than the
+ * count it is paired with.
+ */
+const GOAL_LABEL_TAB = 214;
+const GOAL_FIGURE_TAB = 168;
+
+/**
+ * One extension of a cabinet.
+ *
+ * A rounded rectangle tipped in 3D rather than a clipped polygon: the
+ * perspective narrows the free edge into a trapezoid while the corner radii
+ * survive, which a clip-path cannot do. Shared by the counter and the goal bar
+ * so the two carry the same shape rather than two that merely resemble it.
+ */
+function Tab({
+  children,
+  edge,
+  edgeColor,
+  fill,
+  style,
+  width,
+}: {
+  children?: ReactNode;
+  edge: "top" | "bottom";
+  edgeColor: string;
+  fill: string;
+  /** Where along the body it sits. */
+  style?: CSSProperties;
+  width: number;
+}) {
+  const up = edge === "top";
+
+  return (
+    <div
+      className={up ? "absolute top-0" : "absolute bottom-0"}
+      style={{
+        backgroundColor: fill,
+        height: BUMP + TUCK,
+        width,
+        borderRadius: up ? "14px 14px 0 0" : "0 0 14px 14px",
+        transform: `perspective(${TIP.perspective}px) rotateX(${
+          up ? TIP.degrees : -TIP.degrees
+        }deg)`,
+        transformOrigin: up ? "bottom" : "top",
+        // Drawn inside, so it cannot show up as a seam where the tab tucks
+        // under the body and the body paints over it.
+        boxShadow: `inset 0 0 0 1px ${edgeColor}`,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Centres a tab across the body it belongs to. */
+function centeredTab(width: number): CSSProperties {
+  return { left: "50%", marginLeft: -width / 2 };
+}
+
+/**
+ * The screen inside a tab.
+ *
+ * Each screen is a child of its tab rather than a sibling laid over it. That is
+ * what keeps the border honest: an inset child is the same rectangle scaled
+ * down, so once the parent is tipped both are the same trapezoid and the gap
+ * between them stays even. Two separately-transformed shapes taper at different
+ * rates and the border quietly thickens along its length.
+ */
+function tabScreenShape(edge: "top" | "bottom"): CSSProperties {
+  const up = edge === "top";
+
+  return {
+    inset: BORDER,
+    // The free edge is the one tipped away from the viewer, so its larger inset
+    // foreshortens to about the same gap the sides show. The tucked edge runs
+    // level with the body — insetting a border there too would stack against
+    // the body's own padding and read as a double-thick band.
+    top: up ? FREE_EDGE_INSET : TUCK,
+    bottom: up ? TUCK : FREE_EDGE_INSET,
+    borderRadius: 7,
+  };
+}
+
+/**
+ * The chrome of a part: its tabs and its body, drawn as one silhouette.
+ *
+ * All the pieces share a fill and overlap, so they read as one shape, and the
+ * shadow is thrown by the group so it follows the union instead of outlining
+ * every piece. The group is what carries the translucency, too — translucent
+ * pieces would compound where they meet and draw a seam at every overlap.
+ */
+function Chrome({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="absolute inset-0"
+      style={{
+        filter: "drop-shadow(0 6px 16px rgba(15,23,32,0.18))",
+        opacity: OVERLAY_PANEL_ALPHA,
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 /**
  * The cabinet is one silhouette, not a body with things stuck to it.
- *
- * Each extension is a rounded rectangle tipped in 3D rather than a clipped
- * polygon: the perspective narrows the free edge into a trapezoid while the
- * corner radii survive, which a clip-path cannot do. All three pieces share the
- * same fill and overlap, so they read as one shape, and the shadow is thrown by
- * the group so it follows the union instead of outlining every piece.
- *
- * Each screen is a child of its extension rather than a sibling laid over it.
- * That is what keeps the border honest: an inset child is the same rectangle
- * scaled down, so once the parent is tipped both are the same trapezoid and the
- * gap between them stays even. Two separately-transformed shapes taper at
- * different rates and the border quietly thickens along its length.
  */
 function Cabinet({
   bottomScreen,
+  edgeColor,
   fillColor,
   topScreen,
 }: {
   bottomScreen: ReactNode;
+  edgeColor: string;
   fillColor: string;
   topScreen: ReactNode;
 }) {
-  const fill = { backgroundColor: fillColor };
-
   return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0"
-      style={{
-        filter: "drop-shadow(0 6px 16px rgba(15,23,32,0.18))",
-        // Faded as a group, so overlaps do not compound into visible seams.
-        opacity: 0.95,
-      }}
-    >
-      <div
-        className="absolute top-0"
-        style={{
-          ...fill,
-          height: BUMP + TUCK,
-          width: EXTENSION_WIDTH,
-          left: "50%",
-          marginLeft: -EXTENSION_WIDTH / 2,
-          borderRadius: "14px 14px 0 0",
-          transform: `perspective(${TIP.perspective}px) rotateX(${TIP.degrees}deg)`,
-          transformOrigin: "bottom",
-        }}
-      >
-        {topScreen}
-      </div>
-      <div
-        className="absolute bottom-0"
-        style={{
-          ...fill,
-          height: BUMP + TUCK,
-          width: EXTENSION_WIDTH,
-          left: "50%",
-          marginLeft: -EXTENSION_WIDTH / 2,
-          borderRadius: "0 0 14px 14px",
-          transform: `perspective(${TIP.perspective}px) rotateX(${-TIP.degrees}deg)`,
-          transformOrigin: "top",
-        }}
-      >
-        {bottomScreen}
-      </div>
-      <div
-        className="absolute inset-x-0 rounded-[26px]"
-        style={{ ...fill, top: BUMP, bottom: BUMP }}
-      />
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <Chrome>
+        <Tab
+          edge="top"
+          edgeColor={edgeColor}
+          fill={fillColor}
+          style={centeredTab(EXTENSION_WIDTH)}
+          width={EXTENSION_WIDTH}
+        >
+          {topScreen}
+        </Tab>
+        <Tab
+          edge="bottom"
+          edgeColor={edgeColor}
+          fill={fillColor}
+          style={centeredTab(EXTENSION_WIDTH)}
+          width={EXTENSION_WIDTH}
+        >
+          {bottomScreen}
+        </Tab>
+        <div
+          className="absolute inset-x-0 rounded-[26px]"
+          style={{
+            backgroundColor: fillColor,
+            top: BUMP,
+            bottom: BUMP,
+            boxShadow: `inset 0 0 0 1px ${edgeColor}`,
+          }}
+        />
+      </Chrome>
     </div>
   );
 }
@@ -359,6 +452,7 @@ export function OverlayTotal({
   const displayFace = overlayDisplayFace(appearance);
   const screenInk = overlayScreenInk(appearance);
   const surface = overlaySurfaceSolid(appearance);
+  const edgeColor = overlaySurface(appearance).borderColor;
 
   // Mid-animation the state already holds the new tab, so the figure holds the
   // value from before this spin and climbs only once the wheel settles.
@@ -436,23 +530,14 @@ export function OverlayTotal({
       }}
     >
       <Cabinet
+        edgeColor={edgeColor}
         bottomScreen={
           <Screen
             // Inset by the same border on every side, so it is this extension's
             // own shape scaled down rather than a second shape laid on top.
             className="absolute grid place-items-center"
             face={chipFace}
-            // Stops a full border short of the body rather than running under
-            // it, so the whole screen is visible instead of half of one.
-            shape={{
-              inset: BORDER,
-              // Level with the body's edge. Insetting a border here too would
-              // stack against the body's own padding and read as a double-thick
-              // band between this screen and the figure.
-              top: TUCK,
-              bottom: FREE_EDGE_INSET,
-              borderRadius: 7,
-            }}
+            shape={tabScreenShape("bottom")}
           >
             <span
               className="whitespace-nowrap text-[1rem] font-black uppercase tracking-[0.02em] leading-none"
@@ -473,12 +558,7 @@ export function OverlayTotal({
           <Screen
             className="absolute grid place-items-center"
             face={chipFace}
-            shape={{
-              inset: BORDER,
-              top: FREE_EDGE_INSET,
-              bottom: TUCK,
-              borderRadius: 7,
-            }}
+            shape={tabScreenShape("top")}
             // Nothing armed: the slot runs a glow across itself rather than
             // showing a placeholder figure, so it reads as waiting.
             wave={armed ? undefined : overlayGlow(appearance)}
@@ -549,6 +629,10 @@ export function OverlayGoalBar({
 }) {
   const ink = overlayInk(appearance);
   const accent = overlayAccent(appearance);
+  const chipFace = overlayChipFace(appearance);
+  const chipInk = overlayChipInk(appearance);
+  const surface = overlaySurfaceSolid(appearance);
+  const edgeColor = overlaySurface(appearance).borderColor;
   const current = state?.counterCents ?? 0;
   const progress = goalCents > 0 ? Math.min(1, current / goalCents) : 0;
   const shape = appearance.goalShape;
@@ -582,96 +666,141 @@ export function OverlayGoalBar({
 
   return (
     <div
-      // Deeper at the bottom on purpose: the marker overhangs the track by
-      // nine pixels and throws a glow past that, so equal padding would leave
-      // it grazing the pill's edge.
-      className="w-full max-w-[600px] rounded-full border-2 px-5 pb-2.5 pt-2 backdrop-blur-md"
-      style={{ ...overlaySurface(appearance, 0.88), color: ink }}
+      className="relative w-full max-w-[600px]"
+      style={{ color: ink, paddingTop: BUMP }}
     >
-      <div className="flex items-baseline justify-between gap-4">
-        <p className="truncate text-sm font-bold tracking-wide lg:text-base">
-          {goalLabel}
-        </p>
-        <p className="flex shrink-0 items-baseline text-base font-black leading-none lg:text-xl">
-          {currentControl ?? formatMoney(current)}
-          {goalControl ? (
-            <span className="opacity-50">/{goalControl}</span>
-          ) : goalCents > 0 ? (
-            <span className="opacity-50">/{formatMoney(goalCents)}</span>
-          ) : null}
-        </p>
-      </div>
-
-      {/* The fill is the loudest thing on the bar, so it gets real height and a
-          marker riding its tip rather than ending on a flat edge. */}
-      {/* The marker overhangs the track, so the row carries its own room. */}
-      <div
-        className="relative mt-2 h-3.5 rounded-full"
-        style={{ backgroundColor: `${ink}1f` }}
-      >
+      {/* Not aria-hidden the way the counter's cabinet is: these tabs carry the
+          label and the count, and on the Live page those are the streamer's
+          editable controls rather than decoration. */}
+      <Chrome>
+        <Tab
+          edge="top"
+          edgeColor={edgeColor}
+          fill={surface}
+          style={{ left: 22, maxWidth: "calc(50% - 26px)" }}
+          width={GOAL_LABEL_TAB}
+        >
+          <Screen
+            className="absolute grid place-items-center px-2"
+            face={chipFace}
+            shape={tabScreenShape("top")}
+          >
+            <span
+              className="w-full truncate text-center text-[0.95rem] font-black uppercase leading-none tracking-[0.02em]"
+              style={{ color: chipInk }}
+            >
+              {goalLabel}
+            </span>
+          </Screen>
+        </Tab>
+        <Tab
+          edge="top"
+          edgeColor={edgeColor}
+          fill={surface}
+          style={{ right: 22, maxWidth: "calc(50% - 26px)" }}
+          width={GOAL_FIGURE_TAB}
+        >
+          <Screen
+            className="absolute grid place-items-center px-2"
+            face={chipFace}
+            shape={tabScreenShape("top")}
+          >
+            <span
+              className="flex items-baseline whitespace-nowrap text-[0.95rem] font-black leading-none"
+              style={{ color: chipInk }}
+            >
+              {currentControl ?? formatMoney(current)}
+              {goalControl ? (
+                <span className="opacity-60">/{goalControl}</span>
+              ) : goalCents > 0 ? (
+                <span className="opacity-60">/{formatMoney(goalCents)}</span>
+              ) : null}
+            </span>
+          </Screen>
+        </Tab>
         <div
-          className="h-full rounded-full transition-[width] duration-slow ease-standard"
+          className="absolute inset-x-0 rounded-full"
           style={{
-            width: `${progress * 100}%`,
-            background: appearance.goalRainbow
-              ? rainbowFill(appearance.vivid)
-              : accent,
-            // The gradient belongs to the track, not to the fill. Left alone it
-            // scales to whatever is filled, squeezing the whole rainbow into a
-            // half-full bar — so the colour under the marker was never the
-            // colour the marker had computed for that position.
-            backgroundSize:
-              appearance.goalRainbow && progress > 0
-                ? `${100 / progress}% 100%`
-                : undefined,
-            backgroundRepeat: "no-repeat",
-            boxShadow: `0 0 12px ${accent}66`,
+            backgroundColor: surface,
+            top: BUMP,
+            bottom: 0,
+            boxShadow: `inset 0 0 0 1px ${edgeColor}`,
           }}
         />
-        {shape !== "none" && progress > 0 ? (
-          <svg
-            aria-hidden="true"
-            className="absolute top-1/2 h-8 w-8 transition-[left] duration-slow ease-standard"
-            // The translate lives in the transform rather than in a class so
-            // the pulse keyframe can carry it too.
-            key={`marker-${pulseKey}`}
-            style={{
-              left: `${progress * 100}%`,
-              transform: "translate(-50%, -50%)",
-              filter: pulsing ? markerGlow(marker.from) : undefined,
-              animation: pulseKey
-                ? `marker-pulse ${MARKER_PULSE_MS}ms var(--ease-standard)`
-                : undefined,
-            }}
-            viewBox="0 0 24 24"
-          >
-            <defs>
-              <linearGradient id={markerGradientId} x1="0" x2="1" y1="0" y2="1">
-                <stop offset="0%" stopColor={marker.from} />
-                <stop offset="100%" stopColor={marker.to} />
-              </linearGradient>
-            </defs>
-            {/* White body, edge in the colour the bar has reached. Colouring
-                the body instead camouflaged it against the fill it rides.
-                Painting the stroke before the fill keeps it outside the shape —
-                a centred stroke eats half its width out of the white. */}
-            <path
-              d={GOAL_SHAPE_PATHS[shape]}
-              fill="#fff"
-              paintOrder="stroke"
-              stroke={`url(#${markerGradientId})`}
-              strokeLinejoin="round"
-              strokeWidth="3.4"
-            />
-          </svg>
-        ) : null}
-      </div>
+      </Chrome>
 
-      {/* Sits under the track rather than beside the label: the marker
-          overhangs the fill, so the row above it has no spare width. */}
-      <p className="mt-1.5 text-right text-[0.6rem] font-semibold leading-none tracking-[0.12em] opacity-35">
-        tributes.bio
-      </p>
+      {/* The bar itself, unchanged: the fill is the loudest thing here, so it
+          gets real height and a marker riding its tip rather than ending on a
+          flat edge. The marker overhangs the track, so the row carries its own
+          room. */}
+      <div className="relative px-5 pb-2 pt-2.5">
+        <div
+          className="relative h-3.5 rounded-full"
+          style={{ backgroundColor: `${ink}1f` }}
+        >
+          <div
+            className="h-full rounded-full transition-[width] duration-slow ease-standard"
+            style={{
+              width: `${progress * 100}%`,
+              background: appearance.goalRainbow
+                ? rainbowFill(appearance.vivid)
+                : accent,
+              // The gradient belongs to the track, not to the fill. Left alone
+              // it scales to whatever is filled, squeezing the whole rainbow
+              // into a half-full bar — so the colour under the marker was never
+              // the colour the marker had computed for that position.
+              backgroundSize:
+                appearance.goalRainbow && progress > 0
+                  ? `${100 / progress}% 100%`
+                  : undefined,
+              backgroundRepeat: "no-repeat",
+              boxShadow: `0 0 12px ${accent}66`,
+            }}
+          />
+          {shape !== "none" && progress > 0 ? (
+            <svg
+              aria-hidden="true"
+              className="absolute top-1/2 h-8 w-8 transition-[left] duration-slow ease-standard"
+              // The translate lives in the transform rather than in a class so
+              // the pulse keyframe can carry it too.
+              key={`marker-${pulseKey}`}
+              style={{
+                left: `${progress * 100}%`,
+                transform: "translate(-50%, -50%)",
+                filter: pulsing ? markerGlow(marker.from) : undefined,
+                animation: pulseKey
+                  ? `marker-pulse ${MARKER_PULSE_MS}ms var(--ease-standard)`
+                  : undefined,
+              }}
+              viewBox="0 0 24 24"
+            >
+              <defs>
+                <linearGradient id={markerGradientId} x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stopColor={marker.from} />
+                  <stop offset="100%" stopColor={marker.to} />
+                </linearGradient>
+              </defs>
+              {/* White body, edge in the colour the bar has reached. Colouring
+                  the body instead camouflaged it against the fill it rides.
+                  Painting the stroke before the fill keeps it outside the
+                  shape — a centred stroke eats half its width out of the
+                  white. */}
+              <path
+                d={GOAL_SHAPE_PATHS[shape]}
+                fill="#fff"
+                paintOrder="stroke"
+                stroke={`url(#${markerGradientId})`}
+                strokeLinejoin="round"
+                strokeWidth="3.4"
+              />
+            </svg>
+          ) : null}
+        </div>
+
+        <p className="mt-1.5 text-right text-[0.6rem] font-semibold leading-none tracking-[0.12em] opacity-35">
+          tributes.bio
+        </p>
+      </div>
     </div>
   );
 }
@@ -710,8 +839,8 @@ export function OverlayQueue({
 
   return (
     <div
-      className="w-full max-w-[320px] rounded-3xl border-2 p-4 backdrop-blur-md"
-      style={{ ...overlaySurface(appearance, 0.88), color: ink }}
+      className="w-full max-w-[320px] rounded-3xl border p-4 backdrop-blur-md"
+      style={{ ...overlaySurface(appearance), color: ink }}
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-bold uppercase tracking-[0.12em] opacity-80">

@@ -407,7 +407,13 @@ export function LiveControlPage() {
   const shownWheelId = spinning
     ? state?.wheelId
     : (state?.nextWheelId ?? state?.wheelId);
-  const shownWheel = wheels.find((wheel) => wheel.id === shownWheelId) ?? config;
+  // Resolved against the library, which is subscribed, rather than against the
+  // active copy, which is a duplicate written at save time and so can be a
+  // version behind the wheel the streamer is looking at in their editor.
+  const shownWheel =
+    wheels.find((wheel) => wheel.id === shownWheelId) ??
+    wheels.find((wheel) => wheel.isDefault && !wheel.archived) ??
+    config;
   const nextUp = queued[0] ?? null;
   const runOpen = state?.tabOpen === true && !spinning;
 
@@ -507,7 +513,11 @@ export function LiveControlPage() {
                 a spin, rather than stacked underneath it. */}
             <div className="flex w-full flex-wrap items-center justify-center gap-6">
               <div className="w-full max-w-[380px]">
-                <OverlayWheel animation={animation} config={shownWheel} />
+                <OverlayWheel
+                  animation={animation}
+                  appearance={settings.appearance}
+                  config={shownWheel}
+                />
               </div>
               <OverlayTotal
                 appearance={settings.appearance}
