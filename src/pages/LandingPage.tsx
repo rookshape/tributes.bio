@@ -95,7 +95,7 @@ export function LandingPage() {
         {/* The overlay sources remain independent, as they are in OBS. The
             surrounding wash gives them a shared scene without pretending the
             product renders them inside one framed widget. */}
-        <section className="relative left-1/2 w-screen -translate-x-1/2 bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_18%,#edf5ff_76%,#ffffff_100%)] py-20 sm:py-28 lg:py-32">
+        <section className="relative left-1/2 w-screen -translate-x-1/2 bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_18%,#edf5ff_76%,#ffffff_100%)] pb-6 pt-14 sm:pb-8 sm:pt-16 lg:pb-8 lg:pt-20">
           <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
             <div className="grid gap-5 pb-6 sm:pb-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-end lg:gap-16">
               <div>
@@ -110,7 +110,7 @@ export function LandingPage() {
               </p>
             </div>
 
-            <div className="mt-12 sm:mt-16">
+            <div className="mt-6 sm:mt-8">
               <StreamShowcase />
             </div>
           </div>
@@ -167,19 +167,30 @@ export function LandingPage() {
         </div>
 
         {/* Inside the sky, not below it. */}
-        <footer className="relative mx-auto w-full max-w-5xl px-4 pb-8 pt-24 sm:px-6 sm:pt-32">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="relative mx-auto w-full max-w-5xl px-4 pb-10 pt-24 sm:px-6 sm:pb-8 sm:pt-32">
+          {/* Narrow: centred, links above the legal line, because the links are
+              the part anyone is actually reaching for. Wide: the row it was,
+              legal to the left and links to the right. */}
+          <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:text-left">
             {/* Names the operating company as well as the product. Tributes is
                 the trading name; lurk LLC is who the contract and the payouts
                 are actually with, and a card statement or a processor review
-                should be able to connect the two without asking. */}
-            <p className="text-detail font-semibold text-white">
-              Tributes is a product of lurk LLC. © {new Date().getFullYear()} lurk
-              LLC. All rights reserved.
+                should be able to connect the two without asking.
+
+                Balanced rather than ragged: left to itself this wraps with
+                "reserved." alone on the second line. */}
+            <p className="order-2 text-balance text-detail font-semibold text-white sm:order-1">
+              Tributes is a product of lurk LLC.{" "}
+              {/* Kept whole: balancing the line otherwise breaks between the
+                  symbol and the year. */}
+              <span className="whitespace-nowrap">
+                © {new Date().getFullYear()} lurk LLC.
+              </span>{" "}
+              All rights reserved.
             </p>
             <nav
               aria-label="Footer"
-              className="flex flex-wrap gap-x-6 gap-y-2 text-detail font-semibold"
+              className="order-1 flex flex-wrap justify-center gap-x-6 gap-y-2 text-detail font-semibold sm:order-2 sm:justify-end"
             >
               <Link className="text-white hover:text-white/75" to="/terms">
                 Terms
