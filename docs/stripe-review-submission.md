@@ -25,7 +25,9 @@ would rather be told to use it than deploy something that gets shut off later.
 ## The business
 
 - Legal entity: **lurk LLC**, «state of formation», United States
-- Product: **Tributes** — `https://tributes.bio`
+- Product: **Tributes**
+- Live site: **https://tributes-bio-prod.web.app** (moving to `https://tributes.bio`
+  once DNS is cut over; both serve the same deployment)
 - Stripe account: «platform account id»
 - Contact for this review: «name», «email»
 
@@ -213,8 +215,13 @@ service — will be published before launch and linked from the checkout page.
 - Both flows are fully implemented and tested against Stripe test mode.
 - Paid Spins are **not enabled in production** and will stay disabled until this
   review concludes.
-- Legal documents (Terms, Privacy, Acceptable Use, Payment and Refund policy) are
-  drafted and will be published before we accept live payments.
+- The site is live and public. Terms, Privacy, and Payments and Refunds are
+  published and linked from the footer of every page:
+  - https://tributes-bio-prod.web.app/terms
+  - https://tributes-bio-prod.web.app/privacy
+  - https://tributes-bio-prod.web.app/refunds
+- Pricing is stated on the home page, and every total a payer sees includes the
+  fee before they commit.
 - No live charges have been processed.
 
 ## Placeholders to fill before sending
