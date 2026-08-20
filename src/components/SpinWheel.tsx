@@ -123,7 +123,21 @@ export function SpinWheel({
       playedSpinIdRef.current = animation.id;
     }
 
+    /**
+     * The library sizes its canvas from the container's client size and then
+     * only ever re-does it on a window resize. Any layout that settles after
+     * construction — fonts arriving, a flex parent resolving, a panel opening —
+     * leaves the canvas at a stale size, and because it is a static-flow child
+     * a too-small canvas sits at the container's top-left while the label and
+     * glow overlays centre their viewBox. The wheel ends up drawn up and to the
+     * left of where the labels are placed, which is a uniform shift rather than
+     * anything wrong with the labels themselves.
+     */
+    const observer = new ResizeObserver(() => wheel.resize());
+    observer.observe(container);
+
     return () => {
+      observer.disconnect();
       wheel.remove();
       wheelRef.current = null;
     };
@@ -303,7 +317,10 @@ export function SpinWheel({
           ))}
         </svg>
       ) : null}
-      <div className="absolute inset-[5%]" ref={containerRef} />
+      <div
+        className="absolute inset-[5%] flex items-center justify-center"
+        ref={containerRef}
+      />
       <div className="absolute inset-[5%] z-[4]">
         <WheelSliceGlow
           center={50}
