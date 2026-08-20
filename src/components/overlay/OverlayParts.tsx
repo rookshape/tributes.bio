@@ -134,7 +134,7 @@ const PLATE = {
    * pixels of drop rendered as 19, and the screen inside it started above the
    * wheel's edge and emerged from underneath rather than sitting below it.
    */
-  drop: 15.5,
+  drop: 17.5,
   /** How far it runs up behind the wheel. Must clear the arc's climb, which at
       this width is about 8 — the rest is margin. */
   tuck: 9.5,
@@ -147,15 +147,15 @@ const PLATE = {
    * whole plate, with the white showing only as a hairline.
    */
   sideBorder: 3.2,
-  bottomBorder: 2.6,
+  bottomBorder: 2,
   /**
    * Gap between the wheel's edge and the top of the lit screen — again flat,
    * so it has to be generous to survive the foreshortening.
    */
-  screenGap: 3.4,
-  fontSize: 4,
+  screenGap: 3,
+  fontSize: 4.4,
   /** Scaled with the plate, or a taller plate would taper into a wedge. */
-  tip: { perspective: "6.4cqw", degrees: 6 },
+  tip: { perspective: "6.9cqw", degrees: 6 },
 };
 
 /** A share of the wheel's width. */
