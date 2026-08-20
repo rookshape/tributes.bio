@@ -153,7 +153,7 @@ const PLATE = {
    * so it has to be generous to survive the foreshortening.
    */
   screenGap: 3,
-  fontSize: 4.4,
+  fontSize: 4.9,
   /** Scaled with the plate, or a taller plate would taper into a wedge. */
   tip: { perspective: "6.9cqw", degrees: 6 },
 };
