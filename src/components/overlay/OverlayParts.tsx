@@ -183,6 +183,13 @@ function useCountUp(target: number, durationMs = COUNT_UP_MS) {
   return shown;
 }
 
+/** Uniform border left around every screen. */
+const BORDER = 12;
+/** Visible height of an extension above or below the body. */
+const BUMP = 38;
+/** How far an extension runs on under the body, hiding its flared base. */
+const TUCK = 10;
+
 /**
  * The cabinet is one silhouette, not a body with things stuck to it.
  *
@@ -191,8 +198,22 @@ function useCountUp(target: number, durationMs = COUNT_UP_MS) {
  * corner radii survive, which a clip-path cannot do. All three pieces share the
  * same fill and overlap, so they read as one shape, and the shadow is thrown by
  * the group so it follows the union instead of outlining every piece.
+ *
+ * Each screen is a child of its extension rather than a sibling laid over it.
+ * That is what keeps the border honest: an inset child is the same rectangle
+ * scaled down, so once the parent is tipped both are the same trapezoid and the
+ * gap between them stays even. Two separately-transformed shapes taper at
+ * different rates and the border quietly thickens along its length.
  */
-function Cabinet({ fillColor }: { fillColor: string }) {
+function Cabinet({
+  bottomScreen,
+  fillColor,
+  topScreen,
+}: {
+  bottomScreen: ReactNode;
+  fillColor: string;
+  topScreen: ReactNode;
+}) {
   const fill = { backgroundColor: fillColor };
 
   return (
@@ -206,30 +227,38 @@ function Cabinet({ fillColor }: { fillColor: string }) {
       }}
     >
       <div
-        className="absolute top-0 h-[56px] w-[104px]"
+        className="absolute top-0"
         style={{
           ...fill,
+          height: BUMP + TUCK,
+          width: 104,
           left: "50%",
           marginLeft: -52,
           borderRadius: "15px 15px 0 0",
           transform: "perspective(22px) rotateX(4deg)",
           transformOrigin: "bottom",
         }}
-      />
+      >
+        {topScreen}
+      </div>
       <div
-        className="absolute bottom-0 h-[58px] w-[164px]"
+        className="absolute bottom-0"
         style={{
           ...fill,
+          height: BUMP + TUCK,
+          width: 164,
           left: "50%",
           marginLeft: -82,
           borderRadius: "0 0 15px 15px",
           transform: "perspective(22px) rotateX(-4deg)",
           transformOrigin: "top",
         }}
-      />
+      >
+        {bottomScreen}
+      </div>
       <div
-        className="absolute inset-x-0 bottom-[52px] top-[52px] rounded-[26px]"
-        style={fill}
+        className="absolute inset-x-0 rounded-[26px]"
+        style={{ ...fill, top: BUMP, bottom: BUMP }}
       />
     </div>
   );
@@ -369,38 +398,72 @@ export function OverlayTotal({
 
   return (
     <div
-      className="relative w-full max-w-[214px] pb-[64px] pt-[64px]"
+      className="relative w-full max-w-[214px]"
       key={`cabinet-${pulseKey}`}
-      style={{ color: ink, animation: "total-pop 480ms var(--ease-standard)" }}
+      style={{
+        color: ink,
+        animation: "total-pop 480ms var(--ease-standard)",
+        // Derived, so the figure's border can never drift from the screens'.
+        paddingTop: BUMP + BORDER,
+        paddingBottom: BUMP + BORDER,
+      }}
     >
-      <Cabinet fillColor={surface} />
-
-      {/* Upper left: what is armed. */}
-      <Screen
-        charging={spinning && armed}
-        className="absolute left-1/2 top-[19px] grid h-[24px] w-[80px] place-items-center rounded-[8px]"
-        // Same perspective and origin as the extension behind it, so its sides
-        // slant parallel to the white rather than cutting across it.
-        shape={{
-          marginLeft: -40,
-          transform: "perspective(22px) rotateX(4deg)",
-          transformOrigin: "bottom",
-        }}
-        face={face}
-        ink={screenInk}
-        // Nothing armed: the slot runs a glow across itself rather than showing
-        // a placeholder figure, so it reads as waiting rather than as a value.
-        wave={armed ? undefined : overlayGlow(appearance)}
-      >
-        {armed ? (
-          <span
-            className="text-base font-black leading-none lg:text-lg"
-            style={{ color: screenInk }}
+      <Cabinet
+        bottomScreen={
+          <Screen
+            charging={spinning}
+            // Inset by the same border on every side, so it is this extension's
+            // own shape scaled down rather than a second shape laid on top.
+            className="absolute grid place-items-center"
+            face={face}
+            ink={screenInk}
+            shape={{
+              inset: BORDER,
+              top: 0,
+              borderRadius: `0 0 ${BORDER - 5}px ${BORDER - 5}px`,
+            }}
           >
-            {`${multiplier}×`}
-          </span>
-        ) : null}
-      </Screen>
+            <span
+              className="whitespace-nowrap text-xs font-black uppercase tracking-[0.08em] lg:text-sm"
+              // Keyed on the wording so a change remounts the span and replays
+              // the slide, rather than swapping the text in place.
+              key={label}
+              style={{
+                color: screenInk,
+                animation: "label-slide 420ms var(--ease-standard)",
+              }}
+            >
+              {label}
+            </span>
+          </Screen>
+        }
+        fillColor={surface}
+        topScreen={
+          <Screen
+            charging={spinning && armed}
+            className="absolute grid place-items-center"
+            face={face}
+            ink={screenInk}
+            shape={{
+              inset: BORDER,
+              bottom: 0,
+              borderRadius: `${BORDER - 5}px ${BORDER - 5}px 0 0`,
+            }}
+            // Nothing armed: the slot runs a glow across itself rather than
+            // showing a placeholder figure, so it reads as waiting.
+            wave={armed ? undefined : overlayGlow(appearance)}
+          >
+            {armed ? (
+              <span
+                className="text-base font-black leading-none lg:text-lg"
+                style={{ color: screenInk }}
+              >
+                {`${multiplier}×`}
+              </span>
+            ) : null}
+          </Screen>
+        }
+      />
 
       {/* The figure. */}
       <div className="relative px-[12px]">
@@ -423,31 +486,6 @@ export function OverlayTotal({
         </Screen>
       </div>
 
-      {/* Bottom centre: how many spins are left. */}
-      <Screen
-        charging={spinning}
-        className="absolute bottom-[19px] left-1/2 grid h-[25px] w-[140px] place-items-center rounded-[8px]"
-        shape={{
-          marginLeft: -70,
-          transform: "perspective(22px) rotateX(-4deg)",
-          transformOrigin: "top",
-        }}
-        face={face}
-        ink={screenInk}
-      >
-        <span
-          className="whitespace-nowrap text-xs font-black uppercase tracking-[0.08em] lg:text-sm"
-          // Keyed on the wording so a change remounts the span and replays the
-          // slide, rather than swapping the text in place.
-          key={label}
-          style={{
-            color: screenInk,
-            animation: "label-slide 420ms var(--ease-standard)",
-          }}
-        >
-          {label}
-        </span>
-      </Screen>
     </div>
   );
 }
