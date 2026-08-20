@@ -23,7 +23,7 @@ export function LandingPage() {
       <section className="relative isolate overflow-hidden pb-16 pt-24 text-center sm:pb-20 sm:pt-28">
         <div className="relative left-1/2 w-max -translate-x-1/2 pb-3">
           <h1
-            className="whitespace-nowrap text-[35.5vw] leading-[1.05]"
+            className="whitespace-nowrap text-[33.5vw] leading-[1.05]"
             style={{
               background: "linear-gradient(180deg, #82aefc 12%, #82aefc 48%, #ffffff 96%)",
               backgroundClip: "text",
@@ -73,38 +73,51 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-        <div className="grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:gap-14">
-          <div className="min-w-0 lg:order-1">
-            <h2 className="text-headline font-semibold text-content">In your bio</h2>
-            <p className="mt-3 max-w-md text-lead text-content-muted">
-              One page for your links and your tributes. Share one address,
-              and let people support you where they already find you.
-            </p>
-          </div>
-          <div className="min-w-0 lg:order-2">
-            <BioShowcase />
-          </div>
-        </div>
+      <div className="relative overflow-hidden">
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:py-32">
+          <div className="grid min-w-0 gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:gap-16">
+            <div className="relative z-10 self-start lg:sticky lg:top-32 lg:pt-36">
+              <div aria-hidden="true" className="mb-6 h-px w-16 bg-accent" />
+              <h2 className="display-type text-display tracking-normal text-content sm:text-hero">
+                In your bio
+              </h2>
+              <p className="mt-5 max-w-md text-lead text-content-muted">
+                One page for your links and your tributes. Share one address,
+                and let people support you where they already find you.
+              </p>
+            </div>
 
-        {/* Full width rather than half of a two-column row: these are four
-            separate OBS sources a streamer arranges across a scene, and in a
-            narrow column they stack into a tower that looks nothing like how
-            they are used. */}
-        <div className="py-12 sm:py-16">
-          <div className="max-w-xl">
-            <h2 className="text-headline font-semibold text-content">On your stream</h2>
-            <p className="mt-3 text-lead text-content-muted">
-              Turn sending into a live game. A viewer pays to spin your wheel,
-              you spin it on stream, and they send whatever it lands on. The most
-              they can pay is agreed before they start.
-            </p>
+            <div className="min-w-0">
+              <BioShowcase />
+            </div>
           </div>
-          <div className="mt-10">
-            <StreamShowcase />
+        </section>
+
+        {/* The overlay sources remain independent, as they are in OBS. The
+            surrounding wash gives them a shared scene without pretending the
+            product renders them inside one framed widget. */}
+        <section className="relative left-1/2 w-screen -translate-x-1/2 bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_18%,#edf5ff_76%,#ffffff_100%)] py-20 sm:py-28 lg:py-32">
+          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+            <div className="grid gap-5 border-b border-[#82aefc]/25 pb-10 sm:pb-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-end lg:gap-16">
+              <div>
+                <div aria-hidden="true" className="mb-6 h-px w-16 bg-accent" />
+                <h2 className="display-type text-display tracking-normal text-content sm:text-hero">
+                  On your stream
+                </h2>
+              </div>
+              <p className="max-w-xl text-lead text-content-muted">
+                Turn sending into a live game. A viewer pays to spin your wheel,
+                you spin it on stream, and they send whatever it lands on. The most
+                they can pay is agreed before they start.
+              </p>
+            </div>
+
+            <div className="mt-12 sm:mt-16">
+              <StreamShowcase />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       {/*
         The close: what it costs, the call to action, and the footer, all on one
@@ -128,8 +141,12 @@ export function LandingPage() {
           backgroundRepeat: "no-repeat",
         }}
       >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#2d6fe0]/35"
+        />
         <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-20 text-center sm:px-6 sm:pt-24">
-          <h2 className="text-hero font-semibold text-content">Totally Free</h2>
+          <h2 className="display-type text-hero text-content">Totally Free</h2>
           <p className="mx-auto mt-4 max-w-xl text-lead text-content-muted">
             Free to set up and free to keep. You get the full amount someone
             sends you. The sender covers the service fee: {feePercentLabel(TIP_FEE_RATE)} on
@@ -158,22 +175,25 @@ export function LandingPage() {
                 the trading name; lurk LLC is who the contract and the payouts
                 are actually with, and a card statement or a processor review
                 should be able to connect the two without asking. */}
-            <p className="text-detail text-white/85">
+            <p className="text-detail font-semibold text-white">
               Tributes is a product of lurk LLC. © {new Date().getFullYear()} lurk
               LLC. All rights reserved.
             </p>
-            <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-detail">
-              <Link className="text-white/85 hover:text-white" to="/terms">
+            <nav
+              aria-label="Footer"
+              className="flex flex-wrap gap-x-6 gap-y-2 text-detail font-semibold"
+            >
+              <Link className="text-white hover:text-white/75" to="/terms">
                 Terms
               </Link>
-              <Link className="text-white/85 hover:text-white" to="/privacy">
+              <Link className="text-white hover:text-white/75" to="/privacy">
                 Privacy
               </Link>
-              <Link className="text-white/85 hover:text-white" to="/refunds">
+              <Link className="text-white hover:text-white/75" to="/refunds">
                 Refunds
               </Link>
               <a
-                className="text-white/85 hover:text-white"
+                className="text-white hover:text-white/75"
                 href="mailto:support@tributes.bio"
               >
                 Support
