@@ -77,7 +77,6 @@ export function LandingPage() {
         <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:py-32">
           <div className="grid min-w-0 gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:gap-16">
             <div className="relative z-10 self-start lg:sticky lg:top-32 lg:pt-36">
-              <div aria-hidden="true" className="mb-6 h-px w-16 bg-accent" />
               <h2 className="display-type text-display tracking-normal text-content sm:text-hero">
                 In your bio
               </h2>
@@ -98,9 +97,8 @@ export function LandingPage() {
             product renders them inside one framed widget. */}
         <section className="relative left-1/2 w-screen -translate-x-1/2 bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_18%,#edf5ff_76%,#ffffff_100%)] py-20 sm:py-28 lg:py-32">
           <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-            <div className="grid gap-5 border-b border-[#82aefc]/25 pb-10 sm:pb-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-end lg:gap-16">
+            <div className="grid gap-5 pb-6 sm:pb-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-end lg:gap-16">
               <div>
-                <div aria-hidden="true" className="mb-6 h-px w-16 bg-accent" />
                 <h2 className="display-type text-display tracking-normal text-content sm:text-hero">
                   On your stream
                 </h2>
@@ -148,10 +146,10 @@ export function LandingPage() {
         <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-20 text-center sm:px-6 sm:pt-24">
           <h2 className="display-type text-hero text-content">Totally Free</h2>
           <p className="mx-auto mt-4 max-w-xl text-lead text-content-muted">
-            Free to set up and free to keep. You get the full amount someone
-            sends you. The sender covers the service fee: {feePercentLabel(TIP_FEE_RATE)} on
-            a tribute, {feePercentLabel(SPIN_FEE_RATE)} on a spin, shown before
-            they pay.
+            Free to set up. Free to keep. You get the full amount someone sends
+            you, and the sender covers a small fee shown before they pay.{" "}
+            {feePercentLabel(TIP_FEE_RATE)} on a tribute,{" "}
+            {feePercentLabel(SPIN_FEE_RATE)} on a spin.
           </p>
           <div className="mt-9 flex justify-center">
             {/* The primary variant is already a white face with an accent
