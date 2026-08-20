@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { BioPageView } from "../components/BioPageView";
 import { TributeForm } from "../components/TributeForm";
 import {
@@ -10,7 +10,8 @@ import {
 } from "../components/overlay/OverlayParts";
 import { Tabs, Toggle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { getCreatorWorkspace } from "../lib/bio";
+import { getCreatorByUsername } from "../lib/account";
+import { getCreatorWorkspace, getPublicCreatorLinks } from "../lib/bio";
 import { DEFAULT_OVERLAY_APPEARANCE } from "../lib/overlayTheme";
 import { DEFAULT_OVERLAY_SETTINGS, subscribeOverlaySettings } from "../lib/spinGoal";
 import { getSpinConfig } from "../lib/spin";
@@ -64,10 +65,18 @@ const PHONE = { width: 430, height: 968 };
 
 export function PreviewPage() {
   const { appUser, loading, user } = useAuth();
+  const [params] = useSearchParams();
+  /**
+   * `?as=<username>` loads the creator's public data and skips the sign-in
+   * check, so the scenes can be rendered by something that has no session —
+   * a headless browser taking the shots, for instance. It reads nothing a
+   * visitor to the public page could not read anyway.
+   */
+  const asUsername = params.get("as");
   const creatorId = appUser?.creatorId ?? user?.uid;
 
-  const [scene, setScene] = useState("bio");
-  const [chrome, setChrome] = useState(true);
+  const [scene, setScene] = useState(params.get("scene") ?? "bio");
+  const [chrome, setChrome] = useState(params.get("bare") !== "1");
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [links, setLinks] = useState<CreatorLink[]>([]);
   const [spinConfig, setSpinConfig] = useState<SpinConfig | null>(null);
@@ -77,7 +86,40 @@ export function PreviewPage() {
   });
 
   useEffect(() => {
-    if (!creatorId) return;
+    if (!asUsername) return;
+
+    let active = true;
+
+    void (async () => {
+      const publicProfile = await getCreatorByUsername(asUsername).catch(() => null);
+      if (!active || !publicProfile) return;
+
+      const [publicLinks, wheels, activeCopy] = await Promise.all([
+        getPublicCreatorLinks(publicProfile.id).catch(() => []),
+        // Owner-only, so this comes back empty without a session. The active
+        // copy is readable by anyone who could reach the public spin page, and
+        // is the wheel a viewer would actually be shown.
+        listWheels(publicProfile.id).catch(() => []),
+        getSpinConfig(publicProfile.id).catch(() => null),
+      ]);
+      if (!active) return;
+
+      setProfile(publicProfile);
+      setLinks(publicLinks);
+      setSpinConfig(
+        wheels.find((entry) => entry.isDefault && !entry.archived) ??
+          wheels.find((entry) => !entry.archived) ??
+          activeCopy,
+      );
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [asUsername]);
+
+  useEffect(() => {
+    if (asUsername || !creatorId) return;
 
     let active = true;
 
@@ -102,13 +144,14 @@ export function PreviewPage() {
 
     const unsubscribe = subscribeOverlaySettings(creatorId, setSettings);
 
+
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [creatorId]);
+  }, [asUsername, creatorId]);
 
-  if (!loading && !user) return <Navigate replace to="/login" />;
+  if (!asUsername && !loading && !user) return <Navigate replace to="/login" />;
 
   const appearance = settings.appearance ?? DEFAULT_OVERLAY_APPEARANCE;
 

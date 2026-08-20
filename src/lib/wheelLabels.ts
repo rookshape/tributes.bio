@@ -18,6 +18,21 @@
  */
 const LABEL_RADIUS_FRACTION = 0.88;
 
+/**
+ * Above this many slices, labels run down the slice instead of across it.
+ *
+ * Radial labels exist because upright ones collide once the wheel is busy — the
+ * arc a label has to fit across shrinks with every slice added. But they cost
+ * something: at six slices the ones at the sides come out level while the ones
+ * on the diagonals sit at sixty degrees, and a wheel with room to spare reads
+ * as tilted for no reason. Under the threshold there is room, so they stay
+ * upright.
+ */
+const UPRIGHT_MAX_SLICES = 8;
+
+/** Where an upright label sits, as a share of the face. */
+const UPRIGHT_RADIUS_FRACTION = 0.66;
+
 /** What limits the type is the width of the slice where the label sits. */
 export function labelFontSize(faceRadius: number, sliceCount: number) {
   const ratio = sliceCount > 12 ? 0.108 : sliceCount > 8 ? 0.12 : 0.14;
@@ -29,9 +44,26 @@ export function labelFontSize(faceRadius: number, sliceCount: number) {
  * `angleDeg` is the slice's centre in screen terms — 0 pointing right — so
  * callers pass `sliceCentre - 90`.
  */
-export function radialLabel(center: number, faceRadius: number, angleDeg: number) {
-  const radius = faceRadius * LABEL_RADIUS_FRACTION;
+export function radialLabel(
+  center: number,
+  faceRadius: number,
+  angleDeg: number,
+  sliceCount: number,
+) {
   const radians = (angleDeg * Math.PI) / 180;
+
+  if (sliceCount <= UPRIGHT_MAX_SLICES) {
+    const upright = faceRadius * UPRIGHT_RADIUS_FRACTION;
+
+    return {
+      x: center + upright * Math.cos(radians),
+      y: center + upright * Math.sin(radians),
+      transform: undefined,
+      anchor: "middle" as const,
+    };
+  }
+
+  const radius = faceRadius * LABEL_RADIUS_FRACTION;
   const x = center + radius * Math.cos(radians);
   const y = center + radius * Math.sin(radians);
 

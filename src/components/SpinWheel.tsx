@@ -169,12 +169,20 @@ export function SpinWheel({
           LABEL_CENTER,
           FACE_RADIUS,
           rotation + (index + 0.5) * sliceAngle - 90,
+          slices.length,
         );
 
         label.setAttribute("x", String(placement.x));
         label.setAttribute("y", String(placement.y));
-        label.setAttribute("transform", placement.transform);
         label.setAttribute("text-anchor", placement.anchor);
+
+        // Upright labels have no rotation at all, and a stale transform would
+        // otherwise survive a change in slice count.
+        if (placement.transform) {
+          label.setAttribute("transform", placement.transform);
+        } else {
+          label.removeAttribute("transform");
+        }
       });
 
       frame = window.requestAnimationFrame(followRotation);

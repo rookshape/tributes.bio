@@ -52,7 +52,7 @@ export function WheelThumbnail({
           const from = point(start, RADIUS);
           const to = point(end, RADIUS);
 
-          const label = radialLabel(CENTER, RADIUS, start + sliceAngle / 2 - 90);
+          const label = radialLabel(CENTER, RADIUS, start + sliceAngle / 2 - 90, slices.length);
 
           return (
             <g key={slice.id}>

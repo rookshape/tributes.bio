@@ -100,6 +100,7 @@ export function EditableSpinWheel({
             CENTER,
             RADIUS,
             startAngle + sliceAngle / 2 - 90,
+            slices.length,
           );
           const selected = slice.id === selectedSliceId;
           const path = wedgePath(startAngle, endAngle);
