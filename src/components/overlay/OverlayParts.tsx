@@ -100,10 +100,75 @@ export const OVERLAY_PARTS: {
 /** How long the wheel's plate holds its title before flipping to the wordmark. */
 const WHEEL_TITLE_MS = 9000;
 const WHEEL_WORDMARK_MS = 3500;
-/** The plate hanging off the bottom of the wheel. */
-const WHEEL_TAB = 226;
-/** How far it runs up behind the wheel, hiding its flat top against the arc. */
-const WHEEL_TUCK = 10;
+/**
+ * The plate under the wheel.
+ *
+ * Struck from the wheel's own centre rather than laid out in boxes: its top
+ * edge *is* an arc of the rim, its sides run back in toward the hub, and its
+ * screen is the same shape inset. The first version was a CSS tab, which can
+ * only ever be a rectangle held up against a circle — the bare plate it left
+ * ran deep at the ends and thin in the middle, and no amount of narrowing it
+ * fixed that, because the mismatch is the shape rather than the size.
+ *
+ * Everything is in the wheel's own 100-unit space, so it scales with the wheel
+ * the way the rim lettering used to.
+ */
+const PLATE = {
+  center: 50,
+  /** Where the wheel's glass frame ends. */
+  rim: 48,
+  /** A hair inside the rim, so no hairline of background shows at the join. */
+  inner: 47.4,
+  depth: 9,
+  /** Half-widths in degrees either side of bottom-centre. Narrower below, so
+      the band tapers the way the counter's tabs do. */
+  topHalfAngle: 26,
+  bottomHalfAngle: 21,
+  border: 2.1,
+  /** Corners come from stroking the fill rather than from mitring it. */
+  round: 1.4,
+};
+
+/** Extra height the plate needs below the wheel's square box, as a % of width. */
+const PLATE_ROOM = 8;
+
+function platePoint(radius: number, degreesFromBottom: number) {
+  const radians = ((90 + degreesFromBottom) * Math.PI) / 180;
+
+  return {
+    x: PLATE.center + radius * Math.cos(radians),
+    y: PLATE.center + radius * Math.sin(radians),
+  };
+}
+
+/** A curved trapezoid: an arc along the rim, a wider one below it, sides between. */
+function platePath(
+  inner: number,
+  outer: number,
+  topHalf: number,
+  bottomHalf: number,
+) {
+  const a = platePoint(inner, topHalf);
+  const b = platePoint(inner, -topHalf);
+  const c = platePoint(outer, -bottomHalf);
+  const d = platePoint(outer, bottomHalf);
+
+  return [
+    `M ${a.x} ${a.y}`,
+    `A ${inner} ${inner} 0 0 0 ${b.x} ${b.y}`,
+    `L ${c.x} ${c.y}`,
+    `A ${outer} ${outer} 0 0 1 ${d.x} ${d.y}`,
+    "Z",
+  ].join(" ");
+}
+
+/** An arc for the lettering to sit on, read left to right. */
+function plateTextArc(radius: number, halfAngle: number) {
+  const from = platePoint(radius, halfAngle);
+  const to = platePoint(radius, -halfAngle);
+
+  return `M ${from.x} ${from.y} A ${radius} ${radius} 0 0 0 ${to.x} ${to.y}`;
+}
 
 export function OverlayWheel({
   appearance = DEFAULT_OVERLAY_APPEARANCE,
@@ -126,6 +191,7 @@ export function OverlayWheel({
   // one interval because the two are held for different lengths — the wheel is
   // the thing being watched, so the branding takes the shorter turn.
   const [showWordmark, setShowWordmark] = useState(false);
+  const plateArcId = useId().replace(/:/g, "");
 
   useEffect(() => {
     if (basic) return;
@@ -139,8 +205,27 @@ export function OverlayWheel({
 
   const plate = showWordmark ? "tributes.bio" : config.name;
 
+  const outer = PLATE.inner + PLATE.depth;
+  // Measured from the rim rather than from the plate's own top edge, which is
+  // tucked behind the wheel: a border inset from something you cannot see is
+  // not the border anyone reads.
+  const screenInner = PLATE.rim + PLATE.border;
+  const screenOuter = outer - PLATE.border;
+  // Held to a constant width around the band: an angular inset that ignored
+  // radius would leave the sides thicker at the top than at the bottom.
+  const screenTopHalf =
+    PLATE.topHalfAngle - (PLATE.border / screenInner) * (180 / Math.PI);
+  const screenBottomHalf =
+    PLATE.bottomHalfAngle - (PLATE.border / screenOuter) * (180 / Math.PI);
+  // Glyphs stand off their baseline, so it sits below the band's middle for the
+  // lettering to land centred on it.
+  const textRadius = (screenInner + screenOuter) / 2 + 1.05;
+
   return (
-    <div className="w-full max-w-[520px]">
+    <div
+      className="relative w-full max-w-[520px]"
+      style={basic ? undefined : { paddingBottom: `${PLATE_ROOM}%` }}
+    >
       <SpinWheel
         animation={animation}
         // Set into the rim only in the plain style. The cabinet style hangs it
@@ -154,46 +239,76 @@ export function OverlayWheel({
       />
 
       {basic ? null : (
-        <div
-          className="relative mx-auto"
-          style={{
-            width: WHEEL_TAB,
-            height: BUMP + TUCK - WHEEL_TUCK,
-            // Pulled up under the wheel so the plate's flat top meets the arc
-            // rather than hanging off the single point where a circle's lowest
-            // edge would touch it.
-            marginTop: -WHEEL_TUCK,
-          }}
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          viewBox={`0 0 100 ${100 + PLATE_ROOM}`}
         >
-          <Chrome>
-            <Tab
-              edge="bottom"
-              edgeColor={edgeColor}
+          <defs>
+            <path
+              d={plateTextArc(textRadius, screenTopHalf)}
+              id={`${plateArcId}-arc`}
+            />
+          </defs>
+          <g
+            style={{
+              filter: "drop-shadow(0 3px 8px rgba(15,23,32,0.22))",
+              opacity: OVERLAY_PANEL_ALPHA,
+            }}
+          >
+            {/* Filled and stroked in the same colour: the stroke is what rounds
+                the corners, which a path cannot do on its own. */}
+            <path
+              d={platePath(
+                PLATE.inner,
+                outer,
+                PLATE.topHalfAngle,
+                PLATE.bottomHalfAngle,
+              )}
               fill={surface}
-              style={{ left: 0, top: -WHEEL_TUCK }}
-              width={WHEEL_TAB}
+              stroke={surface}
+              strokeLinejoin="round"
+              strokeWidth={PLATE.round}
+            />
+            <path
+              d={platePath(screenInner, screenOuter, screenTopHalf, screenBottomHalf)}
+              fill={chipFace}
+              stroke={chipFace}
+              strokeLinejoin="round"
+              strokeWidth={PLATE.round * 0.6}
+            />
+            {/* Stands in for the screens' inset shadow, which SVG has no
+                equivalent of — enough to read as set into the plate. */}
+            <path
+              d={platePath(screenInner, screenOuter, screenTopHalf, screenBottomHalf)}
+              fill="none"
+              stroke="rgba(0,0,0,0.16)"
+              strokeLinejoin="round"
+              strokeWidth="0.35"
+            />
+            <text
+              fill={chipInk}
+              fontSize="2.9"
+              fontWeight="900"
+              // Keyed on the wording so a change remounts the node and replays
+              // the slide rather than swapping the text in place.
+              key={plate}
+              letterSpacing="0.14"
+              style={{
+                animation: "label-slide 420ms var(--ease-standard)",
+                textTransform: "uppercase",
+              }}
             >
-              <Screen
-                className="absolute grid place-items-center px-3"
-                face={chipFace}
-                shape={tabScreenShape("bottom")}
+              <textPath
+                href={`#${plateArcId}-arc`}
+                startOffset="50%"
+                textAnchor="middle"
               >
-                <span
-                  className="w-full truncate text-center text-[1.05rem] font-black uppercase leading-none tracking-[0.04em]"
-                  // Keyed on the wording so a change remounts the span and
-                  // replays the slide rather than swapping the text in place.
-                  key={plate}
-                  style={{
-                    color: chipInk,
-                    animation: "label-slide 420ms var(--ease-standard)",
-                  }}
-                >
-                  {plate}
-                </span>
-              </Screen>
-            </Tab>
-          </Chrome>
-        </div>
+                {plate}
+              </textPath>
+            </text>
+          </g>
+        </svg>
       )}
     </div>
   );
@@ -313,6 +428,7 @@ function Tab({
   edgeColor,
   fill,
   style,
+  tip = TIP,
   width,
 }: {
   children?: ReactNode;
@@ -321,6 +437,12 @@ function Tab({
   fill: string;
   /** Where along the body it sits. */
   style?: CSSProperties;
+  /**
+   * How hard the free edge is drawn in. The default is tuned for a tab about
+   * as tall as the counter's; a taller one needs a deeper perspective to taper
+   * by the same proportion rather than closing into a wedge.
+   */
+  tip?: { perspective: number; degrees: number };
   width: number;
 }) {
   const up = edge === "top";
@@ -333,8 +455,8 @@ function Tab({
         height: BUMP + TUCK,
         width,
         borderRadius: up ? "14px 14px 0 0" : "0 0 14px 14px",
-        transform: `perspective(${TIP.perspective}px) rotateX(${
-          up ? TIP.degrees : -TIP.degrees
+        transform: `perspective(${tip.perspective}px) rotateX(${
+          up ? tip.degrees : -tip.degrees
         }deg)`,
         transformOrigin: up ? "bottom" : "top",
         // Drawn inside, so it cannot show up as a seam where the tab tucks
@@ -348,9 +470,15 @@ function Tab({
   );
 }
 
-/** Centres a tab across the body it belongs to. */
-function centeredTab(width: number): CSSProperties {
-  return { left: "50%", marginLeft: -width / 2 };
+/**
+ * Centres a tab across the body it belongs to.
+ *
+ * Auto margins between pinned edges rather than a half-width offset: the offset
+ * centres by the width the tab *asked* for, so one clamped by a max-width ends
+ * up sitting off to one side.
+ */
+function centeredTab(): CSSProperties {
+  return { left: 0, right: 0, marginLeft: "auto", marginRight: "auto" };
 }
 
 /**
@@ -421,7 +549,7 @@ function Cabinet({
           edge="top"
           edgeColor={edgeColor}
           fill={fillColor}
-          style={centeredTab(EXTENSION_WIDTH)}
+          style={centeredTab()}
           width={EXTENSION_WIDTH}
         >
           {topScreen}
@@ -430,7 +558,7 @@ function Cabinet({
           edge="bottom"
           edgeColor={edgeColor}
           fill={fillColor}
-          style={centeredTab(EXTENSION_WIDTH)}
+          style={centeredTab()}
           width={EXTENSION_WIDTH}
         >
           {bottomScreen}
@@ -528,7 +656,9 @@ export function OverlayTotal({
 
   // Mid-animation the state already holds the new tab, so the figure holds the
   // value from before this spin and climbs only once the wheel settles.
-  const tabCents = spinning ? (state?.tabBeforeCents ?? 0) : (state?.tabCents ?? 0);
+  const tabCents = spinning
+    ? (state?.tabBeforeCents ?? 0)
+    : (state?.tabCents ?? 0);
   // While the wheel turns, everything shows as it stood before this spin, so a
   // bonus or a multiplier is never announced ahead of the result landing.
   const spinsLeft = spinning
@@ -553,7 +683,10 @@ export function OverlayTotal({
       return;
     }
 
-    const timer = window.setTimeout(() => setShowWordmark(true), WORDMARK_DELAY_MS);
+    const timer = window.setTimeout(
+      () => setShowWordmark(true),
+      WORDMARK_DELAY_MS,
+    );
     return () => window.clearTimeout(timer);
   }, [roundOver]);
 
@@ -681,7 +814,10 @@ export function OverlayTotal({
       />
 
       {/* The figure. */}
-      <div className="relative" style={{ paddingLeft: BORDER, paddingRight: BORDER }}>
+      <div
+        className="relative"
+        style={{ paddingLeft: BORDER, paddingRight: BORDER }}
+      >
         <Screen
           className="relative rounded-[16px] px-2 py-3.5"
           deep
@@ -707,7 +843,6 @@ export function OverlayTotal({
           </p>
         </Screen>
       </div>
-
     </div>
   );
 }
@@ -980,7 +1115,10 @@ export function OverlayQueue({
           <p className="flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] opacity-70">
             <span
               className="h-1.5 w-1.5 animate-pulse rounded-full"
-              style={{ backgroundColor: accent, boxShadow: `0 0 6px ${accent}` }}
+              style={{
+                backgroundColor: accent,
+                boxShadow: `0 0 6px ${accent}`,
+              }}
             />
             Spinning now
           </p>
@@ -1054,7 +1192,7 @@ export function OverlayQueue({
 
   return (
     <div
-      className="relative w-full max-w-[320px]"
+      className="relative w-full min-w-[248px] max-w-[320px]"
       style={{ color: ink, paddingTop: BUMP }}
     >
       <Chrome>
@@ -1065,7 +1203,9 @@ export function OverlayQueue({
           edge="top"
           edgeColor={edgeColor}
           fill={surface}
-          style={centeredTab(QUEUE_TAB)}
+          // Never wider than the panel it sits on, whatever the column it
+          // lands in decides that panel should be.
+          style={{ ...centeredTab(), maxWidth: "calc(100% - 28px)" }}
           width={QUEUE_TAB}
         >
           <Screen
