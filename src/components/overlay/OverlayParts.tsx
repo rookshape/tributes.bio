@@ -322,8 +322,10 @@ function Screen({
         animation: wave ? "slot-wave 2.6s linear infinite" : undefined,
         // Neutral and tight rather than a soft tinted haze — a blurred, hue
         // tinted shadow reads as smudge at overlay size.
+        // The main screen is flat: a soft inset there bled inwards from the
+        // edges and read as a haze around the figure.
         boxShadow: deep
-          ? "inset 0 2px 4px rgba(0,0,0,0.20), inset 0 -1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(0,0,0,0.07)"
+          ? "inset 0 0 0 1px rgba(0,0,0,0.08)"
           : "inset 0 1px 2px rgba(0,0,0,0.26), inset 0 0 0 1px rgba(0,0,0,0.10)",
       }}
     >
@@ -502,7 +504,13 @@ export function OverlayTotal({
           <p
             className="flex items-center justify-center font-black leading-none"
             style={{
-              color: screenInk,
+              // The colour the small screens are, not the colour of the text on
+              // them — so the three screens share one palette. On a near-white
+              // face that needs an outline to hold its shape.
+              color: chipFace,
+              WebkitTextStrokeWidth: "2px",
+              WebkitTextStrokeColor: screenInk,
+              paintOrder: "stroke fill",
               // Sized from the glyph count: a narrower screen means a five
               // figure total would run off the end at one fixed size.
               fontSize: figureSize(amount.length),
