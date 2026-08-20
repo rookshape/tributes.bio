@@ -8,34 +8,55 @@ export function LandingPage() {
   const { appUser, user } = useAuth();
 
   return (
-    <main>
-      <section className="relative isolate">
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 top-0 -z-10 h-full"
-          style={{ background: "linear-gradient(180deg, #0091ff 0%, #1f9dff 100%)" }}
-        />
-        <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-24 text-center sm:px-6 sm:pb-20 sm:pt-28">
-          <h1 className="text-display font-semibold text-white sm:text-hero">Tributes</h1>
-          <p className="mx-auto mt-4 max-w-xl text-lead text-white/85 sm:text-xl">
+    <main
+      // One background for the page rather than one per section. Each band was
+      // setting its own — a white hero, a grey costs strip, a plain canvas
+      // between them — so the page read as a stack of separate pages with
+      // seams where they met. This runs off the app's grey-white at the very
+      // top, settles into white, and stays there until the sky takes over.
+      style={{
+        backgroundImage:
+          "linear-gradient(180deg, rgb(var(--canvas)) 0px, #ffffff 340px)",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      <section className="relative isolate overflow-hidden pb-16 pt-24 text-center sm:pb-20 sm:pt-28">
+        <div className="relative left-1/2 w-max -translate-x-1/2 pb-3">
+          <h1
+            className="whitespace-nowrap text-[32.7vw] leading-[1.05]"
+            style={{
+              background: "linear-gradient(180deg, #82aefc 12%, #82aefc 48%, #ffffff 96%)",
+              backgroundClip: "text",
+              color: "transparent",
+              fontFamily: '"Fira Sans Extra Condensed", sans-serif',
+              fontStyle: "italic",
+              fontWeight: 800,
+              WebkitBackgroundClip: "text",
+            }}
+          >
+            Tributes
+          </h1>
+        </div>
+        <div className="relative mx-auto mt-10 w-full max-w-3xl px-4 sm:mt-14 sm:px-6">
+          <p className="mx-auto max-w-xl text-lead text-content-muted sm:text-xl">
             Get paid in your bio, and on your stream.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             {user ? (
               <ButtonLink
                 size="lg"
                 to={appUser?.onboardingComplete ? "/dashboard" : "/onboarding"}
-                variant="primary"
+                variant="accent"
               >
                 {appUser?.onboardingComplete ? "Open dashboard" : "Continue setup"}
               </ButtonLink>
             ) : (
               <>
-                <ButtonLink size="lg" to="/signup" variant="primary">
+                <ButtonLink size="lg" to="/signup" variant="accent">
                   Create your page
                 </ButtonLink>
                 <Link
-                  className="inline-flex min-h-12 items-center rounded-control px-4 text-lead font-medium text-white/85 hover:text-white"
+                  className="inline-flex min-h-12 items-center rounded-control px-4 text-lead font-medium text-content-muted hover:text-content"
                   to="/login"
                 >
                   Log in
@@ -44,11 +65,6 @@ export function LandingPage() {
             )}
           </div>
         </div>
-        <div
-          aria-hidden="true"
-          className="h-20 sm:h-28"
-          style={{ background: "linear-gradient(180deg, #1f9dff 0%, rgb(var(--canvas)) 100%)" }}
-        />
       </section>
 
       <section className="mx-auto w-full max-w-5xl px-4 sm:px-6">
@@ -84,67 +100,82 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Stated plainly on the public page rather than only at checkout: the
-          fee is payer-side, so a creator deciding whether to sign up needs to
-          know what their audience will be asked for. */}
-      <section className="border-t border-line bg-surface-sunken">
-        <div className="mx-auto w-full max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
-          <h2 className="text-headline font-semibold text-content">What it costs</h2>
-          <p className="mt-3 max-w-2xl text-lead text-content-muted">
+      {/*
+        The close: what it costs, the call to action, and the footer, all on one
+        sky. They were three stacked bands saying overlapping things — a fee
+        explanation, a "set your page up" nudge, and the legal line — and the
+        honest version of all three is that it is free, so they are one.
+
+        The image runs to the bottom of the document rather than stopping above
+        the footer, so the page ends in the sky instead of on a seam.
+      */}
+      <section
+        className="relative isolate mt-4 overflow-hidden"
+        style={{
+          // Sat at the bottom at its own aspect rather than cropped to cover,
+          // so the clouds keep their shape at any width. The sky's own top is
+          // near-white, so it meets the page's white without a line — which is
+          // why there is no colour behind it filling the gap.
+          backgroundImage: "url('/landing-sky.jpg')",
+          backgroundSize: "100% auto",
+          backgroundPosition: "bottom center",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
+        <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-20 text-center sm:px-6 sm:pt-24">
+          <h2 className="text-hero font-semibold text-content">Totally Free</h2>
+          <p className="mx-auto mt-4 max-w-xl text-lead text-content-muted">
             Free to set up, and free to keep. You receive the full amount someone
-            sends you. Tributes charges the sender a service fee on top —{" "}
-            {feePercentLabel(TIP_FEE_RATE)} on a tribute,{" "}
-            {feePercentLabel(SPIN_FEE_RATE)} on a spin — and it is shown to them
-            before they pay. Card processing and payouts are handled by Stripe.
+            sends you — the sender covers a service fee, {feePercentLabel(TIP_FEE_RATE)} on
+            a tribute and {feePercentLabel(SPIN_FEE_RATE)} on a spin, shown to
+            them before they pay.
           </p>
-        </div>
-      </section>
-
-      <section className="border-t border-line">
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-start gap-6 px-4 py-14 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-16">
-          <div>
-            <h2 className="text-title font-semibold text-content">
-              Set your page up in a few minutes.
-            </h2>
-            <p className="mt-1.5 text-body text-content-muted">
-              Payments and payouts are handled by Stripe.
-            </p>
-          </div>
-          <ButtonLink size="lg" to={user ? "/dashboard" : "/signup"} variant="accent">
-            {user ? "Open dashboard" : "Create your page"}
-          </ButtonLink>
-        </div>
-      </section>
-
-      <footer className="border-t border-line">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          {/* Names the operating company as well as the product. Tributes is
-              the trading name; lurk LLC is who the contract and the payouts are
-              actually with, and a card statement or a processor review should
-              be able to connect the two without asking. */}
-          <p className="text-detail text-content-muted">
-            Tributes is a product of lurk LLC. © {new Date().getFullYear()} lurk
-            LLC. All rights reserved.
-          </p>
-          <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-detail">
-            <Link className="text-content-muted hover:text-content" to="/terms">
-              Terms
-            </Link>
-            <Link className="text-content-muted hover:text-content" to="/privacy">
-              Privacy
-            </Link>
-            <Link className="text-content-muted hover:text-content" to="/refunds">
-              Refunds
-            </Link>
-            <a
-              className="text-content-muted hover:text-content"
-              href="mailto:support@tributes.bio"
+          <div className="mt-9 flex justify-center">
+            {/* The primary variant is already a white face with an accent
+                label, so this is that button rather than a hand-rolled copy
+                of it that would drift the next time the accent moves. */}
+            <ButtonLink
+              className="rounded-full px-8 shadow-[0_10px_30px_rgba(15,23,32,0.12)]"
+              size="lg"
+              to={user ? "/dashboard" : "/signup"}
+              variant="primary"
             >
-              Support
-            </a>
-          </nav>
+              {user ? "Open dashboard" : "Get Started"}
+            </ButtonLink>
+          </div>
         </div>
-      </footer>
+
+        {/* Inside the sky, not below it. */}
+        <footer className="relative mx-auto w-full max-w-5xl px-4 pb-8 pt-24 sm:px-6 sm:pt-32">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            {/* Names the operating company as well as the product. Tributes is
+                the trading name; lurk LLC is who the contract and the payouts
+                are actually with, and a card statement or a processor review
+                should be able to connect the two without asking. */}
+            <p className="text-detail text-content-muted">
+              Tributes is a product of lurk LLC. © {new Date().getFullYear()} lurk
+              LLC. All rights reserved.
+            </p>
+            <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-detail">
+              <Link className="text-content-muted hover:text-content" to="/terms">
+                Terms
+              </Link>
+              <Link className="text-content-muted hover:text-content" to="/privacy">
+                Privacy
+              </Link>
+              <Link className="text-content-muted hover:text-content" to="/refunds">
+                Refunds
+              </Link>
+              <a
+                className="text-content-muted hover:text-content"
+                href="mailto:support@tributes.bio"
+              >
+                Support
+              </a>
+            </nav>
+          </div>
+        </footer>
+      </section>
     </main>
   );
 }
