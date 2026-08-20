@@ -126,8 +126,15 @@ const WHEEL_WORDMARK_MS = 3500;
 const PLATE = {
   /** Just over half the wheel: wide enough to read, and the arc still closes. */
   width: 53,
-  /** How far it hangs below the frame. */
-  drop: 13,
+  /**
+   * How far it hangs below the frame, in its own flat coordinates.
+   *
+   * Much deeper than what ends up on show. The plate is tipped away from the
+   * viewer, so its height foreshortens — at the last set of numbers 39 flat
+   * pixels of drop rendered as 19, and the screen inside it started above the
+   * wheel's edge and emerged from underneath rather than sitting below it.
+   */
+  drop: 22,
   /** How far it runs up behind the wheel. Must clear the arc's climb, which at
       this width is about 8 — the rest is margin. */
   tuck: 9.5,
@@ -141,11 +148,14 @@ const PLATE = {
    */
   sideBorder: 3.2,
   bottomBorder: 3.4,
-  /** Gap between the wheel's edge and the top of the lit screen. */
-  screenGap: 1.2,
+  /**
+   * Gap between the wheel's edge and the top of the lit screen — again flat,
+   * so it has to be generous to survive the foreshortening.
+   */
+  screenGap: 4.5,
   fontSize: 4,
   /** Scaled with the plate, or a taller plate would taper into a wedge. */
-  tip: { perspective: "5.76cqw", degrees: 6 },
+  tip: { perspective: "8cqw", degrees: 6 },
 };
 
 /** A share of the wheel's width. */
@@ -262,12 +272,14 @@ export function OverlayWheel({
               // changes, so what is on show is the same screen the counter and
               // the queue carry, down to the border either side of it.
               shape={{
-                left: PLATE.sideBorder,
-                right: PLATE.sideBorder,
-                // Tighter top and bottom than the border elsewhere, because
-                // what should grow here is the lit part rather than the plate.
-                top: PLATE.tuck + 2,
-                bottom: 10,
+                // Shares of the wheel, like every other measurement on the
+                // plate. Left as bare numbers these became pixels — a three
+                // pixel border on a plate that scales — which is what had the
+                // screen filling it edge to edge.
+                left: cqw(PLATE.sideBorder),
+                right: cqw(PLATE.sideBorder),
+                top: cqw(PLATE.tuck + PLATE.screenGap),
+                bottom: cqw(PLATE.bottomBorder),
                 // Rounder at the top than at the bottom. The white above the
                 // screen is bounded by the wheel's arc, which climbs away from
                 // a straight edge towards the plate's ends — curving the screen

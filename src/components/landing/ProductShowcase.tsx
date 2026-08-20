@@ -107,16 +107,38 @@ const SHOWCASE_QUEUE = [
   { id: "q3", viewerName: "harrowmoth", amountCents: 1200, wheelName: null, status: "queued" },
 ] as never;
 
+/**
+ * A phone, at a phone's proportions.
+ *
+ * The page is laid out at the size it is actually read at and then scaled down
+ * to fit the column, rather than rendered narrow. Rendering it narrow does not
+ * give a smaller phone — it gives a page reflowed into a column no phone has,
+ * with the text wrapping differently and the whole card coming out far taller
+ * than it is wide.
+ */
+const PHONE = { width: 430, height: 968 };
+const CARD_WIDTH = 320;
+const CARD_SCALE = CARD_WIDTH / PHONE.width;
+
 export function BioShowcase() {
   return (
     <div
       aria-label="A creator page with links and a form for sending a tribute"
-      className="mx-auto w-full max-w-[320px] overflow-hidden rounded-[34px] bg-white shadow-[0_20px_50px_rgba(15,23,32,0.16)] ring-1 ring-line"
+      className="mx-auto overflow-hidden rounded-[26px] bg-white shadow-[0_20px_50px_rgba(15,23,32,0.16)] ring-1 ring-line"
       role="img"
+      style={{ width: CARD_WIDTH, height: PHONE.height * CARD_SCALE }}
     >
       {/* Inert: nothing here should be clickable, and the form must not try to
           start a checkout for a creator this page invented. */}
-      <div className="pointer-events-none select-none">
+      <div
+        className="pointer-events-none select-none"
+        style={{
+          width: PHONE.width,
+          height: PHONE.height,
+          transform: `scale(${CARD_SCALE})`,
+          transformOrigin: "top left",
+        }}
+      >
         <BioPageView
           links={SHOWCASE_LINKS}
           preview
