@@ -111,9 +111,9 @@ const WHEEL_WORDMARK_MS = 3500;
  * no amount of reshaping it fixed that.
  */
 const PLATE = {
-  width: 200,
+  width: 190,
   /** How far it hangs below the wheel's frame. */
-  drop: 56,
+  drop: 50,
   /**
    * Border either side of the screen, and below it.
    *
@@ -124,8 +124,8 @@ const PLATE = {
    * the numbers rather than the rendered widths put an eight-pixel border below
    * a twelve-pixel one and called them the same.
    */
-  sideBorder: 15,
-  bottomBorder: 22,
+  sideBorder: 9,
+  bottomBorder: 13,
   /**
    * How far it runs up behind the wheel.
    *
@@ -140,7 +140,7 @@ const PLATE = {
    * element's height, and this tab is buried-part-plus-visible-part tall. At
    * the standard 13 it closed into a wedge.
    */
-  tip: { perspective: 26, degrees: 6 },
+  tip: { perspective: 24, degrees: 6 },
 };
 
 export function OverlayWheel({
@@ -214,7 +214,7 @@ export function OverlayWheel({
         className="pointer-events-none absolute inset-x-0 top-0 aspect-square"
         style={{ filter: "drop-shadow(0 6px 16px rgba(15,23,32,0.16))" }}
       >
-        <div className="absolute inset-[2%] rounded-full bg-white" />
+        <div className="absolute inset-[3.2%] rounded-full bg-white" />
         <div
           className="absolute"
           style={{
@@ -224,7 +224,7 @@ export function OverlayWheel({
             // arc has climbed level with its corners, and that climb grows as
             // the wheel gets smaller — so this clears the smallest the wheel is
             // ever drawn at rather than the size it happens to be here.
-            top: "98%",
+            top: "96.8%",
             marginTop: -PLATE.tuck,
             left: "50%",
             marginLeft: -PLATE.width / 2,
@@ -253,11 +253,15 @@ export function OverlayWheel({
                 right: PLATE.sideBorder,
                 top: PLATE.tuck + TUCK,
                 bottom: PLATE.bottomBorder,
-                borderRadius: 7,
+                // Rounder at the top than at the bottom. The white above the
+                // screen is bounded by the wheel's arc, which climbs away from
+                // a straight edge towards the plate's ends — curving the screen
+                // to meet it keeps that band closer to even.
+                borderRadius: "14px 14px 7px 7px",
               }}
             >
               <span
-                className="w-full truncate text-center text-[0.95rem] font-black uppercase leading-none tracking-[0.02em]"
+                className="w-full truncate text-center text-[1rem] font-black uppercase leading-none tracking-[0.02em]"
                 // Keyed on the wording so a change remounts the span and
                 // replays the slide rather than swapping the text in place.
                 key={plate}

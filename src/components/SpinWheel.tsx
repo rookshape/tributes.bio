@@ -212,7 +212,7 @@ export function SpinWheel({
           and disappear: two translucent whites laid over each other compound
           into a lighter patch, which draws a seam of its own. */}
       {frame ? (
-        <div className="absolute inset-[2%] rounded-full bg-white shadow-[0_6px_18px_rgba(15,23,32,0.12)]" />
+        <div className="absolute inset-[3.2%] rounded-full bg-white shadow-[0_6px_18px_rgba(15,23,32,0.12)]" />
       ) : null}
       {/* Sized in percentages rather than pixels so the tip reaches the same
           way into the slice at any wheel size. The wheel starts 5% in, so 11%
