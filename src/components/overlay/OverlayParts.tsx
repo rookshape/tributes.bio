@@ -125,7 +125,7 @@ const WHEEL_WORDMARK_MS = 3500;
  */
 const PLATE = {
   /** Just over half the wheel: wide enough to read, and the arc still closes. */
-  width: 53,
+  width: 56,
   /**
    * How far it hangs below the frame, in its own flat coordinates.
    *
@@ -134,10 +134,10 @@ const PLATE = {
    * pixels of drop rendered as 19, and the screen inside it started above the
    * wheel's edge and emerged from underneath rather than sitting below it.
    */
-  drop: 17.5,
+  drop: 20,
   /** How far it runs up behind the wheel. Must clear the arc's climb, which at
       this width is about 8 — the rest is margin. */
-  tuck: 9.5,
+  tuck: 10.5,
   /**
    * Border around the lit screen.
    *
@@ -153,9 +153,9 @@ const PLATE = {
    * so it has to be generous to survive the foreshortening.
    */
   screenGap: 3,
-  fontSize: 4.9,
+  fontSize: 4.2,
   /** Scaled with the plate, or a taller plate would taper into a wedge. */
-  tip: { perspective: "6.9cqw", degrees: 6 },
+  tip: { perspective: "7.8cqw", degrees: 6 },
 };
 
 /** A share of the wheel's width. */
@@ -266,7 +266,7 @@ export function OverlayWheel({
             width={0}
           >
             <Screen
-              className="absolute grid place-items-center px-3"
+              className="absolute grid place-items-center px-2"
               face={chipFace}
               // The buried part is added to the top inset and nothing else
               // changes, so what is on show is the same screen the counter and
