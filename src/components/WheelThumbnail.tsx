@@ -1,4 +1,4 @@
-import { labelFontSize, radialLabel } from "../lib/wheelLabels";
+import { LABEL_BASELINE_SHIFT, labelFontSize, radialLabel } from "../lib/wheelLabels";
 import { labelColorForSlice, tintFromSlice } from "../lib/wheelPalette";
 import type { SpinSlice } from "../lib/types";
 import { WheelSliceGlow } from "./WheelSliceGlow";
@@ -63,7 +63,7 @@ export function WheelThumbnail({
                 fill={slice.color}
               />
               <text
-                dominantBaseline="middle"
+                dy={LABEL_BASELINE_SHIFT}
                 fill={labelColorForSlice(slice.color)}
                 fontSize={labelSize}
                 fontWeight="700"

@@ -105,7 +105,7 @@ export function centredSliceLabel(
     return {
       x: center + upright * Math.cos(radians),
       y: center + upright * Math.sin(radians),
-      transform: undefined,
+      rotation: null,
     };
   }
 
@@ -120,6 +120,18 @@ export function centredSliceLabel(
   return {
     x,
     y,
-    transform: `rotate(${flipped ? angleDeg + 180 : angleDeg} ${x} ${y})`,
+    rotation: flipped ? angleDeg + 180 : angleDeg,
   };
 }
+
+/**
+ * Vertical centring that every browser actually does.
+ *
+ * `dominant-baseline: middle` is the obvious way to centre a line of SVG text
+ * on its point, and Safari has never supported it reliably — it put the
+ * baseline on the point instead, so the glyphs sat above it. On a rotated
+ * label "above the baseline" points across the slice rather than up the page,
+ * which is what threw every label sideways over its own wedge boundary. A `dy`
+ * in ems is understood everywhere and does the same job.
+ */
+export const LABEL_BASELINE_SHIFT = "0.35em";

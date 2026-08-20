@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { MAX_WHEEL_SLICES } from "../lib/spin";
-import { labelFontSize, radialLabel } from "../lib/wheelLabels";
+import { LABEL_BASELINE_SHIFT, labelFontSize, radialLabel } from "../lib/wheelLabels";
 import type { SpinSlice } from "../lib/types";
 import { LABEL_OUTLINE, labelColorForSlice, tintFromSlice } from "../lib/wheelPalette";
 import { WheelSliceGlow } from "./WheelSliceGlow";
@@ -131,7 +131,7 @@ export function EditableSpinWheel({
               ) : null}
               <text
                 className="pointer-events-none select-none font-bold"
-                dominantBaseline="middle"
+                dy={LABEL_BASELINE_SHIFT}
                 fill={labelColorForSlice(slice.color)}
                 paintOrder="stroke"
                 stroke={LABEL_OUTLINE}

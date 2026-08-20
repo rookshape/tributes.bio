@@ -7,7 +7,11 @@ import {
   tintFromSlice,
   wheelRimInk,
 } from "../lib/wheelPalette";
-import { centredSliceLabel, labelFontSize } from "../lib/wheelLabels";
+import {
+  LABEL_BASELINE_SHIFT,
+  centredSliceLabel,
+  labelFontSize,
+} from "../lib/wheelLabels";
 import { WheelSliceGlow } from "./WheelSliceGlow";
 
 export type SpinAnimation = {
@@ -185,16 +189,16 @@ export function SpinWheel({
           labelWidths.current[index],
         );
 
-        label.setAttribute("x", String(placement.x));
-        label.setAttribute("y", String(placement.y));
-
-        // Upright labels have no rotation at all, and a stale transform would
-        // otherwise survive a change in slice count.
-        if (placement.transform) {
-          label.setAttribute("transform", placement.transform);
-        } else {
-          label.removeAttribute("transform");
-        }
+        // Position and rotation in one attribute rather than x/y plus a
+        // rotation about that same point. Two attributes that have to agree,
+        // rewritten every frame, is a way for a browser to read one of them a
+        // frame late; a single transform cannot be half-applied.
+        label.setAttribute(
+          "transform",
+          placement.rotation === null
+            ? `translate(${placement.x} ${placement.y})`
+            : `translate(${placement.x} ${placement.y}) rotate(${placement.rotation})`,
+        );
       });
 
       frame = window.requestAnimationFrame(followRotation);
@@ -322,7 +326,7 @@ export function SpinWheel({
       >
         {slices.map((slice, index) => (
           <text
-            dominantBaseline="middle"
+            dy={LABEL_BASELINE_SHIFT}
             fill={labelColorForSlice(slice.color)}
             fontSize={labelSize}
             fontWeight="700"
