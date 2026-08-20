@@ -360,8 +360,16 @@ export function OverlayTotal({
   // Mid-animation the state already holds the new tab, so the figure holds the
   // value from before this spin and climbs only once the wheel settles.
   const tabCents = spinning ? (state?.tabBeforeCents ?? 0) : (state?.tabCents ?? 0);
-  const spinsLeft = state?.spinsLeft ?? 0;
-  const multiplier = spinning ? 0 : (state?.multiplier ?? 0);
+  // While the wheel turns, everything shows as it stood before this spin, so a
+  // bonus or a multiplier is never announced ahead of the result landing.
+  const spinsLeft = spinning
+    ? (state?.spinsLeftBefore ?? 0)
+    : (state?.spinsLeft ?? 0);
+  // The armed multiplier, not the one that just landed: it stays lit until a
+  // cash result spends it, which is the whole reason a viewer cares about it.
+  const multiplier = spinning
+    ? (state?.pendingMultiplierBefore ?? 1)
+    : (state?.pendingMultiplier ?? 1);
 
   const countedCents = useCountUp(tabCents);
 
@@ -400,13 +408,17 @@ export function OverlayTotal({
   // not flicker on its way past the ceiling.
   const ceiling = state.tabMaxCents ?? 0;
   const maxedOut = !spinning && ceiling > 0 && (state.tabCents ?? 0) >= ceiling;
-  const label = spinning
-    ? "Spinning"
-    : spinsLeft > 0
-      ? `${spinsLeft} ${spinsLeft === 1 ? "spin" : "spins"} left`
-      : showWordmark
-        ? "tributes.bio"
-        : "Round over";
+  // Never "Spinning": the count is the one thing a streamer reads off this
+  // screen mid-round, and replacing it with a status is what made them hold it
+  // up on their fingers in the first place.
+  const label =
+    spinsLeft > 1
+      ? `${spinsLeft} spins left`
+      : spinsLeft === 1
+        ? "Last spin"
+        : showWordmark
+          ? "tributes.bio"
+          : "Round over";
 
   return (
     <div

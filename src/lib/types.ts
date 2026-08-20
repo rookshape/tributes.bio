@@ -118,6 +118,8 @@ export type SpinConfig = {
   /** Hue and tone the two alternating slice shades are derived from. */
   wheelHue: number;
   wheelTone: number;
+  /** Soft animated halo on the lighter alternating slices. */
+  wheelGlow: boolean;
   slices: SpinSlice[];
 };
 
@@ -213,6 +215,14 @@ export type SpinState = {
   spinsLeft: number;
   spinsAwarded: number;
   multiplier: number;
+  /**
+   * A multiplier that has landed but not yet been spent, and the values as they
+   * stood before this spin — the overlay shows those while the wheel turns, so
+   * a bonus or a multiplier is not announced before it lands.
+   */
+  pendingMultiplier: number;
+  pendingMultiplierBefore: number;
+  spinsLeftBefore: number;
   startedAtMs: number;
   durationMs: number;
   lockedUntilMs: number;

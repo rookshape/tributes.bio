@@ -15,6 +15,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "./firebase";
 import {
   DEFAULT_WHEEL_APPEARANCE,
+  normalizeWheelGlow,
   normalizeWheelHue,
   normalizeWheelTone,
   sliceColor,
@@ -133,6 +134,7 @@ export function createDefaultSpinConfig(creatorId: string): SpinConfig {
     mockModeEnabled: true,
     wheelHue: DEFAULT_WHEEL_APPEARANCE.hue,
     wheelTone: DEFAULT_WHEEL_APPEARANCE.tone,
+    wheelGlow: DEFAULT_WHEEL_APPEARANCE.glow !== false,
     slices: defaultSpinSlices.map((slice) => ({ ...slice })),
   };
 }
@@ -202,6 +204,7 @@ export function validateSpinConfig(config: SpinConfig) {
 
   const wheelHue = normalizeWheelHue(config.wheelHue);
   const wheelTone = normalizeWheelTone(config.wheelTone);
+  const wheelGlow = normalizeWheelGlow(config.wheelGlow);
   const slices = config.slices.map((slice, index) =>
     normalizeSlice(slice, index, { hue: wheelHue, tone: wheelTone }, config.slices.length),
   );
@@ -235,6 +238,7 @@ export function validateSpinConfig(config: SpinConfig) {
     spinsPerPurchase: normalizeSpinsPerPurchase(config.spinsPerPurchase),
     wheelHue,
     wheelTone,
+    wheelGlow,
     slices,
   };
 }
@@ -292,6 +296,7 @@ function mapSpinConfig(
   const defaults = createDefaultSpinConfig(creatorId);
   const wheelHue = normalizeWheelHue(data.wheelHue);
   const wheelTone = normalizeWheelTone(data.wheelTone);
+  const wheelGlow = normalizeWheelGlow(data.wheelGlow);
   const storedSlices = Array.isArray(data.slices) ? data.slices : null;
   const slices = storedSlices
     ? storedSlices.map((slice, index) =>
@@ -335,6 +340,7 @@ function mapSpinConfig(
     mockModeEnabled: data.mockModeEnabled !== false,
     wheelHue,
     wheelTone,
+    wheelGlow,
     slices,
   };
 }
@@ -367,6 +373,9 @@ function mapSpinState(creatorId: string, data: DocumentData | undefined): SpinSt
     spinsLeft: Number(data?.spinsLeft ?? 0),
     spinsAwarded: Number(data?.spinsAwarded ?? 0),
     multiplier: Number(data?.multiplier ?? 0),
+    pendingMultiplier: Number(data?.pendingMultiplier ?? 1),
+    pendingMultiplierBefore: Number(data?.pendingMultiplierBefore ?? 1),
+    spinsLeftBefore: Number(data?.spinsLeftBefore ?? data?.spinsLeft ?? 0),
     startedAtMs: Number(data?.startedAtMs ?? 0),
     durationMs: Number(data?.durationMs ?? 0),
     lockedUntilMs: Number(data?.lockedUntilMs ?? 0),

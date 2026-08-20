@@ -320,6 +320,11 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
   /** What the tab read before this spin, so the overlay holds the old number
    *  through the animation and ticks up only when the result lands. */
   let selectedTabBeforeCents = 0;
+  /** The same for the spins remaining and the armed multiplier: writing the
+   *  post-spin values straight out would announce a bonus or a multiplier
+   *  before the wheel had finished turning. */
+  let selectedSpinsBefore = 0;
+  let selectedPendingBefore = 1;
   /** The run's winnings, which is what the overlay shows — not the charge. */
   let selectedTabCents = 0;
   let selectedTabCapCents = 0;
@@ -452,6 +457,8 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
     selectedResultType = slice.type;
     selectedWheelId = entryWheelId;
     selectedTabBeforeCents = tabBeforeCents;
+    selectedSpinsBefore = Math.max(1, spinsBefore);
+    selectedPendingBefore = Math.max(1, Number(entry.pendingMultiplier ?? 1));
     selectedTabCents = step.tabCents;
     selectedTabCapCents = tabCapCents;
     selectedSpinsAwarded = step.spinsAwarded;
@@ -513,8 +520,12 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           tabMaxCents: tabCapCents,
           tabOpen: true,
           spinsLeft: step.spinsLeft,
+          spinsLeftBefore: Math.max(1, spinsBefore),
           spinsAwarded: step.spinsAwarded,
           multiplier: step.multiplier,
+          // Armed and waiting for a cash result to spend it on.
+          pendingMultiplier: step.pendingMultiplier,
+          pendingMultiplierBefore: Math.max(1, Number(entry.pendingMultiplier ?? 1)),
           startedAtMs: now,
           durationMs,
           lockedUntilMs: now + durationMs,
@@ -615,8 +626,11 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
         tabMaxCents: tabCapCents,
         tabOpen: false,
         spinsLeft: step.spinsLeft,
+        spinsLeftBefore: Math.max(1, spinsBefore),
         spinsAwarded: step.spinsAwarded,
         multiplier: step.multiplier,
+        pendingMultiplier: step.pendingMultiplier,
+        pendingMultiplierBefore: Math.max(1, Number(entry.pendingMultiplier ?? 1)),
         startedAtMs: now,
         durationMs,
         lockedUntilMs: now + durationMs,
@@ -714,8 +728,12 @@ export const triggerSpin = onCall({ secrets: [stripeSecret] }, async (request) =
           tabMaxCents: selectedTabCapCents,
           tabOpen: false,
           spinsLeft: 0,
+          spinsLeftBefore: selectedSpinsBefore,
           spinsAwarded: selectedSpinsAwarded,
           multiplier: selectedMultiplier,
+          // The run is over, so nothing stays armed.
+          pendingMultiplier: 1,
+          pendingMultiplierBefore: selectedPendingBefore,
           startedAtMs: animationStartedAt,
           durationMs,
           lockedUntilMs: animationStartedAt + durationMs,
