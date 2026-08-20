@@ -12,6 +12,8 @@ import { OnboardingPage } from "./pages/OnboardingPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
 import { PublicProfilePage } from "./pages/PublicProfilePage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
+import { RefundsPage } from "./pages/RefundsPage";
 import { TermsPage } from "./pages/TermsPage";
 
 const AdminPage = lazy(() =>
@@ -75,6 +77,8 @@ function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route index element={<LandingPage />} />
           <Route element={<TermsPage />} path="terms" />
+          <Route element={<PrivacyPage />} path="privacy" />
+          <Route element={<RefundsPage />} path="refunds" />
           <Route element={<AuthPage mode="login" />} path="login" />
           <Route element={<AuthPage mode="signup" />} path="signup" />
           <Route element={<OnboardingPage />} path="onboarding" />

@@ -1,16 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ButtonLink } from "../components/ui";
-
-/** Stands in for a product shot until the real previews are finalised. */
-function PreviewPlaceholder() {
-  return (
-    <div
-      aria-hidden="true"
-      className="aspect-[16/10] w-full rounded-panel border border-line bg-surface-sunken"
-    />
-  );
-}
+import { SPIN_FEE_RATE, TIP_FEE_RATE, feePercentLabel } from "../lib/money";
 
 export function LandingPage() {
   const { appUser, user } = useAuth();
@@ -59,30 +50,43 @@ export function LandingPage() {
         />
       </section>
 
+      {/* No product shots yet, so the sections carry their own weight rather
+          than framing an empty box where a screenshot will eventually go — a
+          placeholder reads as unfinished, and this page is what a payment
+          processor reviews to decide what we sell. */}
       <section className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-        <div className="grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:gap-14">
-          <div className="min-w-0 lg:order-1">
+        <div className="grid gap-10 py-14 sm:py-20 lg:grid-cols-2 lg:gap-16">
+          <div className="min-w-0">
             <h2 className="text-headline font-semibold text-content">In your bio</h2>
-            <p className="mt-3 max-w-md text-lead text-content-muted">
-              One page for your links, and your tributes.
+            <p className="mt-3 text-lead text-content-muted">
+              One page for your links and your tributes. Share a single address,
+              and let people support you from the same place they find you.
             </p>
           </div>
-          <div className="min-w-0 lg:order-2">
-            <PreviewPlaceholder />
+          <div className="min-w-0">
+            <h2 className="text-headline font-semibold text-content">On your stream</h2>
+            <p className="mt-3 text-lead text-content-muted">
+              Turn sending into a live game. A viewer pays to spin your wheel, you
+              spin it on stream, and they send whatever it lands on — with the
+              most they could pay agreed before they start.
+            </p>
           </div>
         </div>
+      </section>
 
-        <div className="grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:gap-14">
-          <div className="min-w-0 lg:order-2">
-            <h2 className="text-headline font-semibold text-content">On your stream</h2>
-            <p className="mt-3 max-w-md text-lead text-content-muted">
-              Turn sending into a fun live game with your viewers. Viewers pay to spin the
-              wheel, then they send whatever it lands on.
-            </p>
-          </div>
-          <div className="min-w-0 lg:order-1">
-            <PreviewPlaceholder />
-          </div>
+      {/* Stated plainly on the public page rather than only at checkout: the
+          fee is payer-side, so a creator deciding whether to sign up needs to
+          know what their audience will be asked for. */}
+      <section className="border-t border-line bg-surface-sunken">
+        <div className="mx-auto w-full max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
+          <h2 className="text-headline font-semibold text-content">What it costs</h2>
+          <p className="mt-3 max-w-2xl text-lead text-content-muted">
+            Free to set up, and free to keep. You receive the full amount someone
+            sends you. Tributes charges the sender a service fee on top —{" "}
+            {feePercentLabel(TIP_FEE_RATE)} on a tribute,{" "}
+            {feePercentLabel(SPIN_FEE_RATE)} on a spin — and it is shown to them
+            before they pay. Card processing and payouts are handled by Stripe.
+          </p>
         </div>
       </section>
 
@@ -104,15 +108,23 @@ export function LandingPage() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          {/* Names the operating company as well as the product. Tributes is
+              the trading name; lurk LLC is who the contract and the payouts are
+              actually with, and a card statement or a processor review should
+              be able to connect the two without asking. */}
           <p className="text-detail text-content-muted">
-            © {new Date().getFullYear()} lurk LLC. All rights reserved.
+            Tributes is a product of lurk LLC. © {new Date().getFullYear()} lurk
+            LLC. All rights reserved.
           </p>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-detail">
-            <Link className="text-content-muted hover:text-content" to="/signup">
-              Create account
+            <Link className="text-content-muted hover:text-content" to="/terms">
+              Terms
             </Link>
-            <Link className="text-content-muted hover:text-content" to="/login">
-              Log in
+            <Link className="text-content-muted hover:text-content" to="/privacy">
+              Privacy
+            </Link>
+            <Link className="text-content-muted hover:text-content" to="/refunds">
+              Refunds
             </Link>
             <a
               className="text-content-muted hover:text-content"
