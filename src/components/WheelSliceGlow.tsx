@@ -17,6 +17,7 @@ type WheelSliceGlowProps = {
   radius: number;
   /** Optional ref on the rotating group — SpinWheel drives this each frame. */
   rotateRef?: RefObject<SVGGElement | null>;
+  /** Unique per instance: two wheels in one document would share gradient ids. */
   filterId: string;
   className?: string;
 };
@@ -43,16 +44,18 @@ function wedgePath(center: number, startAngle: number, endAngle: number, radius:
 }
 
 /**
- * A slow lift on the lighter alternating slices.
+ * A slow lift on the lighter alternating slices — the whole wedge breathes.
  *
- * It lightens the wedge rather than haloing it: the pale colour is laid over
- * the slice and its opacity breathes, so at peak the slice simply reads a shade
- * brighter. An outward halo was the first attempt and it spilled past the rim
- * as a row of soft blobs sitting on the white — the wheel is a hard-edged disc,
- * so anything escaping its edge reads as a mistake rather than as light.
+ * Two earlier versions got this wrong in the same way. Both blurred the wedge,
+ * which softens *edges* and leaves the interior untouched, and both used a glow
+ * colour no lighter than the slice beneath. The result was a slice that never
+ * changed and a pair of bright seams where the blur crept onto the darker
+ * neighbours either side — light in exactly the places it should not have been.
  *
- * Everything is clipped to the wheel face for that reason, and the blur is only
- * wide enough to keep the wedge edges from looking like a second set of slices.
+ * So: no blur. Each lit wedge is painted edge to edge, clipped to nothing but
+ * its own shape, and only its opacity animates. The wash is a radial gradient
+ * because a flat fill reads as a paint chip; carrying more of it at the rim
+ * than at the hub is how a lamp behind the wheel would actually fall.
  */
 export function WheelSliceGlow({
   slices,
@@ -70,7 +73,7 @@ export function WheelSliceGlow({
   const appearance = { hue: wheelHue, tone: wheelTone };
   const glow = wheelSliceGlow(appearance);
   const sliceAngle = 360 / slices.length;
-  const clipId = `${filterId}-clip`;
+  const gradientId = `${filterId}-wash`;
 
   return (
     <svg
@@ -79,34 +82,33 @@ export function WheelSliceGlow({
       viewBox={`0 0 ${center * 2} ${center * 2}`}
     >
       <defs>
-        <clipPath id={clipId}>
-          <circle cx={center} cy={center} r={radius} />
-        </clipPath>
-        <filter filterUnits="userSpaceOnUse" height={center * 2} id={filterId} width={center * 2} x="0" y="0">
-          <feGaussianBlur stdDeviation="1.6" />
-        </filter>
+        <radialGradient
+          cx={center}
+          cy={center}
+          gradientUnits="userSpaceOnUse"
+          id={gradientId}
+          r={radius}
+        >
+          <stop offset="0%" stopColor={glow} stopOpacity="0.35" />
+          <stop offset="55%" stopColor={glow} stopOpacity="0.8" />
+          <stop offset="100%" stopColor={glow} stopOpacity="1" />
+        </radialGradient>
       </defs>
-      <g clipPath={`url(#${clipId})`}>
-        <g ref={rotateRef} style={{ transformOrigin: "center" }}>
-          {slices.map((slice, index) => {
-            if (!isLightSlice(appearance, index, slices.length)) return null;
+      <g ref={rotateRef} style={{ transformOrigin: "center" }}>
+        {slices.map((slice, index) => {
+          if (!isLightSlice(appearance, index, slices.length)) return null;
 
-            const startAngle = index * sliceAngle;
+          const startAngle = index * sliceAngle;
 
-            return (
-              <path
-                className="animate-wheel-glow"
-                // Drawn a shade past the face and clipped back to it, so the
-                // blur has something to eat into at the rim instead of fading
-                // the wedge out before it gets there.
-                d={wedgePath(center, startAngle, startAngle + sliceAngle, radius * 1.06)}
-                fill={glow}
-                filter={`url(#${filterId})`}
-                key={slice.id}
-              />
-            );
-          })}
-        </g>
+          return (
+            <path
+              className="animate-wheel-glow"
+              d={wedgePath(center, startAngle, startAngle + sliceAngle, radius)}
+              fill={`url(#${gradientId})`}
+              key={slice.id}
+            />
+          );
+        })}
       </g>
     </svg>
   );

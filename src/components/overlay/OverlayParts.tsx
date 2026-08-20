@@ -582,10 +582,10 @@ export function OverlayGoalBar({
 
   return (
     <div
-      // Deeper at the bottom on purpose: the marker overhangs the track by ten
-      // pixels and throws a glow past that, so equal padding would leave it
-      // grazing the pill's edge.
-      className="w-full max-w-[600px] rounded-full border-2 px-7 pb-4 pt-2.5 backdrop-blur-md"
+      // Deeper at the bottom on purpose: the marker overhangs the track by
+      // nine pixels and throws a glow past that, so equal padding would leave
+      // it grazing the pill's edge.
+      className="w-full max-w-[600px] rounded-full border-2 px-5 pb-2.5 pt-2 backdrop-blur-md"
       style={{ ...overlaySurface(appearance, 0.88), color: ink }}
     >
       <div className="flex items-baseline justify-between gap-4">
@@ -606,7 +606,7 @@ export function OverlayGoalBar({
           marker riding its tip rather than ending on a flat edge. */}
       {/* The marker overhangs the track, so the row carries its own room. */}
       <div
-        className="relative mt-2.5 h-4 rounded-full"
+        className="relative mt-2 h-3.5 rounded-full"
         style={{ backgroundColor: `${ink}1f` }}
       >
         <div
@@ -631,7 +631,7 @@ export function OverlayGoalBar({
         {shape !== "none" && progress > 0 ? (
           <svg
             aria-hidden="true"
-            className="absolute top-1/2 h-9 w-9 transition-[left] duration-slow ease-standard"
+            className="absolute top-1/2 h-8 w-8 transition-[left] duration-slow ease-standard"
             // The translate lives in the transform rather than in a class so
             // the pulse keyframe can carry it too.
             key={`marker-${pulseKey}`}
@@ -669,7 +669,7 @@ export function OverlayGoalBar({
 
       {/* Sits under the track rather than beside the label: the marker
           overhangs the fill, so the row above it has no spare width. */}
-      <p className="mt-2.5 text-right text-[0.6rem] font-semibold leading-none tracking-[0.12em] opacity-35">
+      <p className="mt-1.5 text-right text-[0.6rem] font-semibold leading-none tracking-[0.12em] opacity-35">
         tributes.bio
       </p>
     </div>

@@ -61,11 +61,16 @@ export function normalizeWheelGlow(value: unknown) {
  * The two alternating shades. Saturation stays inside a pastel band so no
  * tone setting produces a harsh wheel.
  */
+/** Lightness of the lighter of the two alternating slices. */
+function lightSliceLightness(tone: number) {
+  return lerp(0.93, 0.52, tone / 100);
+}
+
 export function wheelTones(appearance: WheelAppearance): [string, string] {
   const hue = normalizeWheelHue(appearance.hue);
   const tone = normalizeWheelTone(appearance.tone);
   const chroma = lerp(0.075, 0.058, tone / 100);
-  const lightA = lerp(0.93, 0.52, tone / 100);
+  const lightA = lightSliceLightness(tone);
   const lightB = clamp(lightA - 0.07, 0.1, 1);
 
   return [oklchToHex(lightA, chroma, hue), oklchToHex(lightB, chroma, hue)];
@@ -102,11 +107,40 @@ export function isLightSlice(appearance: WheelAppearance, index: number, total: 
  * Halo colour for the lighter slices — a touch brighter than the slice itself
  * so the glow reads as light behind the wedge rather than as a second fill.
  */
+/**
+ * The colour the lit slices are washed with.
+ *
+ * It has to be measurably lighter than the slice underneath or the glow does
+ * nothing where it is meant to. The first version derived its own lightness
+ * curve and landed within 0.005 of the light slice's, so the wash was invisible
+ * on the slice and the only place it showed was where the blur crept onto the
+ * dark neighbours — reading as a glowing seam between slices rather than a lit
+ * slice. Deriving it from the slice's own lightness keeps the lift guaranteed.
+ */
 export function wheelSliceGlow(appearance: WheelAppearance) {
   const hue = normalizeWheelHue(appearance.hue);
   const tone = normalizeWheelTone(appearance.tone);
-  const lightness = lerp(0.9, 0.66, tone / 100);
-  const chroma = lerp(0.1, 0.075, tone / 100);
+  const lightness = Math.min(0.97, lightSliceLightness(tone) + 0.11);
+  const chroma = lerp(0.075, 0.06, tone / 100);
+
+  return oklchToHex(
+    lightness,
+    Math.min(maxChroma(lightness, hue), chroma),
+    hue,
+  );
+}
+
+/**
+ * Lettering set into the white rim.
+ *
+ * Kept pale and low-contrast so it reads as part of the bezel rather than as a
+ * caption printed on top of it.
+ */
+export function wheelRimInk(appearance: WheelAppearance) {
+  const hue = normalizeWheelHue(appearance.hue);
+  const tone = normalizeWheelTone(appearance.tone);
+  const lightness = clamp(lightSliceLightness(tone) - 0.05, 0.55, 0.9);
+  const chroma = lerp(0.055, 0.045, tone / 100);
 
   return oklchToHex(
     lightness,

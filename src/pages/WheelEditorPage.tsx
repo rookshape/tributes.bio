@@ -16,7 +16,9 @@ import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../lib/money";
 import {
   MAX_MAX_CHARGE_CENTS,
+  MAX_SLICE_BONUS_SPINS,
   MAX_SPINS_PER_PURCHASE,
+  MAX_WHEEL_SLICES,
   MIN_SPINS_PER_PURCHASE,
   maxChargeFloorCents,
   spinSessionIsLive,
@@ -152,12 +154,13 @@ export function WheelEditorPage() {
     type: "action",
     value: 0,
     action: "",
+    bonusSpins: 0,
     color: "",
   });
 
   const addSlices = () => {
-    if (wheel.slices.length + 2 > 12) {
-      setError("A wheel can hold at most 12 slices.");
+    if (wheel.slices.length + 2 > MAX_WHEEL_SLICES) {
+      setError(`A wheel can hold at most ${MAX_WHEEL_SLICES} slices.`);
       return;
     }
 
@@ -462,6 +465,33 @@ export function WheelEditorPage() {
                   value={sliceInputValue(selected)}
                 />
               )}
+
+              {/* "$50 + spin" is one wedge on the wheel, not two, so cash and
+                  action slices can hand out a spin alongside their own result.
+                  Bonus slices already deal in spins and a multiplier refunds
+                  the spin it cost, so neither offers it. */}
+              {selected.type === "amount" || selected.type === "action" ? (
+                <Input
+                  hint="Landing here also awards this many extra spins."
+                  label="Extra spins"
+                  max={String(MAX_SLICE_BONUS_SPINS)}
+                  min="0"
+                  onChange={(event) =>
+                    changeSlice(selected.id, {
+                      bonusSpins: Math.max(
+                        0,
+                        Math.min(
+                          MAX_SLICE_BONUS_SPINS,
+                          Math.round(Number(event.target.value)) || 0,
+                        ),
+                      ),
+                    })
+                  }
+                  step="1"
+                  type="number"
+                  value={selected.bonusSpins ?? 0}
+                />
+              ) : null}
             </div>
 
             <p className="mt-4 text-caption text-content-subtle">

@@ -51,6 +51,17 @@ export const DEFAULT_MAX_CHARGE_MULTIPLE = 5;
 export const MIN_SPINS_PER_PURCHASE = 1;
 export const MAX_SPINS_PER_PURCHASE = 10;
 
+/** Mirrors MAX_SLICE_BONUS_SPINS in functions/src/spin-tab.ts. */
+export const MAX_SLICE_BONUS_SPINS = 5;
+
+/**
+ * Slice count bounds. Streamers running this format keep twelve to sixteen
+ * wedges on the wheel — enough that a spin feels like a lottery rather than a
+ * coin flip — so twelve is the starting point and sixteen the ceiling.
+ */
+export const MIN_WHEEL_SLICES = 4;
+export const MAX_WHEEL_SLICES = 16;
+
 export function normalizeSpinsPerPurchase(value: unknown) {
   const spins = Math.round(Number(value));
 
@@ -96,13 +107,25 @@ export function normalizeMaxChargeCents(config: {
   );
 }
 
+/**
+ * Twelve wedges, laid out the way the format is actually played: mostly cash,
+ * with the escalators — multipliers, bonus spins, the cash-and-a-spin combo —
+ * scattered so no two land beside each other. A six-slice wheel reads as a coin
+ * flip; this is the density that makes a spin feel like a draw.
+ */
 const defaultSlicesWithoutColor: Omit<SpinSlice, "color">[] = [
   { id: "five", label: "$5", type: "amount", value: 500, action: "" },
-  { id: "double", label: "2x", type: "multiplier", value: 2, action: "" },
-  { id: "bonus", label: "+1", type: "bonus", value: 1, action: "" },
-  { id: "twenty", label: "$20", type: "amount", value: 2000, action: "" },
-  { id: "prompt", label: "Chat", type: "action", value: 0, action: "Chat chooses" },
+  { id: "double", label: "2x next", type: "multiplier", value: 2, action: "" },
   { id: "ten", label: "$10", type: "amount", value: 1000, action: "" },
+  { id: "five-spin", label: "$5 + spin", type: "amount", value: 500, action: "", bonusSpins: 1 },
+  { id: "twenty", label: "$20", type: "amount", value: 2000, action: "" },
+  { id: "bonus-two", label: "+2 spins", type: "bonus", value: 2, action: "" },
+  { id: "ten-again", label: "$10", type: "amount", value: 1000, action: "" },
+  { id: "prompt", label: "Chat", type: "action", value: 0, action: "Chat chooses" },
+  { id: "fifteen", label: "$15", type: "amount", value: 1500, action: "" },
+  { id: "triple", label: "3x next", type: "multiplier", value: 3, action: "" },
+  { id: "twentyfive", label: "$25", type: "amount", value: 2500, action: "" },
+  { id: "fifty", label: "$50", type: "amount", value: 5000, action: "" },
 ];
 
 export const defaultSpinSlices: SpinSlice[] = defaultSlicesWithoutColor.map(
@@ -143,6 +166,14 @@ export function createDefaultSpinConfig(creatorId: string): SpinConfig {
  * Slice colors are always recomputed from the wheel's hue and tone, never read
  * back from storage, so a wheel can only ever use the two alternating shades.
  */
+export function normalizeSliceBonusSpins(value: unknown) {
+  const requested = Number(value ?? 0);
+
+  return Number.isFinite(requested)
+    ? Math.min(MAX_SLICE_BONUS_SPINS, Math.max(0, Math.round(requested)))
+    : 0;
+}
+
 function normalizeSlice(
   slice: Omit<SpinSlice, "color"> & { color?: string },
   index: number,
@@ -159,6 +190,7 @@ function normalizeSlice(
     type,
     value: Number.isFinite(slice.value) ? Math.max(0, Math.round(slice.value)) : 0,
     action: slice.action.trim().slice(0, 80),
+    bonusSpins: normalizeSliceBonusSpins(slice.bonusSpins),
     color: sliceColor(appearance, index, total),
   };
 }
@@ -192,8 +224,13 @@ export function validateSpinConfig(config: SpinConfig) {
     throw new Error("Max charge must be between $1 and $5,000.");
   }
 
-  if (config.slices.length < 4 || config.slices.length > 12) {
-    throw new Error("Use between 4 and 12 wheel slices.");
+  if (
+    config.slices.length < MIN_WHEEL_SLICES ||
+    config.slices.length > MAX_WHEEL_SLICES
+  ) {
+    throw new Error(
+      `Use between ${MIN_WHEEL_SLICES} and ${MAX_WHEEL_SLICES} wheel slices.`,
+    );
   }
 
   // Only two shades alternate, so an odd count would put two identical slices

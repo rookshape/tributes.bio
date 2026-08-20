@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import {
+  MAX_WHEEL_SLICES,
   createDefaultSpinConfig,
   defaultSpinSlices,
   mapSpinConfig,
@@ -199,7 +200,11 @@ export function generateAmountSlices(
 ): Omit<SpinSlice, "color">[] {
   const slices: Omit<SpinSlice, "color">[] = [];
 
-  for (let value = startCents; value <= endCents && slices.length < 12; value += stepCents) {
+  for (
+    let value = startCents;
+    value <= endCents && slices.length < MAX_WHEEL_SLICES;
+    value += stepCents
+  ) {
     slices.push({
       id: crypto.randomUUID(),
       label: `$${Math.round(value / 100)}`,
@@ -244,43 +249,97 @@ const amount = (label: string, value: number) => ({
   action: "",
 });
 
+/** Cash and a free spin off one slice — the "$5 + spin" wedge. */
+const amountPlusSpin = (label: string, value: number, bonusSpins = 1) => ({
+  ...amount(label, value),
+  bonusSpins,
+});
+
+const multiplier = (label: string, value: number) => ({
+  id: crypto.randomUUID(),
+  label,
+  type: "multiplier" as const,
+  value,
+  action: "",
+});
+
+const bonus = (label: string, value: number) => ({
+  id: crypto.randomUUID(),
+  label,
+  type: "bonus" as const,
+  value,
+  action: "",
+});
+
+const act = (label: string, action: string) => ({
+  id: crypto.randomUUID(),
+  label,
+  type: "action" as const,
+  value: 0,
+  action,
+});
+
 export const WHEEL_TEMPLATES: WheelTemplate[] = [
-  template("amounts", "Simple amounts", "Six fixed tips, low to high.", [
+  template("amounts", "Simple amounts", "Twelve fixed tips, low to high.", [
     amount("$5", 500),
+    amount("$8", 800),
     amount("$10", 1000),
+    amount("$12", 1200),
     amount("$15", 1500),
+    amount("$18", 1800),
     amount("$20", 2000),
     amount("$25", 2500),
+    amount("$30", 3000),
+    amount("$35", 3500),
+    amount("$40", 4000),
     amount("$50", 5000),
   ]),
   template(
     "multipliers",
     "Amounts and multipliers",
-    "Fixed tips mixed with multipliers of the spin price.",
+    "Fixed tips with multipliers that arm the next cash result.",
     [
       amount("$5", 500),
-      { id: crypto.randomUUID(), label: "2x", type: "multiplier", value: 2, action: "" },
+      multiplier("2x next", 2),
+      amount("$10", 1000),
       amount("$15", 1500),
-      { id: crypto.randomUUID(), label: "3x", type: "multiplier", value: 3, action: "" },
+      multiplier("3x next", 3),
+      amount("$20", 2000),
+      amount("$8", 800),
+      multiplier("2x next", 2),
       amount("$25", 2500),
-      { id: crypto.randomUUID(), label: "5x", type: "multiplier", value: 5, action: "" },
+      amount("$12", 1200),
+      multiplier("5x next", 5),
+      amount("$30", 3000),
     ],
   ),
   template("bonus", "Bonus spins", "Amounts with free extra spins mixed in.", [
     amount("$5", 500),
-    { id: crypto.randomUUID(), label: "+1 spin", type: "bonus", value: 1, action: "" },
+    bonus("+1 spin", 1),
     amount("$10", 1000),
-    { id: crypto.randomUUID(), label: "+2 spins", type: "bonus", value: 2, action: "" },
+    amountPlusSpin("$5 + spin", 500),
+    amount("$15", 1500),
+    bonus("+2 spins", 2),
+    amount("$8", 800),
+    amountPlusSpin("$10 + spin", 1000),
     amount("$20", 2000),
+    bonus("+1 spin", 1),
+    amount("$25", 2500),
     amount("$30", 3000),
   ]),
   template("choice", "Viewer choice", "Actions your chat picks, priced the same.", [
-    { id: crypto.randomUUID(), label: "Chat picks", type: "action", value: 0, action: "Chat chooses" },
+    act("Chat picks", "Chat chooses"),
     amount("$10", 1000),
-    { id: crypto.randomUUID(), label: "Next game", type: "action", value: 0, action: "Viewer picks the next game" },
+    act("Next game", "Viewer picks the next game"),
     amount("$20", 2000),
-    { id: crypto.randomUUID(), label: "Shoutout", type: "action", value: 0, action: "Shoutout on stream" },
+    act("Shoutout", "Shoutout on stream"),
     amount("$15", 1500),
+    act("Dealer's choice", "Streamer picks the forfeit"),
+    amount("$5", 500),
+    act("Rename me", "Viewer picks a nickname for the stream"),
+    amount("$25", 2500),
+    amountPlusSpin("$5 + spin", 500),
+    amount("$30", 3000),
   ]),
   template("blank", "Blank wheel", "Four empty slices to fill in yourself.", [
     amount("$5", 500),

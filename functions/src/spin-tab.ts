@@ -28,10 +28,14 @@
 export type TabSlice = {
   type?: unknown;
   value?: unknown;
+  bonusSpins?: unknown;
 };
 
 /** Backstop against a wheel whose slices only ever hand out more spins. */
 export const MAX_RUN_SPINS = 30;
+
+/** Ceiling on the spins a single slice may add alongside its own result. */
+export const MAX_SLICE_BONUS_SPINS = 5;
 
 export const MIN_MAX_CHARGE_CENTS = 100;
 export const MAX_MAX_CHARGE_CENTS = 500000;
@@ -150,6 +154,16 @@ export function applyTabStep(
     spinsLeft += spinsAwarded;
   }
   // An action slice costs nothing extra and just uses up a spin.
+
+  // Any slice can also hand out spins on top of its own result — "$50 + spin"
+  // is one slice, not two, and reads on the wheel as a single prize.
+  const extra = Number(slice?.bonusSpins ?? 0);
+  const extraSpins = Number.isFinite(extra)
+    ? Math.min(MAX_SLICE_BONUS_SPINS, Math.max(0, Math.round(extra)))
+    : 0;
+
+  spinsLeft += extraSpins;
+  spinsAwarded += extraSpins;
 
   const clamped = Math.max(0, Math.min(tabCapCents, Math.round(tabCents)));
 

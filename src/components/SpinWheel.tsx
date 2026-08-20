@@ -5,7 +5,7 @@ import {
   LABEL_OUTLINE,
   labelColorForSlice,
   tintFromSlice,
-  wheelInk,
+  wheelRimInk,
 } from "../lib/wheelPalette";
 import { WheelSliceGlow } from "./WheelSliceGlow";
 
@@ -33,7 +33,14 @@ type SpinWheelProps = {
 
 /** Label placement inside the 100-unit overlay viewBox. */
 const LABEL_CENTER = 50;
-const LABEL_RADIUS = 33;
+/**
+ * Labels are hung off the rim and run inward, so this is where each one *ends*
+ * rather than where it is centred. A label centred at mid-radius grows in both
+ * directions and a long one ("$5 + spin") pushes its outer half over the rim;
+ * anchored at the rim it can only ever grow towards the hub, where there is
+ * room.
+ */
+const LABEL_RADIUS = 41;
 
 export function SpinWheel({
   slices,
@@ -148,16 +155,28 @@ export function SpinWheel({
 
       labelRefs.current.forEach((label, index) => {
         if (!label) return;
+
         const angle = rotation + (index + 0.5) * sliceAngle - 90;
         const radians = (angle * Math.PI) / 180;
+        const x = LABEL_CENTER + LABEL_RADIUS * Math.cos(radians);
+        const y = LABEL_CENTER + LABEL_RADIUS * Math.sin(radians);
+
+        // Down the slice rather than across it. Upright labels only ever fitted
+        // because six slices left an eighth of the face each; at twelve they
+        // collide, and the arc a label has to fit across shrinks as slices are
+        // added while the spoke it can run down does not.
+        const wrapped = ((angle % 360) + 360) % 360;
+        // Past the vertical the text would be running right to left, so it gets
+        // turned around and anchored from the other end to stay in place.
+        const flipped = wrapped > 90 && wrapped < 270;
+
+        label.setAttribute("x", String(x));
+        label.setAttribute("y", String(y));
         label.setAttribute(
-          "x",
-          String(LABEL_CENTER + LABEL_RADIUS * Math.cos(radians)),
+          "transform",
+          `rotate(${flipped ? angle + 180 : angle} ${x} ${y})`,
         );
-        label.setAttribute(
-          "y",
-          String(LABEL_CENTER + LABEL_RADIUS * Math.sin(radians)),
-        );
+        label.setAttribute("text-anchor", flipped ? "start" : "end");
       });
 
       frame = window.requestAnimationFrame(followRotation);
@@ -181,9 +200,12 @@ export function SpinWheel({
   }, [animation]);
 
   const tint = slices[0] ? tintFromSlice(slices[0].color) : "#ffffff";
-  // Reads against the white rim, so it takes the wheel's dark ink rather than
-  // a shade of the slice — a pale slice colour vanishes on white.
-  const rimInk = wheelInk({ hue: wheelHue, tone: wheelTone });
+  // What limits the type is the width of the slice where the label sits, and
+  // that narrows as slices are added.
+  const labelSize = slices.length > 12 ? 5 : slices.length > 8 ? 5.6 : 6.5;
+  // Pale on purpose. Set into the bezel rather than printed on it, so it stays
+  // a shade of the wheel's own hue and never competes with the slice labels.
+  const rimInk = wheelRimInk({ hue: wheelHue, tone: wheelTone });
 
   return (
     <div className="relative aspect-square w-full" aria-label="Spin wheel">
@@ -232,7 +254,7 @@ export function SpinWheel({
               fontWeight="700"
               key={arc.href}
               letterSpacing="0.5"
-              opacity="0.55"
+              opacity="0.85"
             >
               <textPath href={`#${arc.href}`} startOffset="50%" textAnchor="middle">
                 {arc.text}
@@ -265,17 +287,16 @@ export function SpinWheel({
           <text
             dominantBaseline="middle"
             fill={labelColorForSlice(slice.color)}
-            fontSize="6.5"
+            fontSize={labelSize}
             fontWeight="700"
             paintOrder="stroke"
             stroke={LABEL_OUTLINE}
             strokeLinejoin="round"
-            strokeWidth="1"
+            strokeWidth="0.9"
             key={slice.id}
             ref={(element) => {
               labelRefs.current[index] = element;
             }}
-            textAnchor="middle"
           >
             {slice.label}
           </text>

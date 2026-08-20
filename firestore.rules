@@ -134,7 +134,7 @@ service cloud.firestore {
             && request.resource.data.goalCents <= 10000000))
         && request.resource.data.slices is list
         && request.resource.data.slices.size() >= 2
-        && request.resource.data.slices.size() <= 12;
+        && request.resource.data.slices.size() <= 16;
     }
 
     function publicSpinAvailable(creatorId) {

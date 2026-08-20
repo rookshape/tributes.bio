@@ -87,6 +87,14 @@ export type SpinSlice = {
   value: number;
   action: string;
   color: string;
+  /**
+   * Spins this slice hands out on top of whatever its type does.
+   *
+   * "$50 + spin" is a staple of the format and is a cash result *and* a bonus
+   * spin at once, so it cannot be expressed as a type. Optional: wheels saved
+   * before it existed simply have none.
+   */
+  bonusSpins?: number;
 };
 
 export type SpinConfig = {
