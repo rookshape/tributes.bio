@@ -12,6 +12,7 @@ import {
   overlayAccent,
   overlayInk,
   overlayGlow,
+  overlayChipInk,
   overlayDisplayFace,
   overlayScreen,
   overlayScreenInk,
@@ -186,7 +187,7 @@ function useCountUp(target: number, durationMs = COUNT_UP_MS) {
 /** Uniform border left around every screen. */
 const BORDER = 10;
 /** Visible height of an extension above or below the body. */
-const BUMP = 38;
+const BUMP = 42;
 /** How far an extension runs on under the body, hiding its flared base. */
 const TUCK = 4;
 /**
@@ -206,7 +207,7 @@ const TIP = { perspective: 13, degrees: 6 };
  */
 const FREE_EDGE_INSET = 12;
 /** Both extensions carry the same screen, so they are the same size. */
-const EXTENSION_WIDTH = 134;
+const EXTENSION_WIDTH = 148;
 
 /**
  * The cabinet is one silhouette, not a body with things stuck to it.
@@ -290,21 +291,16 @@ function Cabinet({
 function Screen({
   children,
   className = "",
-  charging = false,
   deep = false,
   face,
-  ink,
   shape,
   wave,
 }: {
   children?: ReactNode;
   className?: string;
-  /** Breathes while a spin is resolving. */
-  charging?: boolean;
-  face: string;
-  ink: string;
   /** Sunk further, for the one screen that has to read as glass. */
   deep?: boolean;
+  face: string;
   /** Taper matching the extension this screen sits in. */
   shape?: CSSProperties;
   /** Runs a glow across the face instead of showing content. */
@@ -323,21 +319,13 @@ function Screen({
         // restarts mid-sweep and the glow visibly jumps.
         backgroundSize: wave ? "200% 100%" : undefined,
         animation: wave ? "slot-wave 2.6s linear infinite" : undefined,
+        // Neutral and tight rather than a soft tinted haze — a blurred, hue
+        // tinted shadow reads as smudge at overlay size.
         boxShadow: deep
-          ? `inset 0 4px 10px ${ink}3d, inset 0 -1px 0 #ffffffcc, inset 0 0 0 1px ${ink}2b`
-          : `inset 0 1px 3px ${ink}59, inset 0 0 0 1px ${ink}26`,
+          ? "inset 0 2px 4px rgba(0,0,0,0.20), inset 0 -1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(0,0,0,0.07)"
+          : "inset 0 1px 2px rgba(0,0,0,0.26), inset 0 0 0 1px rgba(0,0,0,0.10)",
       }}
     >
-      {charging ? (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            boxShadow: `inset 0 0 12px ${ink}66`,
-            animation: "screen-charge 1s ease-in-out infinite",
-          }}
-        />
-      ) : null}
       {children}
     </div>
   );
@@ -362,7 +350,9 @@ export function OverlayTotal({
 }) {
   const ink = overlayInk(appearance);
   const accent = overlayAccent(appearance);
-  const face = overlayScreen(appearance);
+  // The small screens keep the face they had; only the lettering changed.
+  const chipFace = overlayScreen(appearance);
+  const chipInk = overlayChipInk(appearance);
   const displayFace = overlayDisplayFace(appearance);
   const screenInk = overlayScreenInk(appearance);
   const surface = overlaySurfaceSolid(appearance);
@@ -429,12 +419,10 @@ export function OverlayTotal({
       <Cabinet
         bottomScreen={
           <Screen
-            charging={spinning}
             // Inset by the same border on every side, so it is this extension's
             // own shape scaled down rather than a second shape laid on top.
             className="absolute grid place-items-center"
-            face={face}
-            ink={screenInk}
+            face={chipFace}
             // Stops a full border short of the body rather than running under
             // it, so the whole screen is visible instead of half of one.
             shape={{
@@ -453,7 +441,7 @@ export function OverlayTotal({
               // the slide, rather than swapping the text in place.
               key={label}
               style={{
-                color: screenInk,
+                color: chipInk,
                 animation: "label-slide 420ms var(--ease-standard)",
               }}
             >
@@ -464,10 +452,8 @@ export function OverlayTotal({
         fillColor={surface}
         topScreen={
           <Screen
-            charging={spinning && armed}
             className="absolute grid place-items-center"
-            face={face}
-            ink={screenInk}
+            face={chipFace}
             shape={{
               inset: BORDER,
               top: FREE_EDGE_INSET,
@@ -481,7 +467,7 @@ export function OverlayTotal({
             {armed ? (
               <span
                 className="text-sm font-black leading-none"
-                style={{ color: screenInk }}
+                style={{ color: chipInk }}
               >
                 {`${multiplier}×`}
               </span>
@@ -496,7 +482,6 @@ export function OverlayTotal({
           className="relative rounded-[16px] px-2 py-3.5"
           deep
           face={displayFace}
-          ink={screenInk}
         >
           <p
             className="flex items-center justify-center font-black leading-none"

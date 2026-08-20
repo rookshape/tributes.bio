@@ -203,6 +203,15 @@ export function overlayScreen(appearance: OverlayAppearance) {
 }
 
 /**
+ * Lettering on the small screens: lighter than the face it sits on, so it
+ * reads as etched into the panel rather than printed on it.
+ */
+export function overlayChipInk(appearance: OverlayAppearance) {
+  const hue = normalizeOverlayHue(appearance.hue);
+  return oklchToHex(0.98, Math.min(maxChroma(0.98, hue), 0.02), hue);
+}
+
+/**
  * The main display's face: white with only a whisper of hue in it.
  *
  * The figure is the one thing on the overlay that has to be read instantly, so
@@ -221,10 +230,10 @@ export function overlayDisplayFace(appearance: OverlayAppearance) {
  */
 export function overlayScreenInk(appearance: OverlayAppearance) {
   const hue = normalizeOverlayHue(appearance.hue);
-  const lightness = 0.4;
+  const lightness = 0.5;
   return oklchToHex(
     lightness,
-    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.2 : 0.13),
+    Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.25 : 0.17),
     hue,
   );
 }

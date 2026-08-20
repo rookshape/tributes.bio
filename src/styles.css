@@ -400,17 +400,6 @@ select:focus-visible,
   }
 }
 
-/* The small screens breathe while a spin is resolving. */
-@keyframes screen-charge {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
 /* An empty multiplier slot runs a glow across itself, so the screen reads as
    powered and waiting rather than as switched off. The travel is exactly one
    tile of the background, so the loop closes on itself with no jump. */
