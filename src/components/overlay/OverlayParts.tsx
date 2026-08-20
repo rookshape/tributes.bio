@@ -184,11 +184,27 @@ function useCountUp(target: number, durationMs = COUNT_UP_MS) {
 }
 
 /** Uniform border left around every screen. */
-const BORDER = 12;
+const BORDER = 10;
 /** Visible height of an extension above or below the body. */
-const BUMP = 42;
+const BUMP = 38;
 /** How far an extension runs on under the body, hiding its flared base. */
-const TUCK = 10;
+const TUCK = 4;
+/**
+ * The tip that turns each extension into a trapezoid.
+ *
+ * A shallow perspective is what makes the taper survive on a short element: the
+ * screens are only about eighteen pixels tall, and a gentle angle across that
+ * little height leaves them rendering as plain rectangles.
+ */
+const TIP = { perspective: 13, degrees: 6 };
+/**
+ * Inset on an extension's free edge.
+ *
+ * Larger than the border everywhere else on purpose: that edge is the one
+ * tipped away from the viewer, so the same inset foreshortens to about six
+ * pixels where the sides still read as nine.
+ */
+const FREE_EDGE_INSET = 12;
 /** Both extensions carry the same screen, so they are the same size. */
 const EXTENSION_WIDTH = 134;
 
@@ -236,8 +252,8 @@ function Cabinet({
           width: EXTENSION_WIDTH,
           left: "50%",
           marginLeft: -EXTENSION_WIDTH / 2,
-          borderRadius: "15px 15px 0 0",
-          transform: "perspective(30px) rotateX(3deg)",
+          borderRadius: "14px 14px 0 0",
+          transform: `perspective(${TIP.perspective}px) rotateX(${TIP.degrees}deg)`,
           transformOrigin: "bottom",
         }}
       >
@@ -251,8 +267,8 @@ function Cabinet({
           width: EXTENSION_WIDTH,
           left: "50%",
           marginLeft: -EXTENSION_WIDTH / 2,
-          borderRadius: "0 0 15px 15px",
-          transform: "perspective(30px) rotateX(-3deg)",
+          borderRadius: "0 0 14px 14px",
+          transform: `perspective(${TIP.perspective}px) rotateX(${-TIP.degrees}deg)`,
           transformOrigin: "top",
         }}
       >
@@ -423,8 +439,12 @@ export function OverlayTotal({
             // it, so the whole screen is visible instead of half of one.
             shape={{
               inset: BORDER,
-              top: TUCK + BORDER,
-              borderRadius: 8,
+              // Level with the body's edge. Insetting a border here too would
+              // stack against the body's own padding and read as a double-thick
+              // band between this screen and the figure.
+              top: TUCK,
+              bottom: FREE_EDGE_INSET,
+              borderRadius: 7,
             }}
           >
             <span
@@ -450,8 +470,9 @@ export function OverlayTotal({
             ink={screenInk}
             shape={{
               inset: BORDER,
-              bottom: TUCK + BORDER,
-              borderRadius: 8,
+              top: FREE_EDGE_INSET,
+              bottom: TUCK,
+              borderRadius: 7,
             }}
             // Nothing armed: the slot runs a glow across itself rather than
             // showing a placeholder figure, so it reads as waiting.
@@ -470,7 +491,7 @@ export function OverlayTotal({
       />
 
       {/* The figure. */}
-      <div className="relative px-[12px]">
+      <div className="relative" style={{ paddingLeft: BORDER, paddingRight: BORDER }}>
         <Screen
           className="relative rounded-[16px] px-2 py-3.5"
           deep
