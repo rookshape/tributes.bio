@@ -7,6 +7,7 @@ import {
   tintFromSlice,
   wheelInk,
 } from "../lib/wheelPalette";
+import { WheelSliceGlow } from "./WheelSliceGlow";
 
 export type SpinAnimation = {
   id: string;
@@ -22,6 +23,8 @@ type SpinWheelProps = {
   /** Hue and tone the rim lettering takes its colour from. */
   wheelHue?: number;
   wheelTone?: number;
+  /** Soft animated halo on the lighter alternating slices. */
+  wheelGlow?: boolean;
   animation?: SpinAnimation | null;
   onRest?: () => void;
   /** Fires as each slice boundary passes the pointer, for the tick sound. */
@@ -38,6 +41,7 @@ export function SpinWheel({
   name,
   wheelHue = 210,
   wheelTone = 20,
+  wheelGlow = true,
   onRest,
   onTick,
 }: SpinWheelProps) {
@@ -50,6 +54,8 @@ export function SpinWheel({
   const onTickRef = useRef(onTick);
   const labelRefs = useRef<(SVGTextElement | null)[]>([]);
   const pointerRef = useRef<HTMLDivElement>(null);
+  const glowRotateRef = useRef<SVGGElement>(null);
+  const glowFilterId = useId().replace(/:/g, "");
 
   onRestRef.current = onRest;
   onTickRef.current = onTick;
@@ -136,6 +142,10 @@ export function SpinWheel({
       previousIntoSlice = intoSlice;
       previousRotation = rotation;
 
+      if (glowRotateRef.current) {
+        glowRotateRef.current.style.transform = `rotate(${rotation}deg)`;
+      }
+
       labelRefs.current.forEach((label, index) => {
         if (!label) return;
         const angle = rotation + (index + 0.5) * sliceAngle - 90;
@@ -191,11 +201,17 @@ export function SpinWheel({
           transformOrigin: "50% 0",
         }}
       />
-      {/* The wheel's own name stamped into the rim on the left and right.
-          The pointer owns the top of the rim, so arcs centred there would run
-          underneath it; on the sides both copies stay clear of it and of each
-          other. Each arc sweeps outward-facing, so the right reads top to
-          bottom and the left bottom to top, the way a stamped rim reads. */}
+      {/* The wheel's name on one side of the rim and the wordmark on the
+          other. The pointer owns the top, so arcs centred there would run
+          underneath it; on the sides both stay clear of it and of each other,
+          and each sweeps outward-facing — the right reading top to bottom and
+          the left bottom to top, the way a stamped rim reads.
+
+          Radius 43.9 centres the lettering in the white band rather than
+          sitting it on the inner edge: the band runs from the wheel face at
+          42.3 out to the glass at 48, and glyphs stand off their baseline, so
+          the baseline has to sit below the middle for the letters to land on
+          it. */}
       {name ? (
         <svg
           aria-hidden="true"
@@ -203,28 +219,43 @@ export function SpinWheel({
           viewBox="0 0 100 100"
         >
           <defs>
-            {/* Radius 43 puts the baseline just off the slices, so the glyphs
-                sit in the white rim rather than over the colour. */}
-            <path d="M 50,7 A 43,43 0 0 1 50,93" id={`${rimId}-right`} />
-            <path d="M 50,93 A 43,43 0 0 1 50,7" id={`${rimId}-left`} />
+            <path d="M 50,6.1 A 43.9,43.9 0 0 1 50,93.9" id={`${rimId}-right`} />
+            <path d="M 50,93.9 A 43.9,43.9 0 0 1 50,6.1" id={`${rimId}-left`} />
           </defs>
-          {[`${rimId}-right`, `${rimId}-left`].map((href) => (
+          {[
+            { href: `${rimId}-right`, text: name },
+            { href: `${rimId}-left`, text: "tributes.bio" },
+          ].map((arc) => (
             <text
               fill={rimInk}
               fontSize="3.5"
               fontWeight="700"
-              key={href}
+              key={arc.href}
               letterSpacing="0.5"
               opacity="0.55"
             >
-              <textPath href={`#${href}`} startOffset="50%" textAnchor="middle">
-                {name}
+              <textPath href={`#${arc.href}`} startOffset="50%" textAnchor="middle">
+                {arc.text}
               </textPath>
             </text>
           ))}
         </svg>
       ) : null}
       <div className="absolute inset-[5%]" ref={containerRef} />
+      <div className="absolute inset-[5%] z-[4]">
+        <WheelSliceGlow
+          center={50}
+          filterId={glowFilterId}
+          // The wheel library draws its face at 0.94 of the box, so anything
+          // past this is over the rim rather than over a slice.
+          radius={47 * 0.94}
+          rotateRef={glowRotateRef}
+          slices={slices}
+          wheelGlow={wheelGlow}
+          wheelHue={wheelHue}
+          wheelTone={wheelTone}
+        />
+      </div>
       <svg
         aria-hidden="true"
         className="pointer-events-none absolute inset-[5%] z-[5]"

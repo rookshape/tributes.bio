@@ -77,6 +77,7 @@ service cloud.firestore {
           'mockModeEnabled',
           'wheelHue',
           'wheelTone',
+          'wheelGlow',
           'goalCents',
           'slices',
           'updatedAt'
@@ -122,6 +123,9 @@ service cloud.firestore {
         && request.resource.data.wheelTone is int
         && request.resource.data.wheelTone >= 0
         && request.resource.data.wheelTone <= 100
+        // Slice glow. Older wheels predate it and merge through without one.
+        && (!('wheelGlow' in request.resource.data)
+          || request.resource.data.wheelGlow is bool)
         // Legacy field: the goal moved to spinSettings, so documents written
         // now omit it while older ones still carry it through a merge.
         && (!('goalCents' in request.resource.data)

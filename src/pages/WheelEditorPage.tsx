@@ -353,6 +353,9 @@ export function WheelEditorPage() {
             onSelect={setSelectedSliceId}
             selectedSliceId={selected?.id ?? ""}
             slices={wheel.slices}
+            wheelGlow={wheel.wheelGlow}
+            wheelHue={wheel.wheelHue}
+            wheelTone={wheel.wheelTone}
           />
 
           <div className="mt-8 grid gap-5 border-t border-line pt-6 sm:grid-cols-2">
@@ -388,6 +391,15 @@ export function WheelEditorPage() {
                 value={wheel.wheelTone}
               />
             </label>
+          </div>
+
+          <div className="mt-5">
+            <Toggle
+              checked={wheel.wheelGlow}
+              description="A soft animated halo on the lighter slices."
+              label="Slice glow"
+              onChange={(wheelGlow) => change({ wheelGlow })}
+            />
           </div>
 
         </div>

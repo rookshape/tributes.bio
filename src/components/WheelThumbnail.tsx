@@ -1,5 +1,7 @@
+import { useId } from "react";
 import { labelColorForSlice, tintFromSlice } from "../lib/wheelPalette";
 import type { SpinSlice } from "../lib/types";
+import { WheelSliceGlow } from "./WheelSliceGlow";
 
 const SIZE = 200;
 const CENTER = SIZE / 2;
@@ -21,13 +23,20 @@ function point(angle: number, radius: number) {
  */
 export function WheelThumbnail({
   slices,
+  wheelHue,
+  wheelTone,
+  wheelGlow = true,
   className,
 }: {
   slices: SpinSlice[];
+  wheelHue?: number;
+  wheelTone?: number;
+  wheelGlow?: boolean;
   className?: string;
 }) {
   const sliceAngle = 360 / Math.max(1, slices.length);
   const hubTint = slices[0] ? tintFromSlice(slices[0].color) : "#ffffff";
+  const glowFilterId = useId().replace(/:/g, "");
 
   return (
     <div className={`relative aspect-square ${className ?? ""}`}>
@@ -37,6 +46,15 @@ export function WheelThumbnail({
         className="relative h-full w-full"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
       >
+        <WheelSliceGlow
+          center={CENTER}
+          filterId={glowFilterId}
+          radius={RADIUS}
+          slices={slices}
+          wheelGlow={wheelGlow}
+          wheelHue={wheelHue}
+          wheelTone={wheelTone}
+        />
         {slices.map((slice, index) => {
           const start = index * sliceAngle;
           const end = start + sliceAngle;

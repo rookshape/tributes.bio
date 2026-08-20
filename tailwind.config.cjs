@@ -100,6 +100,12 @@ module.exports = {
           "0%, 100%": { opacity: "0.5" },
           "50%": { opacity: "0.95" },
         },
+        // Lifts the pale slices a shade at peak rather than pulsing hard: the
+        // wheel sits behind a result nobody should be distracted from.
+        "wheel-glow": {
+          "0%, 100%": { opacity: "0.16" },
+          "50%": { opacity: "0.5" },
+        },
       },
       animation: {
         "fade-in": "fade-in var(--duration-base) var(--ease-standard) both",
@@ -107,6 +113,7 @@ module.exports = {
         "scale-in": "scale-in var(--duration-base) var(--ease-standard) both",
         shimmer: "shimmer 1.6s linear infinite",
         "slice-pulse": "slice-pulse 3.2s var(--ease-standard) infinite",
+        "wheel-glow": "wheel-glow 6s var(--ease-standard) infinite",
       },
     },
   },

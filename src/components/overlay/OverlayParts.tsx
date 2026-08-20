@@ -585,7 +585,7 @@ export function OverlayGoalBar({
       // Deeper at the bottom on purpose: the marker overhangs the track by ten
       // pixels and throws a glow past that, so equal padding would leave it
       // grazing the pill's edge.
-      className="w-full max-w-[600px] rounded-full border-2 px-7 pb-6 pt-2.5 backdrop-blur-md"
+      className="w-full max-w-[600px] rounded-full border-2 px-7 pb-4 pt-2.5 backdrop-blur-md"
       style={{ ...overlaySurface(appearance, 0.88), color: ink }}
     >
       <div className="flex items-baseline justify-between gap-4">
@@ -616,6 +616,15 @@ export function OverlayGoalBar({
             background: appearance.goalRainbow
               ? rainbowFill(appearance.vivid)
               : accent,
+            // The gradient belongs to the track, not to the fill. Left alone it
+            // scales to whatever is filled, squeezing the whole rainbow into a
+            // half-full bar — so the colour under the marker was never the
+            // colour the marker had computed for that position.
+            backgroundSize:
+              appearance.goalRainbow && progress > 0
+                ? `${100 / progress}% 100%`
+                : undefined,
+            backgroundRepeat: "no-repeat",
             boxShadow: `0 0 12px ${accent}66`,
           }}
         />
@@ -658,6 +667,11 @@ export function OverlayGoalBar({
         ) : null}
       </div>
 
+      {/* Sits under the track rather than beside the label: the marker
+          overhangs the fill, so the row above it has no spare width. */}
+      <p className="mt-2.5 text-right text-[0.6rem] font-semibold leading-none tracking-[0.12em] opacity-35">
+        tributes.bio
+      </p>
     </div>
   );
 }

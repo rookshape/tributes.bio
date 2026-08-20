@@ -230,7 +230,12 @@ export function PublicSpinPage() {
                       onChange={() => setChosenWheelId(wheel.id)}
                       type="radio"
                     />
-                    <WheelThumbnail slices={wheel.slices} />
+                    <WheelThumbnail
+                      slices={wheel.slices}
+                      wheelGlow={wheel.wheelGlow}
+                      wheelHue={wheel.wheelHue}
+                      wheelTone={wheel.wheelTone}
+                    />
                     <span className="mt-2 block truncate text-sm font-medium text-content">
                       {wheel.name}
                     </span>

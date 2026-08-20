@@ -55,7 +55,7 @@ function WheelCard({
       role="button"
       tabIndex={0}
     >
-      <WheelThumbnail className="w-20 shrink-0" slices={wheel.slices} />
+      <WheelThumbnail className="w-20 shrink-0" slices={wheel.slices} wheelGlow={wheel.wheelGlow} wheelHue={wheel.wheelHue} wheelTone={wheel.wheelTone} />
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <span className="truncate text-body font-semibold text-content">{wheel.name}</span>

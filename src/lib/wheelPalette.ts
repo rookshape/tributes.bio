@@ -7,20 +7,26 @@
  * at overlay size without any per-slice color picking.
  */
 
-import { hexWithAlpha, oklchToHex } from "./oklch";
+import { hexWithAlpha, maxChroma, oklchToHex } from "./oklch";
 
 export type WheelAppearance = {
   /** 0–345 in 15° steps. */
   hue: number;
   /** 0 = lightest, 100 = darkest. */
   tone: number;
+  /** Soft animated halo on the lighter alternating slices. */
+  glow?: boolean;
 };
 
 export const WHEEL_HUE_STEP = 15;
 export const WHEEL_HUE_MAX = 360 - WHEEL_HUE_STEP;
 export const WHEEL_TONE_STEP = 5;
 
-export const DEFAULT_WHEEL_APPEARANCE: WheelAppearance = { hue: 210, tone: 20 };
+export const DEFAULT_WHEEL_APPEARANCE: WheelAppearance = {
+  hue: 210,
+  tone: 20,
+  glow: true,
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -44,6 +50,11 @@ export function normalizeWheelTone(value: unknown) {
       ? value
       : DEFAULT_WHEEL_APPEARANCE.tone;
   return clamp(Math.round(raw / WHEEL_TONE_STEP) * WHEEL_TONE_STEP, 0, 100);
+}
+
+/** Glow is on by default; only an explicit false turns it off. */
+export function normalizeWheelGlow(value: unknown) {
+  return value !== false;
 }
 
 /**
@@ -75,6 +86,32 @@ export function sliceColor(appearance: WheelAppearance, index: number, total: nu
 export function sliceColors(appearance: WheelAppearance, total: number) {
   return Array.from({ length: total }, (_, index) =>
     sliceColor(appearance, index, total),
+  );
+}
+
+/**
+ * Whether a slice wears the lighter of the two alternating shades. Matches
+ * sliceColor so glow lands on the pale wedges only.
+ */
+export function isLightSlice(appearance: WheelAppearance, index: number, total: number) {
+  if (total > 2 && total % 2 === 1 && index === total - 1) return false;
+  return index % 2 === 0;
+}
+
+/**
+ * Halo colour for the lighter slices — a touch brighter than the slice itself
+ * so the glow reads as light behind the wedge rather than as a second fill.
+ */
+export function wheelSliceGlow(appearance: WheelAppearance) {
+  const hue = normalizeWheelHue(appearance.hue);
+  const tone = normalizeWheelTone(appearance.tone);
+  const lightness = lerp(0.9, 0.66, tone / 100);
+  const chroma = lerp(0.1, 0.075, tone / 100);
+
+  return oklchToHex(
+    lightness,
+    Math.min(maxChroma(lightness, hue), chroma),
+    hue,
   );
 }
 
