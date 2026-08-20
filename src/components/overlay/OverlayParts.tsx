@@ -110,39 +110,40 @@ const WHEEL_WORDMARK_MS = 3500;
  * against a translucent white frame, which is two fills meeting at a line, and
  * no amount of reshaping it fixed that.
  */
+/**
+ * The name plate under the wheel, measured as a share of the wheel's width.
+ *
+ * It used to be measured in pixels, which only ever looked right at one size.
+ * A straight edge meeting a circle closes only if it reaches past the point
+ * where the arc has climbed level with its corners, and that climb depends on
+ * the plate's width *relative to the radius* — so a fixed plate on a wheel that
+ * scales is correct at exactly one width and splits open below it. At 240px the
+ * plate was nearly as wide as the wheel and its corners stood 26px clear.
+ *
+ * In `cqw` — a percent of the wheel's own width — every one of these ratios
+ * holds at any size. The wheel's root declares the container.
+ */
 const PLATE = {
-  width: 212,
-  /** How far it hangs below the wheel's frame. */
-  drop: 50,
-  /**
-   * Border either side of the screen, and below it.
-   *
-   * Bigger than the number that draws the same border elsewhere, and unequal
-   * with each other, because the plate is tipped: the perspective foreshortens
-   * an inset by how deep into the tip it sits, and it foreshortens vertically
-   * harder than horizontally. Measured against the wheel's own frame — matching
-   * the numbers rather than the rendered widths put an eight-pixel border below
-   * a twelve-pixel one and called them the same.
-   */
-  sideBorder: 8,
-  bottomBorder: 13,
-  /**
-   * How far it runs up behind the wheel.
-   *
-   * A straight edge meeting a circle only closes if it reaches past the point
-   * where the arc has climbed level with the plate's corners, and that climb
-   * grows with the plate's width — so widening it eats into the margin here. That climb grows
-   * as the wheel gets smaller, so this clears the smallest the wheel is drawn
-   * at — the editor's preview — rather than the size it happens to be here.
-   */
-  tuck: 44,
-  /**
-   * Deeper than the default: the taper a perspective produces grows with the
-   * element's height, and this tab is buried-part-plus-visible-part tall. At
-   * the standard 13 it closed into a wedge.
-   */
-  tip: { perspective: 24, degrees: 6 },
+  /** Just over half the wheel: wide enough to read, and the arc still closes. */
+  width: 53,
+  /** How far it hangs below the frame. */
+  drop: 13,
+  /** How far it runs up behind the wheel. Must clear the arc's climb, which at
+      this width is about 8 — the rest is margin. */
+  tuck: 9.5,
+  sideBorder: 2,
+  bottomBorder: 2.6,
+  /** Gap between the wheel's edge and the top of the lit screen. */
+  screenGap: 0.6,
+  fontSize: 4.2,
+  /** Scaled with the plate, or a taller plate would taper into a wedge. */
+  tip: { perspective: "5.76cqw", degrees: 6 },
 };
+
+/** A share of the wheel's width. */
+function cqw(value: number) {
+  return `${value}cqw`;
+}
 
 export function OverlayWheel({
   appearance = DEFAULT_OVERLAY_APPEARANCE,
@@ -194,8 +195,14 @@ export function OverlayWheel({
   return (
     <div
       className="relative w-full max-w-[520px]"
-      // Room for the part of the plate that hangs below the wheel.
-      style={{ paddingBottom: PLATE.drop }}
+      // Declares the container the plate's cqw units are a share of. Without
+      // it those units fall back to the viewport, which is not a subtle
+      // failure — the plate comes out several times the size of the wheel.
+      style={{
+        containerType: "inline-size",
+        // Room for the part of the plate that hangs below the wheel.
+        paddingBottom: cqw(PLATE.drop),
+      }}
     >
       {/*
         The frame and the plate, drawn as one thing.
@@ -226,19 +233,19 @@ export function OverlayWheel({
             // the wheel gets smaller — so this clears the smallest the wheel is
             // ever drawn at rather than the size it happens to be here.
             top: "96.8%",
-            marginTop: -PLATE.tuck,
+            marginTop: cqw(-PLATE.tuck),
             left: "50%",
-            marginLeft: -PLATE.width / 2,
-            width: PLATE.width,
-            height: PLATE.tuck + PLATE.drop,
+            marginLeft: cqw(-PLATE.width / 2),
+            width: cqw(PLATE.width),
+            height: cqw(PLATE.tuck + PLATE.drop),
           }}
         >
           <Tab
             edge="bottom"
             fill="#ffffff"
-            style={{ left: 0, height: "100%" }}
+            style={{ left: 0, height: "100%", width: "100%" }}
             tip={PLATE.tip}
-            width={PLATE.width}
+            width={0}
           >
             <Screen
               className="absolute grid place-items-center px-3"
@@ -261,12 +268,14 @@ export function OverlayWheel({
               }}
             >
               <span
-                className="w-full truncate text-center text-[1.1rem] font-black uppercase leading-none tracking-[0.01em]"
+                className="w-full truncate text-center font-black uppercase leading-none tracking-[0.01em]"
                 // Keyed on the wording so a change remounts the span and
                 // replays the slide rather than swapping the text in place.
                 key={plate}
                 style={{
                   color: chipInk,
+                  // Scaled with the plate, like everything else on it.
+                  fontSize: cqw(PLATE.fontSize),
                   animation: "label-slide 420ms var(--ease-standard)",
                 }}
               >
@@ -370,7 +379,7 @@ const TUCK = 4;
  * screens are only about eighteen pixels tall, and a gentle angle across that
  * little height leaves them rendering as plain rectangles.
  */
-const TIP = { perspective: 13, degrees: 6 };
+const TIP = { perspective: "13px", degrees: 6 };
 /**
  * Inset on an extension's free edge.
  *
@@ -417,7 +426,7 @@ function Tab({
    * as tall as the counter's; a taller one needs a deeper perspective to taper
    * by the same proportion rather than closing into a wedge.
    */
-  tip?: { perspective: number; degrees: number };
+  tip?: { perspective: string; degrees: number };
   width: number;
 }) {
   const up = edge === "top";
@@ -430,7 +439,7 @@ function Tab({
         height: BUMP + TUCK,
         width,
         borderRadius: up ? "14px 14px 0 0" : "0 0 14px 14px",
-        transform: `perspective(${tip.perspective}px) rotateX(${
+        transform: `perspective(${tip.perspective}) rotateX(${
           up ? tip.degrees : -tip.degrees
         }deg)`,
         transformOrigin: up ? "bottom" : "top",
