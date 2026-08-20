@@ -314,7 +314,7 @@ function Screen({
         ...shape,
         backgroundColor: face,
         backgroundImage: wave
-          ? `linear-gradient(100deg, ${face} 18%, ${wave} 50%, ${face} 82%)`
+          ? `linear-gradient(100deg, ${face} 26%, ${wave} 50%, ${face} 74%)`
           : undefined,
         // The tile must match the keyframe's travel exactly, or the loop
         // restarts mid-sweep and the glow visibly jumps.
@@ -396,6 +396,10 @@ export function OverlayTotal({
 
   const amount = formatMoney(countedCents);
   const armed = multiplier > 1;
+  // Checked against the settled figure, not the one still climbing, so it does
+  // not flicker on its way past the ceiling.
+  const ceiling = state.tabMaxCents ?? 0;
+  const maxedOut = !spinning && ceiling > 0 && (state.tabCents ?? 0) >= ceiling;
   const label = spinning
     ? "Spinning"
     : spinsLeft > 0
@@ -485,9 +489,17 @@ export function OverlayTotal({
         >
           <p
             className="flex items-center justify-center font-black leading-none"
-            // Sized from the glyph count: a narrower screen means a five figure
-            // total would run off the end at one fixed size.
-            style={{ color: screenInk, fontSize: figureSize(amount.length) }}
+            style={{
+              color: screenInk,
+              // Sized from the glyph count: a narrower screen means a five
+              // figure total would run off the end at one fixed size.
+              fontSize: figureSize(amount.length),
+              // Maxed out: the figure cannot climb any further, so it flickers
+              // rather than just sitting there as another number.
+              animation: maxedOut
+                ? "figure-flicker 2.6s linear infinite"
+                : undefined,
+            }}
           >
             {amount.split("").map((char, index) => (
               <Reel char={char} key={`${index}-${char}`} />

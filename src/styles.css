@@ -400,6 +400,29 @@ select:focus-visible,
   }
 }
 
+/* A run that has hit the wheel's ceiling: the figure cannot climb any further,
+   so it flickers like a sign at the end of its tether. */
+@keyframes figure-flicker {
+  0%,
+  7%,
+  11%,
+  19%,
+  54%,
+  59%,
+  100% {
+    opacity: 1;
+  }
+  9% {
+    opacity: 0.25;
+  }
+  15% {
+    opacity: 0.45;
+  }
+  56% {
+    opacity: 0.3;
+  }
+}
+
 /* An empty multiplier slot runs a glow across itself, so the screen reads as
    powered and waiting rather than as switched off. The travel is exactly one
    tile of the background, so the loop closes on itself with no jump. */
