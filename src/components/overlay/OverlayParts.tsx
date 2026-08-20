@@ -12,9 +12,9 @@ import {
   overlayAccent,
   overlayInk,
   overlayGlow,
+  overlayChipFace,
   overlayChipInk,
   overlayDisplayFace,
-  overlayScreen,
   overlayScreenInk,
   overlaySurface,
   overlaySurfaceSolid,
@@ -350,8 +350,7 @@ export function OverlayTotal({
 }) {
   const ink = overlayInk(appearance);
   const accent = overlayAccent(appearance);
-  // The small screens keep the face they had; only the lettering changed.
-  const chipFace = overlayScreen(appearance);
+  const chipFace = overlayChipFace(appearance);
   const chipInk = overlayChipInk(appearance);
   const displayFace = overlayDisplayFace(appearance);
   const screenInk = overlayScreenInk(appearance);
@@ -436,7 +435,7 @@ export function OverlayTotal({
             }}
           >
             <span
-              className="whitespace-nowrap text-[0.68rem] font-black uppercase tracking-[0.06em] leading-none"
+              className="whitespace-nowrap text-[0.82rem] font-black uppercase tracking-[0.05em] leading-none"
               // Keyed on the wording so a change remounts the span and replays
               // the slide, rather than swapping the text in place.
               key={label}
@@ -466,7 +465,7 @@ export function OverlayTotal({
           >
             {armed ? (
               <span
-                className="text-sm font-black leading-none"
+                className="text-base font-black leading-none"
                 style={{ color: chipInk }}
               >
                 {`${multiplier}×`}

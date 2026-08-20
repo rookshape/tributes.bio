@@ -203,6 +203,20 @@ export function overlayScreen(appearance: OverlayAppearance) {
 }
 
 /**
+ * The small screens' face.
+ *
+ * A step down from the main display's and carrying as much chroma as the hue
+ * allows, so the near-white lettering on it has something to sit against. The
+ * lightness does most of the work; leaning on saturation keeps it reading as
+ * the same colour family rather than as a darker panel.
+ */
+export function overlayChipFace(appearance: OverlayAppearance) {
+  const hue = normalizeOverlayHue(appearance.hue);
+  const lightness = 0.78;
+  return oklchToHex(lightness, maxChroma(lightness, hue) * 0.9, hue);
+}
+
+/**
  * Lettering on the small screens: lighter than the face it sits on, so it
  * reads as etched into the panel rather than printed on it.
  */
