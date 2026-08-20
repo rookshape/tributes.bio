@@ -117,18 +117,18 @@ export function TributeForm({
       ) : null}
 
       <div className="relative mt-4">
-        <span className="absolute inset-y-0 left-4 flex items-center text-base opacity-60">
+        <span className="absolute inset-y-0 left-5 flex items-center text-base opacity-60">
           $
         </span>
         <input
           aria-label="Tip amount"
-          className="field h-14 pl-8 pr-3 text-lg"
+          className="field h-14 rounded-full pl-9 pr-4 text-lg"
           id="tribute-amount"
           inputMode="decimal"
           max="500"
           min="1"
           onChange={(event) => setAmount(event.target.value)}
-          placeholder="Enter tip"
+          placeholder="Enter amount"
           step="0.01"
           type="number"
           value={amount}

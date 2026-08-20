@@ -14,6 +14,7 @@ import { getCreatorWorkspace } from "../lib/bio";
 import { DEFAULT_OVERLAY_APPEARANCE } from "../lib/overlayTheme";
 import { DEFAULT_OVERLAY_SETTINGS, subscribeOverlaySettings } from "../lib/spinGoal";
 import { getSpinConfig } from "../lib/spin";
+import { listWheels } from "../lib/wheels";
 import type { SpinOverlaySettings } from "../lib/spinGoal";
 import type { CreatorLink, CreatorProfile, SpinConfig } from "../lib/types";
 
@@ -82,12 +83,21 @@ export function PreviewPage() {
 
     void Promise.all([
       getCreatorWorkspace(creatorId),
+      listWheels(creatorId).catch(() => []),
       getSpinConfig(creatorId).catch(() => null),
-    ]).then(([workspace, config]) => {
+    ]).then(([workspace, wheels, activeCopy]) => {
       if (!active) return;
       setProfile(workspace.profile);
       setLinks(workspace.links);
-      setSpinConfig(config);
+      // The wheel the creator set as their default, taken from the library
+      // rather than from spinConfigs/current — that document is a copy written
+      // at save time, so it can be a different wheel entirely from the one they
+      // last chose.
+      setSpinConfig(
+        wheels.find((entry) => entry.isDefault && !entry.archived) ??
+          wheels.find((entry) => !entry.archived) ??
+          activeCopy,
+      );
     });
 
     const unsubscribe = subscribeOverlaySettings(creatorId, setSettings);
@@ -195,10 +205,11 @@ export function PreviewPage() {
             }}
           >
             <div className="flex flex-wrap items-center justify-center gap-10">
-              {/* The size the OBS source runs at, so the wheel is photographed
-                  at the proportions it actually has on a stream rather than
-                  squeezed into a thumbnail. */}
-              <div className="w-[420px]">
+              {/* The width the Live page gives it. The name plate is sized in
+                  pixels while the wheel scales with its container, so the two
+                  only hold their proportions at a fixed size — photograph it
+                  wider and the plate shrinks against the rim. */}
+              <div className="w-[380px]">
                 {spinConfig ? (
                   <OverlayWheel
                     animation={null}
