@@ -79,3 +79,47 @@ export function radialLabel(
     anchor: flipped ? ("start" as const) : ("end" as const),
   };
 }
+
+/**
+ * The same placement, but centred rather than anchored.
+ *
+ * `text-anchor: end` is what made a radial label grow inward from the rim, and
+ * relying on it meant relying on the browser applying an attribute set after
+ * render — which Safari did not, so every label grew outward across the rim
+ * instead. Given the text's own length there is no need to ask: the midpoint
+ * can be worked out, and a label centred on it lands in exactly the same place
+ * in every browser.
+ */
+export function centredSliceLabel(
+  center: number,
+  faceRadius: number,
+  angleDeg: number,
+  sliceCount: number,
+  textLength: number,
+) {
+  const radians = (angleDeg * Math.PI) / 180;
+
+  if (sliceCount <= UPRIGHT_MAX_SLICES) {
+    const upright = faceRadius * UPRIGHT_RADIUS_FRACTION;
+
+    return {
+      x: center + upright * Math.cos(radians),
+      y: center + upright * Math.sin(radians),
+      transform: undefined,
+    };
+  }
+
+  // Half the text in from where it would have been anchored, which is where its
+  // middle sits when it runs from the rim toward the hub.
+  const radius = faceRadius * LABEL_RADIUS_FRACTION - textLength / 2;
+  const x = center + radius * Math.cos(radians);
+  const y = center + radius * Math.sin(radians);
+  const wrapped = ((angleDeg % 360) + 360) % 360;
+  const flipped = wrapped > 90 && wrapped < 270;
+
+  return {
+    x,
+    y,
+    transform: `rotate(${flipped ? angleDeg + 180 : angleDeg} ${x} ${y})`,
+  };
+}

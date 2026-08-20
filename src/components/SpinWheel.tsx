@@ -7,7 +7,7 @@ import {
   tintFromSlice,
   wheelRimInk,
 } from "../lib/wheelPalette";
-import { labelFontSize, radialLabel } from "../lib/wheelLabels";
+import { centredSliceLabel, labelFontSize } from "../lib/wheelLabels";
 import { WheelSliceGlow } from "./WheelSliceGlow";
 
 export type SpinAnimation = {
@@ -70,6 +70,12 @@ export function SpinWheel({
   const onRestRef = useRef(onRest);
   const onTickRef = useRef(onTick);
   const labelRefs = useRef<(SVGTextElement | null)[]>([]);
+  /**
+   * Measured text lengths, kept because getComputedTextLength forces layout and
+   * this runs every frame. Cleared whenever the slices change, which is the
+   * only time the text can.
+   */
+  const labelWidths = useRef<number[]>([]);
   const pointerRef = useRef<HTMLDivElement>(null);
   const glowRotateRef = useRef<SVGGElement>(null);
 
@@ -124,6 +130,8 @@ export function SpinWheel({
   useEffect(() => {
     if (slices.length < 2) return;
 
+    labelWidths.current = [];
+
     let frame = 0;
     let previousRotation = wheelRef.current?.rotation ?? 0;
     let previousIntoSlice = 0;
@@ -165,16 +173,20 @@ export function SpinWheel({
       labelRefs.current.forEach((label, index) => {
         if (!label) return;
 
-        const placement = radialLabel(
+        if (labelWidths.current[index] === undefined) {
+          labelWidths.current[index] = label.getComputedTextLength();
+        }
+
+        const placement = centredSliceLabel(
           LABEL_CENTER,
           FACE_RADIUS,
           rotation + (index + 0.5) * sliceAngle - 90,
           slices.length,
+          labelWidths.current[index],
         );
 
         label.setAttribute("x", String(placement.x));
         label.setAttribute("y", String(placement.y));
-        label.setAttribute("text-anchor", placement.anchor);
 
         // Upright labels have no rotation at all, and a stale transform would
         // otherwise survive a change in slice count.
@@ -319,6 +331,7 @@ export function SpinWheel({
             strokeLinejoin="round"
             strokeWidth="0.9"
             key={slice.id}
+            textAnchor="middle"
             ref={(element) => {
               labelRefs.current[index] = element;
             }}
