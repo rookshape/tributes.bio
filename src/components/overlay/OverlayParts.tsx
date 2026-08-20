@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type RefObject,
   type ReactNode,
 } from "react";
 import { SpinWheel, type SpinAnimation } from "../SpinWheel";
@@ -168,11 +169,13 @@ export function OverlayWheel({
   config,
   animation,
   onTick,
+  previewRotationRef,
 }: {
   appearance?: OverlayAppearance;
   config: SpinConfig;
   animation: SpinAnimation | null;
   onTick?: () => void;
+  previewRotationRef?: RefObject<number>;
 }) {
   const basic = appearance.panel === "basic";
   const chipFace = overlayChipFace(appearance);
@@ -201,6 +204,7 @@ export function OverlayWheel({
           animation={animation}
           name={config.name}
           onTick={onTick}
+          previewRotationRef={previewRotationRef}
           slices={config.slices}
           wheelGlow={config.wheelGlow}
           wheelHue={config.wheelHue}
@@ -311,6 +315,7 @@ export function OverlayWheel({
         // The group above draws it, together with the plate.
         frame={false}
         onTick={onTick}
+        previewRotationRef={previewRotationRef}
         slices={config.slices}
         wheelGlow={config.wheelGlow}
         wheelHue={config.wheelHue}

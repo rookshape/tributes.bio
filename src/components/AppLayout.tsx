@@ -74,7 +74,7 @@ export function AppLayout() {
                     className={cn(
                       "grid h-9 w-9 place-items-center rounded-control border",
                       onLanding
-                        ? "border-white/45 text-white hover:bg-white/15"
+                        ? "border-[#82aefc]/45 bg-white/65 text-content hover:bg-white"
                         : "icon-button",
                     )}
                     title="Admin"
@@ -114,7 +114,7 @@ export function AppLayout() {
                       className={cn(
                         "grid h-9 w-9 place-items-center overflow-hidden rounded-full border text-detail font-semibold",
                         onLanding
-                          ? "border-white/45 bg-white/15 text-white"
+                          ? "border-[#82aefc]/45 bg-white/70 text-content"
                           : "border-line bg-surface-raised text-content",
                       )}
                       type="button"
@@ -134,7 +134,7 @@ export function AppLayout() {
                   className={cn(
                     "rounded-control px-3 py-2 font-medium",
                     onLanding
-                      ? "text-white/85 hover:text-white"
+                      ? "text-content-muted hover:text-content"
                       : "text-content-muted hover:text-content",
                   )}
                   to="/login"
@@ -142,11 +142,12 @@ export function AppLayout() {
                   Log in
                 </Link>
                 <ButtonLink
+                  className="rounded-full px-5"
                   size="sm"
                   to="/signup"
                   variant={onLanding ? "primary" : "accent"}
                 >
-                  Create account
+                  Sign Up
                 </ButtonLink>
               </>
             )}

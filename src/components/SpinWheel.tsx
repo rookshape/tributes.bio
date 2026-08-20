@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, type RefObject } from "react";
 import { Wheel } from "spin-wheel/dist/spin-wheel-esm.js";
 import type { SpinSlice } from "../lib/types";
 import {
@@ -41,6 +41,8 @@ type SpinWheelProps = {
    */
   frame?: boolean;
   animation?: SpinAnimation | null;
+  /** Optional visual rotation used by inert previews such as the landing page. */
+  previewRotationRef?: RefObject<number>;
   onRest?: () => void;
   /** Fires as each slice boundary passes the pointer, for the tick sound. */
   onTick?: () => void;
@@ -63,6 +65,7 @@ export function SpinWheel({
   wheelTone = 20,
   wheelGlow = true,
   frame = true,
+  previewRotationRef,
   onRest,
   onTick,
 }: SpinWheelProps) {
@@ -74,14 +77,11 @@ export function SpinWheel({
   const onRestRef = useRef(onRest);
   const onTickRef = useRef(onTick);
   const labelRefs = useRef<(SVGTextElement | null)[]>([]);
-  /**
-   * Measured text lengths, kept because getComputedTextLength forces layout and
-   * this runs every frame. Cleared whenever the slices change, which is the
-   * only time the text can.
-   */
+  /** Measured once per label so the animation loop only moves existing text. */
   const labelWidths = useRef<number[]>([]);
   const pointerRef = useRef<HTMLDivElement>(null);
   const glowRotateRef = useRef<SVGGElement>(null);
+  const labelSize = labelFontSize(FACE_RADIUS, slices.length);
 
   onRestRef.current = onRest;
   onTickRef.current = onTick;
@@ -154,9 +154,22 @@ export function SpinWheel({
     let previousRotation = wheelRef.current?.rotation ?? 0;
     let previousIntoSlice = 0;
     const sliceAngle = 360 / slices.length;
+    const measurementContext = document.createElement("canvas").getContext("2d");
+    if (measurementContext) {
+      measurementContext.font = `700 ${labelSize}px Inter, ui-sans-serif, system-ui, sans-serif`;
+    }
 
     const followRotation = () => {
-      const rotation = wheelRef.current?.rotation ?? 0;
+      const wheel = wheelRef.current;
+
+      if (wheel && previewRotationRef && !animation) {
+        const distance = previewRotationRef.current - wheel.rotation;
+        wheel.rotation = Math.abs(distance) < 0.02
+          ? previewRotationRef.current
+          : wheel.rotation + distance * 0.075;
+      }
+
+      const rotation = wheel?.rotation ?? 0;
 
       // The pointer is a flapper resting on the rim: each slice boundary that
       // passes under it knocks it aside, and it springs back. Driving it from
@@ -191,8 +204,15 @@ export function SpinWheel({
       labelRefs.current.forEach((label, index) => {
         if (!label) return;
 
-        if (labelWidths.current[index] === undefined) {
-          labelWidths.current[index] = label.getComputedTextLength();
+        let textLength = labelWidths.current[index];
+        if (textLength === undefined) {
+          // Safari reports SVG text lengths smaller than the glyphs it later
+          // paints. Canvas metrics use the same font size without depending on
+          // SVG layout timing or renderer-specific text-anchor behaviour.
+          textLength =
+            measurementContext?.measureText(slices[index]?.label ?? "").width ??
+            labelSize * (slices[index]?.label.length ?? 1) * 0.58;
+          labelWidths.current[index] = textLength;
         }
 
         const placement = centredSliceLabel(
@@ -200,18 +220,35 @@ export function SpinWheel({
           FACE_RADIUS,
           rotation + (index + 0.5) * sliceAngle - 90,
           slices.length,
-          labelWidths.current[index],
+          textLength,
         );
+        const labelRotation = placement.rotation ?? 0;
+        const rotationRadians = (labelRotation * Math.PI) / 180;
+        const cosine = Math.cos(rotationRadians);
+        const sine = Math.sin(rotationRadians);
+        const startOffset = -textLength / 2;
+        const startX = placement.x + startOffset * cosine;
+        const startY = placement.y + startOffset * sine;
+        const matrixValue = (value: number) =>
+          Math.abs(value) < 0.000001 ? "0" : value.toFixed(6);
 
-        // Position and rotation in one attribute rather than x/y plus a
-        // rotation about that same point. Two attributes that have to agree,
-        // rewritten every frame, is a way for a browser to read one of them a
-        // frame late; a single transform cannot be half-applied.
+        // Position, rotation, and text centring all live in one matrix.
+        // Safari can ignore text-anchor while an SVG transform is being
+        // rewritten every frame, which made it start the word at the intended
+        // midpoint and grow outward over the rim. It also applies chained SVG
+        // transforms inconsistently during rapid updates, so the local
+        // half-width shift is resolved into the matrix here rather than left
+        // for the renderer to compose.
         label.setAttribute(
           "transform",
-          placement.rotation === null
-            ? `translate(${placement.x} ${placement.y})`
-            : `translate(${placement.x} ${placement.y}) rotate(${placement.rotation})`,
+          `matrix(${[
+            cosine,
+            sine,
+            -sine,
+            cosine,
+            startX,
+            startY,
+          ].map(matrixValue).join(",")})`,
         );
       });
 
@@ -220,7 +257,7 @@ export function SpinWheel({
 
     frame = window.requestAnimationFrame(followRotation);
     return () => window.cancelAnimationFrame(frame);
-  }, [slices]);
+  }, [animation, labelSize, previewRotationRef, slices]);
 
   useEffect(() => {
     const wheel = wheelRef.current;
@@ -236,7 +273,6 @@ export function SpinWheel({
   }, [animation]);
 
   const tint = slices[0] ? tintFromSlice(slices[0].color) : "#ffffff";
-  const labelSize = labelFontSize(FACE_RADIUS, slices.length);
   // Pale on purpose. Set into the bezel rather than printed on it, so it stays
   // a shade of the wheel's own hue and never competes with the slice labels.
   const rimInk = wheelRimInk({ hue: wheelHue, tone: wheelTone });
@@ -347,6 +383,7 @@ export function SpinWheel({
           <text
             dy={LABEL_BASELINE_SHIFT}
             fill={labelColorForSlice(slice.color)}
+            fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
             fontSize={labelSize}
             fontWeight="700"
             paintOrder="stroke"
@@ -354,7 +391,7 @@ export function SpinWheel({
             strokeLinejoin="round"
             strokeWidth="0.9"
             key={slice.id}
-            textAnchor="middle"
+            textAnchor="start"
             ref={(element) => {
               labelRefs.current[index] = element;
             }}
