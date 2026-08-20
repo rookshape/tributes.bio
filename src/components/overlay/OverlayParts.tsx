@@ -186,9 +186,11 @@ function useCountUp(target: number, durationMs = COUNT_UP_MS) {
 /** Uniform border left around every screen. */
 const BORDER = 12;
 /** Visible height of an extension above or below the body. */
-const BUMP = 38;
+const BUMP = 42;
 /** How far an extension runs on under the body, hiding its flared base. */
 const TUCK = 10;
+/** Both extensions carry the same screen, so they are the same size. */
+const EXTENSION_WIDTH = 134;
 
 /**
  * The cabinet is one silhouette, not a body with things stuck to it.
@@ -231,11 +233,11 @@ function Cabinet({
         style={{
           ...fill,
           height: BUMP + TUCK,
-          width: 104,
+          width: EXTENSION_WIDTH,
           left: "50%",
-          marginLeft: -52,
+          marginLeft: -EXTENSION_WIDTH / 2,
           borderRadius: "15px 15px 0 0",
-          transform: "perspective(22px) rotateX(4deg)",
+          transform: "perspective(30px) rotateX(3deg)",
           transformOrigin: "bottom",
         }}
       >
@@ -246,11 +248,11 @@ function Cabinet({
         style={{
           ...fill,
           height: BUMP + TUCK,
-          width: 164,
+          width: EXTENSION_WIDTH,
           left: "50%",
-          marginLeft: -82,
+          marginLeft: -EXTENSION_WIDTH / 2,
           borderRadius: "0 0 15px 15px",
-          transform: "perspective(22px) rotateX(-4deg)",
+          transform: "perspective(30px) rotateX(-3deg)",
           transformOrigin: "top",
         }}
       >
@@ -417,14 +419,16 @@ export function OverlayTotal({
             className="absolute grid place-items-center"
             face={face}
             ink={screenInk}
+            // Stops a full border short of the body rather than running under
+            // it, so the whole screen is visible instead of half of one.
             shape={{
               inset: BORDER,
-              top: 0,
-              borderRadius: `0 0 ${BORDER - 5}px ${BORDER - 5}px`,
+              top: TUCK + BORDER,
+              borderRadius: 8,
             }}
           >
             <span
-              className="whitespace-nowrap text-xs font-black uppercase tracking-[0.08em] lg:text-sm"
+              className="whitespace-nowrap text-[0.68rem] font-black uppercase tracking-[0.06em] leading-none"
               // Keyed on the wording so a change remounts the span and replays
               // the slide, rather than swapping the text in place.
               key={label}
@@ -446,8 +450,8 @@ export function OverlayTotal({
             ink={screenInk}
             shape={{
               inset: BORDER,
-              bottom: 0,
-              borderRadius: `${BORDER - 5}px ${BORDER - 5}px 0 0`,
+              bottom: TUCK + BORDER,
+              borderRadius: 8,
             }}
             // Nothing armed: the slot runs a glow across itself rather than
             // showing a placeholder figure, so it reads as waiting.
@@ -455,7 +459,7 @@ export function OverlayTotal({
           >
             {armed ? (
               <span
-                className="text-base font-black leading-none lg:text-lg"
+                className="text-sm font-black leading-none"
                 style={{ color: screenInk }}
               >
                 {`${multiplier}×`}
