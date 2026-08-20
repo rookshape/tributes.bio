@@ -883,9 +883,13 @@ export function OverlayGoalBar({
         className="h-full rounded-full transition-[width] duration-slow ease-standard"
         style={{
           width: `${progress * 100}%`,
-          background: appearance.goalRainbow
+          // Longhands rather than the shorthand: mixing `background` with
+          // backgroundSize and backgroundRepeat is a React warning, and the
+          // gradient needs both of those.
+          backgroundColor: appearance.goalRainbow ? undefined : accent,
+          backgroundImage: appearance.goalRainbow
             ? rainbowFill(appearance.vivid)
-            : accent,
+            : undefined,
           // The gradient belongs to the track, not to the fill. Left alone it
           // scales to whatever is filled, squeezing the whole rainbow into a
           // half-full bar — so the colour under the marker was never the colour

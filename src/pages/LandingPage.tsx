@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ButtonLink } from "../components/ui";
+import { BioShowcase, StreamShowcase } from "../components/landing/ProductShowcase";
 import { SPIN_FEE_RATE, TIP_FEE_RATE, feePercentLabel } from "../lib/money";
 
 export function LandingPage() {
@@ -60,40 +61,25 @@ export function LandingPage() {
             </p>
           </div>
           <div className="min-w-0 lg:order-2">
-            {/* The real page, captured from the product rather than mocked up,
-                which is also what a payment processor reviewing this site is
-                trying to establish. */}
-            <img
-              alt="A creator page with links and a form for sending a tribute"
-              className="mx-auto w-full max-w-[300px] rounded-panel shadow-[0_18px_44px_rgba(15,23,32,0.18)]"
-              height={1456}
-              src="/shot-bio.png"
-              width={700}
-            />
+            <BioShowcase />
           </div>
         </div>
 
-        <div className="grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:gap-14">
-          <div className="min-w-0 lg:order-2">
+        {/* Full width rather than half of a two-column row: these are four
+            separate OBS sources a streamer arranges across a scene, and in a
+            narrow column they stack into a tower that looks nothing like how
+            they are used. */}
+        <div className="py-12 sm:py-16">
+          <div className="max-w-xl">
             <h2 className="text-headline font-semibold text-content">On your stream</h2>
-            <p className="mt-3 max-w-md text-lead text-content-muted">
+            <p className="mt-3 text-lead text-content-muted">
               Turn sending into a live game. A viewer pays to spin your wheel,
               you spin it on stream, and they send whatever it lands on — with
               the most they could pay agreed before they start.
             </p>
           </div>
-          <div className="min-w-0 lg:order-1">
-            {/* Transparent, and shown on a dark panel, because that is how it
-                arrives in OBS — over a scene, not inside a box. */}
-            <div className="rounded-panel bg-[#1b2027] p-5 sm:p-7">
-              <img
-                alt="A spin wheel, a running total, and a goal bar over a stream"
-                className="w-full"
-                height={964}
-                src="/shot-stream.png"
-                width={1400}
-              />
-            </div>
+          <div className="mt-10">
+            <StreamShowcase />
           </div>
         </div>
       </section>
