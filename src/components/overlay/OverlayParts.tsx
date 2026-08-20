@@ -111,7 +111,21 @@ const WHEEL_WORDMARK_MS = 3500;
  * no amount of reshaping it fixed that.
  */
 const PLATE = {
-  width: 176,
+  width: 200,
+  /** How far it hangs below the wheel's frame. */
+  drop: 56,
+  /**
+   * Border either side of the screen, and below it.
+   *
+   * Bigger than the number that draws the same border elsewhere, and unequal
+   * with each other, because the plate is tipped: the perspective foreshortens
+   * an inset by how deep into the tip it sits, and it foreshortens vertically
+   * harder than horizontally. Measured against the wheel's own frame — matching
+   * the numbers rather than the rendered widths put an eight-pixel border below
+   * a twelve-pixel one and called them the same.
+   */
+  sideBorder: 15,
+  bottomBorder: 22,
   /**
    * How far it runs up behind the wheel.
    *
@@ -120,13 +134,13 @@ const PLATE = {
    * as the wheel gets smaller, so this clears the smallest the wheel is drawn
    * at — the editor's preview — rather than the size it happens to be here.
    */
-  tuck: 30,
+  tuck: 36,
   /**
    * Deeper than the default: the taper a perspective produces grows with the
    * element's height, and this tab is buried-part-plus-visible-part tall. At
    * the standard 13 it closed into a wedge.
    */
-  tip: { perspective: 22, degrees: 6 },
+  tip: { perspective: 26, degrees: 6 },
 };
 
 export function OverlayWheel({
@@ -160,16 +174,12 @@ export function OverlayWheel({
 
   const plate = showWordmark ? "tributes.bio" : config.name;
 
-  return (
-    <div className="relative w-full max-w-[520px]">
-      {/* Over the plate, so the disc paints out the plate's flat top and the
-          silhouette closes into one shape. */}
-      <div className="relative z-10">
+  if (basic) {
+    return (
+      <div className="w-full max-w-[520px]">
         <SpinWheel
           animation={animation}
-          // Set into the rim only in the plain style. The cabinet style hangs
-          // it off the plate below instead, where it has room to change.
-          name={basic ? config.name : undefined}
+          name={config.name}
           onTick={onTick}
           slices={config.slices}
           wheelGlow={config.wheelGlow}
@@ -177,22 +187,56 @@ export function OverlayWheel({
           wheelTone={config.wheelTone}
         />
       </div>
+    );
+  }
 
-      {basic ? null : (
+  return (
+    <div
+      className="relative w-full max-w-[520px]"
+      // Room for the part of the plate that hangs below the wheel.
+      style={{ paddingBottom: PLATE.drop }}
+    >
+      {/*
+        The frame and the plate, drawn as one thing.
+
+        This is the whole trick, and getting it wrong is what made every earlier
+        version read as two pieces: the circle used to be its own element with
+        its own shadow, so it cast that shadow *onto* the plate attached to it.
+        No shape or colour work fixes a shadow falling across the join. Here the
+        circle and the plate are siblings with no shadows of their own, and the
+        group throws one — which follows the union of the two, the way a single
+        object's would.
+
+        Square, and pinned to the top, so it lines up with the wheel's own box
+        rather than with the taller box the plate's room makes below it.
+      */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 aspect-square"
+        style={{ filter: "drop-shadow(0 6px 16px rgba(15,23,32,0.16))" }}
+      >
+        <div className="absolute inset-[2%] rounded-full bg-white" />
         <div
-          className="relative z-0 mx-auto"
+          className="absolute"
           style={{
-            width: PLATE.width,
-            height: BUMP + TUCK + PLATE.tuck,
+            // Hung off the frame's own edge, and run back up behind it far
+            // enough that the circle covers the plate's flat top. A straight
+            // edge meeting a circle only closes once it reaches past where the
+            // arc has climbed level with its corners, and that climb grows as
+            // the wheel gets smaller — so this clears the smallest the wheel is
+            // ever drawn at rather than the size it happens to be here.
+            top: "98%",
             marginTop: -PLATE.tuck,
-            filter: "drop-shadow(0 6px 14px rgba(15,23,32,0.14))",
+            left: "50%",
+            marginLeft: -PLATE.width / 2,
+            width: PLATE.width,
+            height: PLATE.tuck + PLATE.drop,
           }}
         >
           <Tab
             edge="bottom"
-            // The wheel's frame, not the themed panel: the plate is part of
-            // that frame rather than something resting against it.
-            edgeColor="rgba(255,255,255,0.9)"
+            // No ring: an edge drawn inside the plate would be a line the
+            // circle it grows out of does not have.
+            edgeColor="transparent"
             fill="#ffffff"
             style={{ left: 0, height: "100%" }}
             tip={PLATE.tip}
@@ -205,14 +249,15 @@ export function OverlayWheel({
               // changes, so what is on show is the same screen the counter and
               // the queue carry, down to the border either side of it.
               shape={{
-                inset: BORDER,
+                left: PLATE.sideBorder,
+                right: PLATE.sideBorder,
                 top: PLATE.tuck + TUCK,
-                bottom: FREE_EDGE_INSET,
+                bottom: PLATE.bottomBorder,
                 borderRadius: 7,
               }}
             >
               <span
-                className="w-full truncate text-center text-[1.05rem] font-black uppercase leading-none tracking-[0.04em]"
+                className="w-full truncate text-center text-[0.95rem] font-black uppercase leading-none tracking-[0.02em]"
                 // Keyed on the wording so a change remounts the span and
                 // replays the slide rather than swapping the text in place.
                 key={plate}
@@ -226,7 +271,18 @@ export function OverlayWheel({
             </Screen>
           </Tab>
         </div>
-      )}
+      </div>
+
+      <SpinWheel
+        animation={animation}
+        // The group above draws it, together with the plate.
+        frame={false}
+        onTick={onTick}
+        slices={config.slices}
+        wheelGlow={config.wheelGlow}
+        wheelHue={config.wheelHue}
+        wheelTone={config.wheelTone}
+      />
     </div>
   );
 }

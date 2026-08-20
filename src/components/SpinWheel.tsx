@@ -26,6 +26,16 @@ type SpinWheelProps = {
   wheelTone?: number;
   /** Soft animated halo on the lighter alternating slices. */
   wheelGlow?: boolean;
+  /**
+   * Draw the white frame.
+   *
+   * The cabinet overlay draws its own, together with the name plate and inside
+   * one group, so that the two share a silhouette and a single shadow. Drawn
+   * here the circle is a shape of its own, and its shadow falls across whatever
+   * is attached to it — which is what made the plate read as a separate piece
+   * resting against the wheel rather than part of it.
+   */
+  frame?: boolean;
   animation?: SpinAnimation | null;
   onRest?: () => void;
   /** Fires as each slice boundary passes the pointer, for the tick sound. */
@@ -48,6 +58,7 @@ export function SpinWheel({
   wheelHue = 210,
   wheelTone = 20,
   wheelGlow = true,
+  frame = true,
   onRest,
   onTick,
 }: SpinWheelProps) {
@@ -197,11 +208,12 @@ export function SpinWheel({
       {/* Glass disc framing the wheel, kept narrow so the pointer clears it. */}
       {/* White, and opaque. At the old alpha the ring took its colour from
           whatever was behind it, so over a dark scene the wheel's "white" frame
-          rendered grey. Opaque also lets the name plate run up behind it and
-          disappear: two translucent whites laid over each other compound into a
-          lighter patch, which draws exactly the seam the plate is meant not to
-          have. */}
-      <div className="absolute inset-[2%] rounded-full bg-white shadow-[0_6px_18px_rgba(15,23,32,0.12)]" />
+          rendered grey. Opaque also lets anything attached to it run up behind
+          and disappear: two translucent whites laid over each other compound
+          into a lighter patch, which draws a seam of its own. */}
+      {frame ? (
+        <div className="absolute inset-[2%] rounded-full bg-white shadow-[0_6px_18px_rgba(15,23,32,0.12)]" />
+      ) : null}
       {/* Sized in percentages rather than pixels so the tip reaches the same
           way into the slice at any wheel size. The wheel starts 5% in, so 11%
           leaves the tip sitting just over the colour. */}
