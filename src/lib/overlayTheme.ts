@@ -212,8 +212,8 @@ export function overlayScreen(appearance: OverlayAppearance) {
  */
 export function overlayChipFace(appearance: OverlayAppearance) {
   const hue = normalizeOverlayHue(appearance.hue);
-  const lightness = 0.78;
-  return oklchToHex(lightness, maxChroma(lightness, hue) * 0.9, hue);
+  const lightness = 0.855;
+  return oklchToHex(lightness, maxChroma(lightness, hue) * 0.86, hue);
 }
 
 /**

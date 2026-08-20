@@ -111,6 +111,7 @@ export function OverlayWheel({
         name={config.name}
         onTick={onTick}
         slices={config.slices}
+        wheelGlow={config.wheelGlow}
         wheelHue={config.wheelHue}
         wheelTone={config.wheelTone}
       />
@@ -435,7 +436,7 @@ export function OverlayTotal({
             }}
           >
             <span
-              className="whitespace-nowrap text-[0.82rem] font-black uppercase tracking-[0.05em] leading-none"
+              className="whitespace-nowrap text-[1rem] font-black uppercase tracking-[0.02em] leading-none"
               // Keyed on the wording so a change remounts the span and replays
               // the slide, rather than swapping the text in place.
               key={label}
@@ -465,7 +466,7 @@ export function OverlayTotal({
           >
             {armed ? (
               <span
-                className="text-base font-black leading-none"
+                className="text-xl font-black leading-none"
                 style={{ color: chipInk }}
               >
                 {`${multiplier}×`}
