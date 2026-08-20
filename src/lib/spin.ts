@@ -11,6 +11,7 @@ import {
   type QueryDocumentSnapshot,
   type Unsubscribe,
 } from "firebase/firestore";
+import { spinFeeCents } from "./money";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "./firebase";
 import {
@@ -322,7 +323,7 @@ export function maxSpinAmountCents(config: SpinConfig) {
 }
 
 export function totalWithServiceFee(amountCents: number) {
-  return amountCents + Math.round(amountCents * 0.25);
+  return amountCents + spinFeeCents(amountCents);
 }
 
 function mapSpinConfig(

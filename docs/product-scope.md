@@ -41,7 +41,7 @@ Personal accounts are optional for visitors. A visitor does not need an account 
 - Spin payments start as fixed-price one-time payments.
 - Stripe Connect is the payout model for creators.
 - Lurk LLC owns the platform Stripe account.
-- Platform revenue comes from a 25% upcharge paid by the person sending the tip.
+- Platform revenue comes from a payer-side upcharge: 25% on bio-page tributes, 20% on live spins. Spins take less because the creator is actively working for them on stream.
 - Visitors should be able to pay without signing up.
 
 Open payment decisions:

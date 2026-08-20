@@ -43,7 +43,7 @@ At the end of this roadmap:
 - Spin is a live-stream product. Its public entry point appears only while a creator is live.
 - Viewers enter the queue from the public page; the streamer triggers queued spins from the dashboard.
 - Creators can receive one-time tips without requiring the payer to create an account.
-- The current 25% payer-side service fee remains the intended revenue model, subject to final processor approval and disclosure review.
+- The payer-side service fee remains the intended revenue model — 25% on tributes, 20% on spins — subject to final processor approval and disclosure review.
 - Streamers need multiple named and reusable wheels, not one global wheel configuration.
 - The Tributes brand remains visible in the OBS experience.
 - Automatic variable charging does not launch without explicit processor and legal approval.
@@ -248,7 +248,7 @@ Goal: resolve the business and trust requirements that must be settled before re
 Processor and product-policy gate:
 
 - Submit the full Tributes business model and both payment flows to Stripe for explicit review
-- Describe creator tips, connected accounts, the 25% payer-side fee, live queues, randomized wheel presentation, maximum authorization, partial capture, and target creator categories accurately
+- Describe creator tips, connected accounts, the payer-side fee (25% tributes, 20% spins), live queues, randomized wheel presentation, maximum authorization, partial capture, and target creator categories accurately
 - Obtain written approval before enabling a result-dependent or variable-capture Spin mode in production
 - Decide the production Spin payment mode from the approval outcome
 - Maintain a processor-approved fallback that uses a known fixed payment and treats the wheel as stream presentation only

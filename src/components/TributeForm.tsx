@@ -1,5 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
+import { tipFeeCents } from "../lib/money";
 import { createTributeCheckout } from "../lib/payments";
 import { derivePageTheme, glassPanelSurface, glassSurface } from "../lib/pageThemes";
 import type { CreatorProfile } from "../lib/types";
@@ -30,7 +31,7 @@ export function TributeForm({ profile, result }: TributeFormProps) {
     return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
   }, [amount]);
   const validAmount = amountCents >= 100 && amountCents <= 50000;
-  const feeCents = Math.round(amountCents * 0.25);
+  const feeCents = tipFeeCents(amountCents);
   const totalCents = amountCents + feeCents;
   const theme = derivePageTheme(profile.appearance);
 

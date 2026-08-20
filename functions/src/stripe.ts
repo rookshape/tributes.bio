@@ -3,6 +3,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import Stripe from "stripe";
+import { spinFeeCents, spinTotalWithFee, tipFeeCents } from "./fees.js";
 import { spinSessionIsLive } from "./spin-session.js";
 import { maxChargeCents, spinsPerPurchase } from "./spin-tab.js";
 
@@ -119,10 +120,6 @@ function connectStatus(account: Stripe.Account): ConnectStatus {
   }
 
   return "needs_action";
-}
-
-function totalWithServiceFee(amountCents: number) {
-  return amountCents + Math.round(amountCents * 0.25);
 }
 
 async function syncConnectAccount(
@@ -370,7 +367,7 @@ export const createTributeCheckoutSession = onCall(
       );
     }
 
-    const platformFeeCents = Math.round(amountCents * 0.25);
+    const platformFeeCents = tipFeeCents(amountCents);
     const totalCents = amountCents + platformFeeCents;
     const anonymous = data.anonymous === true;
     const senderName = anonymous ? "" : optionalText(data.senderName, 80);
@@ -554,7 +551,7 @@ export const createSpinCheckoutSession = onCall(
       );
     }
 
-    const authorizedTotalCents = totalWithServiceFee(maximumCreatorAmountCents);
+    const authorizedTotalCents = spinTotalWithFee(maximumCreatorAmountCents);
     const anonymous = data.anonymous === true;
     const senderName = anonymous ? "" : optionalText(data.senderName, 40);
     const payerEmail =
@@ -913,7 +910,7 @@ export async function captureSpinAuthorization(
     throw new HttpsError("failed-precondition", "Spin authorization not found.");
   }
 
-  const platformFeeCents = Math.round(creatorAmountCents * 0.25);
+  const platformFeeCents = spinFeeCents(creatorAmountCents);
   const totalCents = creatorAmountCents + platformFeeCents;
 
   if (

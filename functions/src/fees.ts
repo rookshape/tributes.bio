@@ -1,19 +1,4 @@
 /**
- * Spin amounts are nearly always whole dollars, and "$45.00" on a stream
- * overlay reads as clutter — so cents only appear when there are cents.
- */
-export function formatMoney(cents: number) {
-  const whole = cents % 100 === 0;
-
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: whole ? 0 : 2,
-  }).format(cents / 100);
-}
-
-/**
  * What the platform takes, added on top of what the creator receives.
  *
  * Two rates, because the two products are not the same sale. A tribute is a
@@ -22,10 +7,15 @@ export function formatMoney(cents: number) {
  * they built — so the platform takes less of it.
  *
  * Both are payer-side: the creator receives the amount shown, and the fee is
- * charged on top of it rather than deducted from it.
+ * charged on top of it rather than deducted from it. Stripe sees the fee as the
+ * application fee on a destination charge, so the split is enforced by the
+ * charge itself rather than by a later transfer.
  *
- * Mirrored in functions/src/fees.ts, which is what actually charges.
+ * Mirrored in src/lib/money.ts, which is what quotes these to a payer before
+ * they agree to them. The two must not drift: a viewer who is shown one number
+ * and charged another is a dispute.
  */
+
 export const TIP_FEE_RATE = 0.25;
 export const SPIN_FEE_RATE = 0.2;
 
@@ -37,7 +27,7 @@ export function spinFeeCents(creatorAmountCents: number) {
   return Math.round(creatorAmountCents * SPIN_FEE_RATE);
 }
 
-/** How the fee reads to a payer, for copy that quotes it. */
-export function feePercentLabel(rate: number) {
-  return `${Math.round(rate * 100)}%`;
+/** What a spin run costs the payer in total, fee included. */
+export function spinTotalWithFee(creatorAmountCents: number) {
+  return creatorAmountCents + spinFeeCents(creatorAmountCents);
 }

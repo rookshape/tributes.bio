@@ -168,7 +168,7 @@ Deliverables:
 - Preset and custom tip amounts
 - Guest checkout without a Tributes account
 - Optional sender name, message, and anonymous mode
-- Payer-side 25% upcharge calculation
+- Payer-side upcharge calculation (25% tributes, 20% spins)
 - Clear fee and total display before payment
 - PaymentIntent metadata for creator and tip reconciliation
 - Webhook handler
@@ -414,7 +414,7 @@ Exit criteria:
 - Whether the counter counts paid amount, wheel result amount, or both.
 - Whether bonus spins are free, paid, or creator-configurable.
 - Whether viewer names are required, optional, or anonymous by default.
-- Whether the 25% upcharge is shown as a platform fee, support fee, or service fee.
+- Whether the payer-side upcharge is shown as a platform fee, support fee, or service fee.
 - Whether creators can hide the Tributes overlay mark on paid plans.
 - Whether adult-adjacent creators are allowed at launch, waitlisted, or restricted until processor approval.
 
