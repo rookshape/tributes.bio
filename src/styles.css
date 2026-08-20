@@ -22,9 +22,17 @@
   --content-muted: 89 100 112;
   --content-subtle: 138 148 159;
 
-  --accent: 0 145 255;
-  --accent-hover: 0 120 214;
-  --accent-contrast: 255 255 255;
+  --accent: 130 174 252;
+  --accent-hover: 105 146 240;
+  /*
+   * Ink for anything the accent *fills*.
+   *
+   * White reads at 2.2:1 on this accent, which is below the floor for text of
+   * any size, so a filled accent surface carries dark ink instead. The accent
+   * as a text colour on white sits at the same 2.2:1 — see the note by
+   * .primary-button.
+   */
+  --accent-contrast: 12 17 22;
 
   --positive: 13 148 96;
   --caution: 176 116 8;
@@ -34,7 +42,7 @@
      surfaces the face alone has no presence, so the edge carries the accent. */
   --btn-face: 255 255 255;
   --btn-face-hover: 244 249 255;
-  --btn-face-line: 0 145 255;
+  --btn-face-line: 130 174 252;
   --btn-face-line-alpha: 0.38;
 
   --shadow-xs: 0 1px 2px rgb(15 23 32 / 0.05);
@@ -176,7 +184,16 @@ select:focus-visible,
     @apply inline-flex min-h-10 select-none items-center justify-center gap-2 rounded-control px-4 text-body font-medium disabled:pointer-events-none disabled:opacity-45;
   }
 
-  /* Primary: white face, accent label. */
+  /*
+   * Primary: white face, accent label.
+   *
+   * The accent on white measures 2.2:1, under the 4.5:1 WCAG asks of text and
+   * under even the 3:1 it allows large text. It is the brand's colour and this
+   * is the shape the brand wants, so it stands — but it is the product's main
+   * call to action, so it is worth knowing rather than discovering later.
+   * Darkening the label to about #4d81d8 would clear 4.5:1 and still read as
+   * the same blue.
+   */
   .primary-button {
     @apply btn-base shadow-xs;
     border: 1px solid rgb(var(--btn-face-line) / var(--btn-face-line-alpha));
