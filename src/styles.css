@@ -355,24 +355,14 @@ select:focus-visible,
    * rolls into place instead of swapping. The window clips with a soft top and
    * bottom edge the way a physical reel disappears into the housing.
    */
+  /* No soft mask on the ends. Fading each digit out at its top and bottom
+     read as depth when the screen behind it was dark; on a light screen it
+     just washes the face colour into the number. Overflow already clips the
+     strip, so the mask was only ever decoration. */
   .reel-window {
     @apply relative inline-block overflow-hidden align-bottom;
     height: 1em;
     width: 0.62em;
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      transparent 0%,
-      #000 22%,
-      #000 78%,
-      transparent 100%
-    );
-    mask-image: linear-gradient(
-      to bottom,
-      transparent 0%,
-      #000 22%,
-      #000 78%,
-      transparent 100%
-    );
   }
 
   .reel-strip {
