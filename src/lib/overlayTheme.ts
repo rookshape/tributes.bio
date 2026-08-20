@@ -244,7 +244,7 @@ export function overlayDisplayFace(appearance: OverlayAppearance) {
  */
 export function overlayScreenInk(appearance: OverlayAppearance) {
   const hue = normalizeOverlayHue(appearance.hue);
-  const lightness = 0.6;
+  const lightness = 0.66;
   return oklchToHex(
     lightness,
     Math.min(maxChroma(lightness, hue), appearance.vivid ? 0.28 : 0.2),
