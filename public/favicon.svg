@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Tributes</title>
+  <!-- The wheel reduced to what survives at sixteen pixels, where the whole
+       mark is sixteen dots across and every feature has to be worth one of
+       them. Six wedges rather than twelve; two blues chosen for contrast with
+       each other rather than for matching the product's palette; and no white
+       rim, because at that size the rim and its outline both land inside a
+       single pixel and turn the edge to mush. What is left — an alternating
+       disc, a hub, and a pointer — is still unmistakably a wheel. -->
+  <clipPath id="disc">
+    <circle cx="32.0" cy="32.0" r="31.0"/>
+  </clipPath>
+  <g clip-path="url(#disc)">
+  <path d="M 32.0 32.0 L 32.00 1.00 A 31.0 31.0 0 0 1 58.85 16.50 Z" fill="#0077e0"/>
+  <path d="M 32.0 32.0 L 58.85 16.50 A 31.0 31.0 0 0 1 58.85 47.50 Z" fill="#7cc6ff"/>
+  <path d="M 32.0 32.0 L 58.85 47.50 A 31.0 31.0 0 0 1 32.00 63.00 Z" fill="#0077e0"/>
+  <path d="M 32.0 32.0 L 32.00 63.00 A 31.0 31.0 0 0 1 5.15 47.50 Z" fill="#7cc6ff"/>
+  <path d="M 32.0 32.0 L 5.15 47.50 A 31.0 31.0 0 0 1 5.15 16.50 Z" fill="#0077e0"/>
+  <path d="M 32.0 32.0 L 5.15 16.50 A 31.0 31.0 0 0 1 32.00 1.00 Z" fill="#7cc6ff"/>
+  </g>
+  <circle cx="32.0" cy="32.0" r="7.5" fill="#ffffff"/>
+  <!-- The pointer is what stops it reading as a pie chart, so it is drawn
+       oversized and in solid white rather than outlined. -->
+  <path d="M 32 21 L 22 1 L 42 1 Z" fill="#ffffff"/>
+</svg>

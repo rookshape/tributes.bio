@@ -12,6 +12,7 @@ import { OnboardingPage } from "./pages/OnboardingPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
 import { PublicProfilePage } from "./pages/PublicProfilePage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { PreviewPage } from "./pages/PreviewPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { RefundsPage } from "./pages/RefundsPage";
 import { TermsPage } from "./pages/TermsPage";
@@ -108,6 +109,9 @@ function AppRoutes() {
           </Route>
         </Route>
         {/* Each overlay part is its own URL so OBS can take three sources. */}
+        {/* Staging for product shots. Signed-in creators only, and not linked
+            from anywhere — it is a tool, not a page. */}
+        <Route element={<PreviewPage />} path="preview" />
         <Route element={<SpinOverlayPage />} path="overlay/:creatorId/spin" />
         <Route element={<SpinOverlayPage />} path="overlay/:creatorId/spin/:part" />
         <Route element={<PublicSpinPage />} path=":username/spin" />

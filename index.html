@@ -11,7 +11,13 @@
       content="Tributes gives creators one page for links, one-time tips, and paid live spins on stream."
     />
 
-    <!-- Favicon and app icon go here once the real logo files land. -->
+    <!-- SVG first for browsers that take it, .ico behind for those that do
+         not. The touch icon is separate because a home screen composites it on
+         an opaque tile, so it carries its own background rather than going
+         black where this one is transparent. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Tributes" />
@@ -22,6 +28,12 @@
     />
     <meta property="og:url" content="https://tributes.bio" />
     <meta property="og:image" content="https://tributes.bio/social-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Tributes — a spin wheel, running total, and goal bar over a stream"
+    />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>

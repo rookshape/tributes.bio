@@ -50,26 +50,50 @@ export function LandingPage() {
         />
       </section>
 
-      {/* No product shots yet, so the sections carry their own weight rather
-          than framing an empty box where a screenshot will eventually go — a
-          placeholder reads as unfinished, and this page is what a payment
-          processor reviews to decide what we sell. */}
       <section className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-        <div className="grid gap-10 py-14 sm:py-20 lg:grid-cols-2 lg:gap-16">
-          <div className="min-w-0">
+        <div className="grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:gap-14">
+          <div className="min-w-0 lg:order-1">
             <h2 className="text-headline font-semibold text-content">In your bio</h2>
-            <p className="mt-3 text-lead text-content-muted">
+            <p className="mt-3 max-w-md text-lead text-content-muted">
               One page for your links and your tributes. Share a single address,
               and let people support you from the same place they find you.
             </p>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 lg:order-2">
+            {/* The real page, captured from the product rather than mocked up,
+                which is also what a payment processor reviewing this site is
+                trying to establish. */}
+            <img
+              alt="A creator page with links and a form for sending a tribute"
+              className="mx-auto w-full max-w-[300px] rounded-panel shadow-[0_18px_44px_rgba(15,23,32,0.18)]"
+              height={1456}
+              src="/shot-bio.png"
+              width={700}
+            />
+          </div>
+        </div>
+
+        <div className="grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:gap-14">
+          <div className="min-w-0 lg:order-2">
             <h2 className="text-headline font-semibold text-content">On your stream</h2>
-            <p className="mt-3 text-lead text-content-muted">
-              Turn sending into a live game. A viewer pays to spin your wheel, you
-              spin it on stream, and they send whatever it lands on — with the
-              most they could pay agreed before they start.
+            <p className="mt-3 max-w-md text-lead text-content-muted">
+              Turn sending into a live game. A viewer pays to spin your wheel,
+              you spin it on stream, and they send whatever it lands on — with
+              the most they could pay agreed before they start.
             </p>
+          </div>
+          <div className="min-w-0 lg:order-1">
+            {/* Transparent, and shown on a dark panel, because that is how it
+                arrives in OBS — over a scene, not inside a box. */}
+            <div className="rounded-panel bg-[#1b2027] p-5 sm:p-7">
+              <img
+                alt="A spin wheel, a running total, and a goal bar over a stream"
+                className="w-full"
+                height={964}
+                src="/shot-stream.png"
+                width={1400}
+              />
+            </div>
           </div>
         </div>
       </section>
